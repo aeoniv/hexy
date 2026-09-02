@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+	<application>
+		<!-- See ixmesh's manifest: this meta-data is the only thing that makes
+		     Engine.has_singleton("IxMnn") true. -->
+		<meta-data
+			android:name="org.godotengine.plugin.v2.IxMnn"
+			android:value="com.ix64.hexy.mnn.IxMnn" />
+	</application>
+</manifest>

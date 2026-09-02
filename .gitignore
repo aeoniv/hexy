@@ -1,0 +1,51 @@
+# Godot
+.godot/
+*.tmp
+export_presets.cfg
+android/
+*.apk
+
+# Android plugin build state and drop-ins (see android_plugin/README.md).
+# godot-lib.template_release.aar is ~100 MB of engine, mnn-jni/ is ~16 MB of
+# Alibaba's .so files — both are fetched per machine, never vendored.
+android_plugin/.gradle/
+android_plugin/.kotlin/
+android_plugin/build/
+android_plugin/*/build/
+android_plugin/*/.cxx/
+android_plugin/local.properties
+android_plugin/libs/*.aar
+android_plugin/libs/mnn-jni/
+android_plugin/hs_err_pid*.log
+
+# Plugin AARs staged for export — build output, same policy as ix64-avatar
+addons/ixmesh/bin/*.aar
+addons/ixmesh/bin/**/*.aar
+addons/ixmnn/bin/*.aar
+addons/ixmnn/bin/**/*.aar
+addons/ixloc/bin/*.aar
+addons/ixloc/bin/**/*.aar
+
+# ixbody: the aar, and the MediaPipe model the build fetches into it.
+addons/ixbody/bin/*.aar
+addons/ixbody/bin/**/*.aar
+android_plugin/ixbody/src/main/assets/
+tools/*.task
+
+# ixvoice: the aar, build output like its four siblings.
+addons/ixvoice/bin/*.aar
+addons/ixvoice/bin/**/*.aar
+
+# The knowledge graph is DERIVED from this repo and rebuilt by `/graphify`:
+# a graph.json, an HTML viewer and an extraction cache that grows with every
+# run. Vendoring it would commit a stale picture of the code beside the code.
+graphify-out/
+
+# ixcap: the aar, build output like its five siblings. HexCam's camera plugin —
+# addons/ixcap/bin/**/.gitkeep is tracked so the export plugin's path exists in
+# a fresh checkout; the 10 kB aar itself is built by
+# `./gradlew :ixcap:assembleRelease :ixcap:assembleDebug`.
+addons/ixcap/bin/*.aar
+addons/ixcap/bin/**/*.aar
+takes/
+__pycache__/
