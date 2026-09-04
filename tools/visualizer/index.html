@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hexy C++ Native & MNN Interactive Diagram & Pipeline Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070a12;
+      --card-bg: rgba(15, 23, 42, 0.88);
+      --card-border: rgba(255, 255, 255, 0.09);
+      --accent-blue: #38bdf8;
+      --accent-cyan: #22d3ee;
+      --accent-purple: #c084fc;
+      --accent-green: #4ade80;
+      --accent-amber: #fbbf24;
+      --accent-orange: #fb923c;
+      --accent-rose: #fb7185;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0f172a 45%, var(--bg) 95%);
+      color: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      user-select: none;
+    }
+
+    /* Top Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .header-title h1 {
+      font-size: 1.28rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header-title p {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+    .header-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent-blue);
+      font-size: 0.76rem;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .badge-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+    }
+
+    /* Controls Bar */
+    .controls-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 8px 12px;
+      border-radius: 10px;
+      backdrop-filter: blur(16px);
+    }
+    .btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .btn:hover {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent-blue);
+      transform: translateY(-1px);
+    }
+    .btn.active {
+      background: rgba(56, 189, 248, 0.25);
+      border-color: var(--accent-blue);
+      color: #fff;
+    }
+    .btn-play {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      border-color: #60a5fa;
+      color: white;
+    }
+    .btn-play:hover {
+      background: linear-gradient(135deg, #0369a1, #1d4ed8);
+    }
+    .prompt-input {
+      flex: 1;
+      min-width: 240px;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--card-border);
+      color: #fff;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+    }
+
+    /* Main Dual Viewport */
+    .viewport-grid {
+      display: grid;
+      grid-template-columns: 1.55fr 1fr;
+      gap: 12px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Diagram Stage & Zoom Container */
+    .diagram-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      position: relative;
+    }
+
+    .diagram-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.45);
+      border-bottom: 1px solid var(--card-border);
+      z-index: 10;
+    }
+    .tabs-group {
+      display: flex;
+      gap: 4px;
+    }
+    .tab-btn {
+      padding: 5px 11px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .tab-btn.active {
+      color: var(--accent-cyan);
+      background: rgba(34, 211, 238, 0.12);
+      border-color: rgba(34, 211, 238, 0.3);
+    }
+
+    /* Zoom / Pan Toolbar Controls */
+    .zoom-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 3px 6px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+    }
+    .zoom-btn {
+      width: 26px;
+      height: 24px;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-main);
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .zoom-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--card-border);
+    }
+    .zoom-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--accent-cyan);
+      padding: 0 6px;
+      min-width: 48px;
+      text-align: center;
+    }
+
+    /* Viewport Area */
+    .diagram-viewport {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      cursor: grab;
+      background: radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.45) 0%, rgba(8, 12, 20, 0.95) 100%);
+      min-height: 520px;
+    }
+    .diagram-viewport:active {
+      cursor: grabbing;
+    }
+
+    /* Canvas that gets scaled and translated */
+    .diagram-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      transform-origin: 0 0;
+      transition: transform 0.05s linear;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    svg.interactive-svg {
+      width: 900px;
+      height: 540px;
+      user-select: none;
+      filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.4));
+    }
+
+    /* SVG Interactive Nodes */
+    .interactive-node {
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .interactive-node:hover rect,
+    .interactive-node:hover polygon,
+    .interactive-node:hover circle {
+      filter: drop-shadow(0 0 12px var(--accent-cyan));
+      stroke: var(--accent-cyan) !important;
+    }
+    .interactive-node.active rect,
+    .interactive-node.active polygon,
+    .interactive-node.active circle {
+      stroke: var(--accent-green) !important;
+      fill: #1e3a5f !important;
+      filter: drop-shadow(0 0 14px var(--accent-green));
+    }
+
+    .interactive-arrow {
+      stroke: var(--text-muted);
+      stroke-width: 1.8;
+      fill: none;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .interactive-arrow:hover {
+      stroke: var(--accent-cyan);
+      stroke-width: 2.8;
+    }
+    .interactive-arrow.active {
+      stroke: var(--accent-green) !important;
+      stroke-width: 3.2 !important;
+      filter: drop-shadow(0 0 10px var(--accent-green));
+      animation: pulse-line 1.2s infinite;
+    }
+
+    .interactive-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      fill: var(--text-muted);
+      cursor: pointer;
+      transition: fill 0.2s ease;
+    }
+    .interactive-label:hover { fill: #fff; }
+    .interactive-label.active {
+      fill: var(--accent-green);
+      font-weight: 700;
+      filter: drop-shadow(0 0 6px var(--accent-green));
+    }
+
+    @keyframes pulse-line {
+      0%, 100% { stroke-opacity: 1; }
+      50% { stroke-opacity: 0.35; }
+    }
+
+    /* Options Popover Modal */
+    .options-popover {
+      position: absolute;
+      top: 55px;
+      right: 16px;
+      width: 320px;
+      background: rgba(13, 20, 36, 0.95);
+      border: 1px solid var(--accent-cyan);
+      border-radius: 10px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
+      padding: 14px;
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .popover-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 8px;
+    }
+    .popover-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .popover-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .popover-close:hover { color: #fff; }
+    .popover-desc {
+      font-size: 0.78rem;
+      color: var(--text-main);
+      line-height: 1.4;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .popover-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .action-btn {
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .action-btn:hover {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent-blue);
+      color: var(--accent-cyan);
+    }
+
+    /* Right: Code Execution & State Inspector */
+    .inspector-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      backdrop-filter: blur(16px);
+    }
+    .card-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* 4-Layer Status Track */
+    .layer-mini-track {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .mini-node {
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .mini-node:hover { border-color: var(--accent-blue); }
+    .mini-node.active {
+      border-color: var(--accent-cyan);
+      background: rgba(34, 211, 238, 0.15);
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.2);
+    }
+    .mini-node.warning {
+      border-color: var(--accent-orange);
+      background: rgba(251, 146, 60, 0.15);
+      box-shadow: 0 0 10px rgba(251, 146, 60, 0.2);
+    }
+    .mini-node.success {
+      border-color: var(--accent-green);
+      background: rgba(74, 222, 128, 0.15);
+      box-shadow: 0 0 10px rgba(74, 222, 128, 0.2);
+    }
+    .mini-node-title {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .mini-node-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: #fff;
+    }
+
+    /* Hex & Decision Box */
+    .hex-display {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      background: rgba(0, 0, 0, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      padding: 8px;
+      line-height: 1.4;
+      min-height: 40px;
+    }
+    .byte-tag {
+      display: inline-block;
+      padding: 1px 5px;
+      margin: 2px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+    }
+    .byte-ascii {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .byte-lead {
+      background: rgba(192, 132, 252, 0.2);
+      color: var(--accent-purple);
+      border: 1px solid rgba(192, 132, 252, 0.4);
+    }
+    .byte-continuation {
+      background: rgba(251, 146, 60, 0.2);
+      color: var(--accent-orange);
+      border: 1px solid rgba(251, 146, 60, 0.4);
+    }
+
+    .log-box {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.74rem;
+      line-height: 1.45;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.45);
+      min-height: 56px;
+      border-left: 3px solid var(--accent-cyan);
+    }
+
+    .speech-box {
+      font-size: 0.95rem;
+      line-height: 1.5;
+      padding: 10px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.4);
+      min-height: 70px;
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .cursor-pulse {
+      display: inline-block;
+      width: 6px;
+      height: 1em;
+      background: var(--accent-cyan);
+      vertical-align: middle;
+      margin-left: 3px;
+      animation: pulse 0.8s infinite;
+    }
+    @keyframes pulse {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-title">
+      <h1>Hexy C++ Native & MNN Interactive Studio</h1>
+      <p>Interactive Pan/Zoom UML Diagrams, Node Option Menus & Live C++ Streaming</p>
+    </div>
+    <div class="header-badges">
+      <div class="badge-status">
+        <span class="badge-dot"></span>
+        <span id="headerStatus">DESKTOP MOCK / JNI READY</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Controls Bar -->
+  <div class="controls-panel">
+    <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted);">SCENARIOS:</span>
+    <button class="btn" onclick="setScenario(0)">1. Standard Dialogue</button>
+    <button class="btn" onclick="setScenario(1)">2. Split Emoji (😀)</button>
+    <button class="btn" onclick="setScenario(2)">3. &lt;think&gt; Filter</button>
+    <button class="btn" onclick="setScenario(3)">4. CJK Multilingual</button>
+
+    <input type="text" id="promptText" class="prompt-input" value="Your keys are waiting on the counter by the door." />
+
+    <button class="btn btn-play" id="playBtn" onclick="togglePlay()">▶ Play Stream</button>
+    <button class="btn" onclick="stepToken()">⏭ Step Token</button>
+    <button class="btn" onclick="resetState()">↺ Reset</button>
+
+    <div style="display: flex; align-items: center; gap: 5px; margin-left: auto;">
+      <span style="font-size: 0.75rem; color: var(--text-muted);">Speed:</span>
+      <input type="range" id="speedSlider" min="50" max="600" step="25" value="200" style="cursor: pointer;" />
+      <span id="speedDisplay" style="font-family: 'JetBrains Mono'; font-size: 0.72rem; color: var(--accent-cyan);">200ms</span>
+    </div>
+  </div>
+
+  <!-- Dual Viewport Grid -->
+  <div class="viewport-grid">
+
+    <!-- Left: Diagram Stage with Pan & Zoom & Options Popover -->
+    <div class="diagram-panel">
+      <div class="diagram-nav">
+        <div class="tabs-group">
+          <button class="tab-btn active" id="tab0" onclick="switchTab(0)">1. Streaming Sequence UML</button>
+          <button class="tab-btn" id="tab1" onclick="switchTab(1)">2. Architecture Pipeline</button>
+          <button class="tab-btn" id="tab2" onclick="switchTab(2)">3. Safety Filter Decision Flow</button>
+        </div>
+
+        <div class="zoom-toolbar">
+          <button class="zoom-btn" onclick="zoomIn()" title="Zoom In">+</button>
+          <button class="zoom-btn" onclick="zoomOut()" title="Zoom Out">−</button>
+          <span class="zoom-badge" id="zoomBadge">100%</span>
+          <button class="zoom-btn" onclick="resetZoom()" title="Reset Zoom">↺</button>
+          <button class="zoom-btn" onclick="fitView()" title="Fit View">⛶</button>
+        </div>
+      </div>
+
+      <div class="diagram-viewport" id="diagramViewport">
+        <div class="diagram-canvas" id="diagramCanvas">
+          <div id="svgMount" style="display: flex; justify-content: center; align-items: center;"></div>
+        </div>
+
+        <!-- Interactive Options Popover Menu -->
+        <div class="options-popover" id="optionsPopover">
+          <div class="popover-header">
+            <span class="popover-title" id="popoverTitle">Node Options</span>
+            <button class="popover-close" onclick="closePopover()">✕</button>
+          </div>
+          <div class="popover-desc" id="popoverDesc">
+            Click an option below to simulate, inspect code, or verify contracts.
+          </div>
+          <div class="popover-actions" id="popoverActions">
+            <!-- Dynamic Actions Injected here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Code Execution & State Inspector -->
+    <div class="inspector-panel">
+
+      <!-- 4-Layer Status Track -->
+      <div class="card">
+        <div class="card-title">
+          <span>Live 4-Layer Stack Status</span>
+          <span id="tokenCounter" style="font-size: 0.7rem; color: var(--accent-blue); font-family: 'JetBrains Mono';">0 / 0 Tokens</span>
+        </div>
+        <div class="layer-mini-track">
+          <div class="mini-node" id="nodeGD" onclick="openNodeOptions('godot')">
+            <span class="mini-node-title">1. Godot</span>
+            <span class="mini-node-val" id="valGD">IDLE</span>
+          </div>
+          <div class="mini-node" id="nodeKT" onclick="openNodeOptions('kotlin')">
+            <span class="mini-node-title">2. Kotlin</span>
+            <span class="mini-node-val" id="valKT">IDLE</span>
+          </div>
+          <div class="mini-node" id="nodeCPP" onclick="openNodeOptions('jni')">
+            <span class="mini-node-title">3. C++ JNI</span>
+            <span class="mini-node-val" id="valCPP">IDLE</span>
+          </div>
+          <div class="mini-node" id="nodeMNN" onclick="openNodeOptions('mnn')">
+            <span class="mini-node-title">4. MNN Engine</span>
+            <span class="mini-node-val" id="valMNN">IDLE</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hex Byte Stream -->
+      <div class="card">
+        <div class="card-title">
+          <span>Incoming Byte Wire (MNN ➔ xsputn)</span>
+          <span id="accumLabel" style="font-size: 0.7rem; color: var(--text-muted); font-family: 'JetBrains Mono';">0B in buffer</span>
+        </div>
+        <div class="hex-display" id="hexContainer">[Standby: Waiting for token]</div>
+      </div>
+
+      <!-- Decision Engine Log -->
+      <div class="card">
+        <div class="card-title">
+          <span>C++ Filter Logic (danglingUtf8 & tagPrefixLen)</span>
+        </div>
+        <div class="log-box" id="logContainer">Ready. Step through or play to see C++ branches execute.</div>
+      </div>
+
+      <!-- Spoken Transcript Output -->
+      <div class="card" style="flex: 1;">
+        <div class="card-title">
+          <span>Emitted Speech Transcript (Godot Receiver)</span>
+          <span id="ttftBadge" style="font-size: 0.7rem; color: var(--accent-green); font-family: 'JetBrains Mono';">TTFT: -</span>
+        </div>
+        <div class="speech-box">
+          <span id="speechText"></span><span class="cursor-pulse"></span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // =========================================================================
+    // Pan & Zoom Engine
+    // =========================================================================
+
+    let scale = 1.0;
+    let panX = 0;
+    let panY = 0;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    const viewport = document.getElementById('diagramViewport');
+    const canvas = document.getElementById('diagramCanvas');
+    const zoomBadge = document.getElementById('zoomBadge');
+
+    function applyTransform() {
+      canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+      zoomBadge.innerText = `${Math.round(scale * 100)}%`;
+    }
+
+    function zoomIn() {
+      scale = Math.min(scale * 1.2, 3.2);
+      applyTransform();
+    }
+
+    function zoomOut() {
+      scale = Math.max(scale / 1.2, 0.4);
+      applyTransform();
+    }
+
+    function resetZoom() {
+      scale = 1.0;
+      panX = 0;
+      panY = 0;
+      applyTransform();
+    }
+
+    function fitView() {
+      const vRect = viewport.getBoundingClientRect();
+      scale = Math.min(vRect.width / 920, vRect.height / 560, 1.2);
+      panX = (vRect.width - 900 * scale) / 2;
+      panY = (vRect.height - 540 * scale) / 2;
+      applyTransform();
+    }
+
+    viewport.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const rect = viewport.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const factor = e.deltaY < 0 ? 1.15 : 0.85;
+      const newScale = Math.min(Math.max(0.4, scale * factor), 3.5);
+
+      panX = mouseX - (mouseX - panX) * (newScale / scale);
+      panY = mouseY - (mouseY - panY) * (newScale / scale);
+      scale = newScale;
+
+      applyTransform();
+    }, { passive: false });
+
+    viewport.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.options-popover') || e.target.closest('.zoom-toolbar')) return;
+      isDragging = true;
+      startX = e.clientX - panX;
+      startY = e.clientY - panY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      panX = e.clientX - startX;
+      panY = e.clientY - startY;
+      applyTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    // =========================================================================
+    // Options Popover & Interactive Node Handlers
+    // =========================================================================
+
+    function openNodeOptions(key) {
+      const popover = document.getElementById('optionsPopover');
+      const title = document.getElementById('popoverTitle');
+      const desc = document.getElementById('popoverDesc');
+      const actions = document.getElementById('popoverActions');
+
+      popover.style.display = 'flex';
+
+      if (key === 'godot') {
+        title.innerText = "⚙ Layer 1: Godot Seam (mnn_runtime.gd)";
+        desc.innerText = "Decouples LLM inference from rendering. Ingests signals: chat_token, chat_done.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="triggerPresetText('Test message from Godot.')">▶ Trigger Sample Utterance</button>
+          <button class="action-btn" onclick="alert('File: res://scripts/brain/mnn_runtime.gd\\nSignals: chat_token(chunk), chat_done(full)')">📄 View Script Interface</button>
+          <button class="action-btn" onclick="alert('Rule: Never block the main rendering thread. Uses single worker thread.')">🛡️ Thread Safety Guarantee</button>
+        `;
+      } else if (key === 'kotlin') {
+        title.innerText = "⚙ Layer 2: Kotlin Worker (IxMnn.kt)";
+        desc.innerText = "Serializes calls onto a single background thread. Guarantees non-reentrant safety.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="alert('IxMnn.kt uses single-threaded executor to prevent concurrent access to MNN session.')">🛡️ Non-Reentrant Contract</button>
+          <button class="action-btn" onclick="alert('Method: onChatToken(byte[])\\nAvoids ART NewStringUTF Modified-UTF-8 crashes.')">📄 JNI Wire Contract</button>
+        `;
+      } else if (key === 'jni' || key === 'stream') {
+        title.innerText = "⚙ Layer 3: C++ JNI TokenStream (ixmnn_jni.cpp)";
+        desc.innerText = "Custom std::streambuf hooking xsputn(). Executes danglingUtf8() and tagPrefixLen().";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="setScenario(1)">⚡ Simulate Split Emoji (danglingUtf8)</button>
+          <button class="action-btn" onclick="setScenario(2)">⚡ Simulate Reasoning Filter (<think>)</button>
+          <button class="action-btn" onclick="alert('Memory Rule: JNI_OnLoad caches global ref (NewGlobalRef). Local refs are never held across frames.')">🛡️ Memory & Lifetime Safety</button>
+        `;
+      } else if (key === 'mnn') {
+        title.innerText = "⚙ Layer 4: Alibaba MNN Core (libllm.so)";
+        desc.innerText = "Autoregressive neural decoder using Key-Value (KV) cache for fast edge inference.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="stepToken()">⏭ Step Single Token</button>
+          <button class="action-btn" onclick="togglePlay()">▶ Stream Full Response</button>
+          <button class="action-btn" onclick="alert('Model: Qwen3-0.6B-Instruct quantized for mobile NPU/CPU.')">📄 Model Specifications</button>
+        `;
+      } else if (key.startsWith('step_')) {
+        const num = key.replace('step_', '');
+        title.innerText = `⚙ Step ${num} in Sequence`;
+        desc.innerText = `Message transfer step #${num} in the streaming sequence pipeline.`;
+        actions.innerHTML = `
+          <button class="action-btn" onclick="jumpToStep(${num})">🎯 Jump Simulation to Step ${num}</button>
+          <button class="action-btn" onclick="alert('Step ${num} executed during autoregressive token cycle.')">📄 View Sequence Rationale</button>
+        `;
+      } else if (key === 'filter_think') {
+        title.innerText = "🛡 Filter 1: <think> Reasoning Filter";
+        desc.innerText = "Detects and suppresses Qwen/DeepSeek internal thought tokens so they aren't spoken.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="setScenario(2)">⚡ Test <think> Tag Filter</button>
+          <button class="action-btn" onclick="alert('tagPrefixLen() holds back trailing <thi prefixes until completed.')">📄 Algorithm Details</button>
+        `;
+      } else if (key === 'filter_utf8') {
+        title.innerText = "🛡 Filter 2: danglingUtf8 Boundary Guard";
+        desc.innerText = "Detects split multi-byte characters at chunk boundaries and delays them until completed.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="setScenario(1)">⚡ Test Split Multi-Byte Emoji (😀)</button>
+          <button class="action-btn" onclick="alert('Inspects trailing byte headers: 110xxxxx, 1110xxxx, 11110xxx.')">📄 UTF-8 Byte Table</button>
+        `;
+      } else if (key === 'filter_wire') {
+        title.innerText = "🛡 Filter 3: Raw Byte Wire Format";
+        desc.innerText = "Passes jbyteArray directly to JVM. Bypasses Android ART NewStringUTF crashes.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="alert('Android ART Modified UTF-8 encodes code points >= U+10000 into 6-byte surrogate pairs. NewStringUTF crashes on emojis.')">📄 Why Not jstring?</button>
+        `;
+      }
+    }
+
+    function closePopover() {
+      document.getElementById('optionsPopover').style.display = 'none';
+    }
+
+    function triggerPresetText(txt) {
+      document.getElementById('promptText').value = txt;
+      resetState();
+      buildTokenQueue();
+      togglePlay();
+      closePopover();
+    }
+
+    function jumpToStep(num) {
+      closePopover();
+      highlightArrow(`s${num}`);
+    }
+
+    // =========================================================================
+    // 3 Interactive SVG Diagrams
+    // =========================================================================
+
+    // Diagram 1: Sequence Diagram
+    function renderSequenceSvg() {
+      return `
+        <svg class="interactive-svg" viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="#94a3b8" />
+            </marker>
+            <marker id="arrow-active" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="#4ade80" />
+            </marker>
+          </defs>
+
+          <!-- Autoregressive Loop Box -->
+          <rect x="50" y="230" width="800" height="175" rx="8" fill="rgba(30, 41, 59, 0.35)" stroke="rgba(148, 163, 184, 0.3)" stroke-dasharray="6 3" />
+          <rect x="50" y="230" width="160" height="22" fill="rgba(56, 189, 248, 0.25)" rx="4" />
+          <text x="60" y="245" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#38bdf8">LOOP [Token Generation]</text>
+
+          <!-- Lifelines -->
+          <line x1="90" y1="50" x2="90" y2="520" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="4 4" />
+          <line x1="270" y1="50" x2="270" y2="520" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="4 4" />
+          <line x1="460" y1="50" x2="460" y2="520" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="4 4" />
+          <line x1="640" y1="50" x2="640" y2="520" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="4 4" />
+          <line x1="810" y1="50" x2="810" y2="520" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="4 4" />
+
+          <!-- Activation Bars -->
+          <rect x="85" y="80" width="10" height="420" rx="2" fill="rgba(56, 189, 248, 0.25)" stroke="#38bdf8" />
+          <rect x="265" y="85" width="10" height="415" rx="2" fill="rgba(192, 132, 252, 0.25)" stroke="#c084fc" />
+          <rect x="455" y="125" width="10" height="345" rx="2" fill="rgba(56, 189, 248, 0.25)" stroke="#38bdf8" />
+          <rect x="635" y="160" width="10" height="280" rx="2" fill="rgba(74, 222, 128, 0.25)" stroke="#4ade80" />
+          <rect x="805" y="195" width="10" height="215" rx="2" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" />
+
+          <!-- Steps -->
+          <line class="interactive-arrow" id="arrow_s1" x1="95" y1="85" x2="265" y2="85" marker-end="url(#arrow)" onclick="openNodeOptions('step_1')" />
+          <text class="interactive-label" id="label_s1" x="180" y="80" text-anchor="middle" onclick="openNodeOptions('step_1')">1. chat_stream("prompt")</text>
+
+          <line class="interactive-arrow" id="arrow_s2" x1="275" y1="125" x2="455" y2="125" marker-end="url(#arrow)" onclick="openNodeOptions('step_2')" />
+          <text class="interactive-label" id="label_s2" x="365" y="120" text-anchor="middle" onclick="openNodeOptions('step_2')">2. nativeChatStream(handle)</text>
+
+          <line class="interactive-arrow" id="arrow_s3" x1="465" y1="160" x2="635" y2="160" marker-end="url(#arrow)" onclick="openNodeOptions('step_3')" />
+          <text class="interactive-label" id="label_s3" x="550" y="155" text-anchor="middle" onclick="openNodeOptions('step_3')">3. Attach TokenStream(os)</text>
+
+          <line class="interactive-arrow" id="arrow_s4" x1="465" y1="195" x2="805" y2="195" marker-end="url(#arrow)" onclick="openNodeOptions('step_4')" />
+          <text class="interactive-label" id="label_s4" x="635" y="190" text-anchor="middle" onclick="openNodeOptions('step_4')">4. llm->response(&os)</text>
+
+          <!-- Loop Section -->
+          <line class="interactive-arrow" id="arrow_s5" x1="805" y1="265" x2="645" y2="265" marker-end="url(#arrow)" onclick="openNodeOptions('step_5')" />
+          <text class="interactive-label" id="label_s5" x="725" y="260" text-anchor="middle" onclick="openNodeOptions('step_5')">5. xsputn("the ", 4)</text>
+
+          <path class="interactive-arrow" id="arrow_s6" d="M 645 295 H 680 V 315 H 646" marker-end="url(#arrow)" onclick="openNodeOptions('step_6')" />
+          <text class="interactive-label" id="label_s6" x="690" y="308" onclick="openNodeOptions('step_6')">6. danglingUtf8 & tagPrefixLen</text>
+
+          <line class="interactive-arrow" id="arrow_s7" x1="635" y1="345" x2="275" y2="345" marker-end="url(#arrow)" onclick="openNodeOptions('step_7')" />
+          <text class="interactive-label" id="label_s7" x="455" y="340" text-anchor="middle" onclick="openNodeOptions('step_7')">7. onChatToken(byte[])</text>
+
+          <line class="interactive-arrow" id="arrow_s8" x1="265" y1="375" x2="95" y2="375" marker-end="url(#arrow)" onclick="openNodeOptions('step_8')" />
+          <text class="interactive-label" id="label_s8" x="180" y="370" text-anchor="middle" onclick="openNodeOptions('step_8')">8. emit_signal("chat_token")</text>
+
+          <!-- Completion -->
+          <line class="interactive-arrow" id="arrow_s9" x1="805" y1="430" x2="465" y2="430" marker-end="url(#arrow)" onclick="openNodeOptions('step_9')" />
+          <text class="interactive-label" id="label_s9" x="635" y="425" text-anchor="middle" onclick="openNodeOptions('step_9')">9. Inference Finished (EOS)</text>
+
+          <path class="interactive-arrow" id="arrow_s10" d="M 645 455 H 675 V 470 H 646" marker-end="url(#arrow)" onclick="openNodeOptions('step_10')" />
+          <text class="interactive-label" id="label_s10" x="685" y="465" onclick="openNodeOptions('step_10')">10. buf.finish()</text>
+
+          <line class="interactive-arrow" id="arrow_s11" x1="455" y1="485" x2="275" y2="485" marker-end="url(#arrow)" onclick="openNodeOptions('step_11')" />
+          <text class="interactive-label" id="label_s11" x="365" y="480" text-anchor="middle" onclick="openNodeOptions('step_11')">11. Returns byte[]</text>
+
+          <line class="interactive-arrow" id="arrow_s12" x1="265" y1="510" x2="95" y2="510" marker-end="url(#arrow)" onclick="openNodeOptions('step_12')" />
+          <text class="interactive-label" id="label_s12" x="180" y="505" text-anchor="middle" onclick="openNodeOptions('step_12')">12. emit_signal("chat_done")</text>
+
+          <!-- Participants Headers -->
+          <g class="interactive-node" onclick="openNodeOptions('godot')">
+            <rect x="25" y="8" width="130" height="38" rx="6" fill="#111827" stroke="#67e8f9" stroke-width="1.5" />
+            <text x="90" y="24" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#f8fafc" text-anchor="middle">Godot (GDScript)</text>
+            <text x="90" y="38" font-family="'JetBrains Mono', monospace" font-size="8" fill="#67e8f9" text-anchor="middle">mnn_runtime.gd</text>
+          </g>
+
+          <g class="interactive-node" onclick="openNodeOptions('kotlin')">
+            <rect x="205" y="8" width="130" height="38" rx="6" fill="#111827" stroke="#c084fc" stroke-width="1.5" />
+            <text x="270" y="24" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#f8fafc" text-anchor="middle">Kotlin Worker</text>
+            <text x="270" y="38" font-family="'JetBrains Mono', monospace" font-size="8" fill="#c084fc" text-anchor="middle">IxMnn.kt</text>
+          </g>
+
+          <g class="interactive-node" onclick="openNodeOptions('jni')">
+            <rect x="395" y="8" width="130" height="38" rx="6" fill="#111827" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="460" y="24" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#f8fafc" text-anchor="middle">C++ JNI Bridge</text>
+            <text x="460" y="38" font-family="'JetBrains Mono', monospace" font-size="8" fill="#38bdf8" text-anchor="middle">ixmnn_jni.cpp</text>
+          </g>
+
+          <g class="interactive-node" onclick="openNodeOptions('stream')">
+            <rect x="575" y="8" width="130" height="38" rx="6" fill="#111827" stroke="#34d399" stroke-width="1.5" />
+            <text x="640" y="24" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#f8fafc" text-anchor="middle">TokenStream</text>
+            <text x="640" y="38" font-family="'JetBrains Mono', monospace" font-size="8" fill="#34d399" text-anchor="middle">std::streambuf</text>
+          </g>
+
+          <g class="interactive-node" onclick="openNodeOptions('mnn')">
+            <rect x="745" y="8" width="130" height="38" rx="6" fill="#111827" stroke="#fb923c" stroke-width="1.5" />
+            <text x="810" y="24" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#f8fafc" text-anchor="middle">MNN Core</text>
+            <text x="810" y="38" font-family="'JetBrains Mono', monospace" font-size="8" fill="#fb923c" text-anchor="middle">libllm.so</text>
+          </g>
+        </svg>
+      `;
+    }
+
+    // Diagram 2: Architecture Pipeline
+    function renderArchitectureSvg() {
+      return `
+        <svg class="interactive-svg" viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg">
+          <!-- Layer 1: Godot -->
+          <g class="interactive-node" onclick="openNodeOptions('godot')">
+            <rect x="80" y="40" width="740" height="90" rx="10" fill="#0f172a" stroke="#38bdf8" stroke-width="2" />
+            <text x="105" y="70" font-family="'Outfit', sans-serif" font-size="14" font-weight="700" fill="#38bdf8">LAYER 1: GODOT GAMEPLAY ENGINE (GDScript)</text>
+            <text x="105" y="92" font-family="'JetBrains Mono', monospace" font-size="11" fill="#94a3b8">scripts/brain/mnn_runtime.gd  •  res://scenes/hexy.tscn  •  scripts/broker.gd</text>
+            <text x="105" y="112" font-family="'Outfit', sans-serif" font-size="11" fill="#4ade80">✓ 60 FPS Main Loop  •  Lip Sync Visemes  •  Desktop Deterministic Mock</text>
+          </g>
+
+          <!-- Bridge 1 -->
+          <line x1="450" y1="130" x2="450" y2="170" stroke="#38bdf8" stroke-width="3" stroke-dasharray="4 4" />
+          <text x="465" y="155" font-family="'JetBrains Mono', monospace" font-size="10" fill="#38bdf8">Godot Android Plugin API</text>
+
+          <!-- Layer 2: Android JVM -->
+          <g class="interactive-node" onclick="openNodeOptions('kotlin')">
+            <rect x="80" y="170" width="740" height="90" rx="10" fill="#0f172a" stroke="#c084fc" stroke-width="2" />
+            <text x="105" y="200" font-family="'Outfit', sans-serif" font-size="14" font-weight="700" fill="#c084fc">LAYER 2: ANDROID PLUGIN & THREAD SERIALIZER (Kotlin)</text>
+            <text x="105" y="222" font-family="'JetBrains Mono', monospace" font-size="11" fill="#94a3b8">IxMnn.kt  •  IxMnnNative.kt  •  workerExecutor (Executors.newSingleThreadExecutor())</text>
+            <text x="105" y="242" font-family="'Outfit', sans-serif" font-size="11" fill="#c084fc">✓ Non-Reentrant Protection  •  Signals dispatch back to Godot</text>
+          </g>
+
+          <!-- Bridge 2 -->
+          <line x1="450" y1="260" x2="450" y2="300" stroke="#c084fc" stroke-width="3" stroke-dasharray="4 4" />
+          <text x="465" y="285" font-family="'JetBrains Mono', monospace" font-size="10" fill="#c084fc">JNI Boundary (jbyteArray)</text>
+
+          <!-- Layer 3: C++ JNI Bridge -->
+          <g class="interactive-node" onclick="openNodeOptions('jni')">
+            <rect x="80" y="300" width="740" height="90" rx="10" fill="#0f172a" stroke="#22d3ee" stroke-width="2" />
+            <text x="105" y="330" font-family="'Outfit', sans-serif" font-size="14" font-weight="700" fill="#22d3ee">LAYER 3: NATIVE C++ JNI & STREAMBUF FILTERS (ixmnn_jni.cpp)</text>
+            <text x="105" y="352" font-family="'JetBrains Mono', monospace" font-size="11" fill="#94a3b8">TokenStream : public std::streambuf  •  danglingUtf8()  •  tagPrefixLen()</text>
+            <text x="105" y="372" font-family="'Outfit', sans-serif" font-size="11" fill="#22d3ee">✓ Zero-Copy Streaming  •  Cached JNI Handles at Load  •  Mutes internal thoughts</text>
+          </g>
+
+          <!-- Bridge 3 -->
+          <line x1="450" y1="390" x2="450" y2="430" stroke="#22d3ee" stroke-width="3" stroke-dasharray="4 4" />
+          <text x="465" y="415" font-family="'JetBrains Mono', monospace" font-size="10" fill="#22d3ee">C++ std::ostream&</text>
+
+          <!-- Layer 4: MNN Core -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn')">
+            <rect x="80" y="430" width="740" height="85" rx="10" fill="#0f172a" stroke="#fb923c" stroke-width="2" />
+            <text x="105" y="460" font-family="'Outfit', sans-serif" font-size="14" font-weight="700" fill="#fb923c">LAYER 4: ALIBABA MNN TRANSFORMER COMPUTE (libllm.so + libMNN.so)</text>
+            <text x="105" y="482" font-family="'JetBrains Mono', monospace" font-size="11" fill="#94a3b8">MNN::Transformer::Llm  •  Qwen3-0.6B Weights  •  Vulkan/OpenCL/CPU Backends</text>
+            <text x="105" y="502" font-family="'Outfit', sans-serif" font-size="11" fill="#fb923c">✓ Autoregressive KV-Cached Edge AI Inference</text>
+          </g>
+        </svg>
+      `;
+    }
+
+    // Diagram 3: Safety Filter Flow
+    function renderSafetyFilterSvg() {
+      return `
+        <svg class="interactive-svg" viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg">
+          <!-- Input Box -->
+          <g class="interactive-node" onclick="openNodeOptions('stream')">
+            <rect x="325" y="20" width="250" height="50" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2" />
+            <text x="450" y="42" font-family="'Outfit', sans-serif" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">Raw Bytes from MNN Engine</text>
+            <text x="450" y="57" font-family="'JetBrains Mono', monospace" font-size="9" fill="#38bdf8" text-anchor="middle">TokenStream::xsputn(s, n)</text>
+          </g>
+
+          <line x1="450" y1="70" x2="450" y2="110" stroke="#94a3b8" stroke-width="2" />
+
+          <!-- Filter 1 Diamond -->
+          <g class="interactive-node" onclick="openNodeOptions('filter_think')">
+            <polygon points="450,110 570,165 450,220 330,165" fill="#1e293b" stroke="#c084fc" stroke-width="2" />
+            <text x="450" y="160" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">Filter 1: Inside &lt;think&gt;?</text>
+            <text x="450" y="176" font-family="'JetBrains Mono', monospace" font-size="9" fill="#c084fc" text-anchor="middle">tagPrefixLen()</text>
+          </g>
+
+          <!-- Branch 1 Left: Drop -->
+          <line x1="330" y1="165" x2="160" y2="165" stroke="#f87171" stroke-width="2" />
+          <g class="interactive-node" onclick="openNodeOptions('filter_think')">
+            <rect x="60" y="140" width="180" height="50" rx="6" fill="#1e293b" stroke="#f87171" stroke-width="1.5" />
+            <text x="150" y="162" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#f87171" text-anchor="middle">Drop Reasoning Bytes</text>
+            <text x="150" y="177" font-family="'JetBrains Mono', monospace" font-size="9" fill="#94a3b8" text-anchor="middle">Do not speak thoughts</text>
+          </g>
+
+          <!-- Branch 1 Down: Clean to Filter 2 -->
+          <line x1="450" y1="220" x2="450" y2="260" stroke="#4ade80" stroke-width="2" />
+
+          <!-- Filter 2 Diamond -->
+          <g class="interactive-node" onclick="openNodeOptions('filter_utf8')">
+            <polygon points="450,260 570,315 450,370 330,315" fill="#1e293b" stroke="#fbbf24" stroke-width="2" />
+            <text x="450" y="310" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">Filter 2: Split UTF-8?</text>
+            <text x="450" y="326" font-family="'JetBrains Mono', monospace" font-size="9" fill="#fbbf24" text-anchor="middle">danglingUtf8()</text>
+          </g>
+
+          <!-- Branch 2 Left: Hold back -->
+          <line x1="330" y1="315" x2="160" y2="315" stroke="#fbbf24" stroke-width="2" />
+          <g class="interactive-node" onclick="openNodeOptions('filter_utf8')">
+            <rect x="60" y="290" width="180" height="50" rx="6" fill="#1e293b" stroke="#fbbf24" stroke-width="1.5" />
+            <text x="150" y="312" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#fbbf24" text-anchor="middle">Hold Back 1-3 Bytes</text>
+            <text x="150" y="327" font-family="'JetBrains Mono', monospace" font-size="9" fill="#94a3b8" text-anchor="middle">Wait for next token chunk</text>
+          </g>
+
+          <!-- Branch 2 Down: Clean to Filter 3 -->
+          <line x1="450" y1="370" x2="450" y2="410" stroke="#4ade80" stroke-width="2" />
+
+          <!-- Filter 3: Raw Byte Wire Format -->
+          <g class="interactive-node" onclick="openNodeOptions('filter_wire')">
+            <rect x="325" y="410" width="250" height="50" rx="8" fill="#1e293b" stroke="#4ade80" stroke-width="2" />
+            <text x="450" y="432" font-family="'Outfit', sans-serif" font-size="12" font-weight="700" fill="#4ade80" text-anchor="middle">Filter 3: Raw Byte Wire Format</text>
+            <text x="450" y="447" font-family="'JetBrains Mono', monospace" font-size="9" fill="#94a3b8" text-anchor="middle">jbyteArray (Zero Modified-UTF8 Crashes)</text>
+          </g>
+
+          <!-- Final Emission Box -->
+          <line x1="450" y1="460" x2="450" y2="490" stroke="#4ade80" stroke-width="2" />
+          <g class="interactive-node" onclick="openNodeOptions('godot')">
+            <rect x="310" y="490" width="280" height="40" rx="6" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="450" y="514" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#f8fafc" text-anchor="middle">Emit onChatToken() to Godot Engine</text>
+          </g>
+        </svg>
+      `;
+    }
+
+    let activeTab = 0;
+
+    function switchTab(idx) {
+      activeTab = idx;
+      for (let i = 0; i < 3; i++) {
+        const tab = document.getElementById(`tab${i}`);
+        if (i === idx) tab.classList.add('active');
+        else tab.classList.remove('active');
+      }
+
+      const mount = document.getElementById('svgMount');
+      if (idx === 0) mount.innerHTML = renderSequenceSvg();
+      else if (idx === 1) mount.innerHTML = renderArchitectureSvg();
+      else if (idx === 2) mount.innerHTML = renderSafetyFilterSvg();
+
+      closePopover();
+      resetZoom();
+    }
+
+    // =========================================================================
+    // Simulation Engine & Arrow Highlighting
+    // =========================================================================
+
+    function highlightArrow(stepId) {
+      document.querySelectorAll('.interactive-arrow').forEach(a => {
+        a.classList.remove('active');
+        a.setAttribute('marker-end', 'url(#arrow)');
+      });
+      document.querySelectorAll('.interactive-label').forEach(l => l.classList.remove('active'));
+
+      const arrow = document.getElementById(`arrow_${stepId}`);
+      const label = document.getElementById(`label_${stepId}`);
+      if (arrow) {
+        arrow.classList.add('active');
+        arrow.setAttribute('marker-end', 'url(#arrow-active)');
+      }
+      if (label) label.classList.add('active');
+    }
+
+    // Exact C++ Logic
+    function danglingUtf8(bytes) {
+      const n = bytes.length;
+      for (let back = 1; back <= 4 && back <= n; ++back) {
+        const b = bytes[n - back];
+        if ((b & 0x80) === 0) return 0;
+        if ((b & 0xC0) === 0xC0) {
+          let need = 1;
+          if ((b & 0xE0) === 0xC0) need = 2;
+          else if ((b & 0xF0) === 0xE0) need = 3;
+          else if ((b & 0xF8) === 0xF0) need = 4;
+          return back < need ? back : 0;
+        }
+      }
+      return 0;
+    }
+
+    function tagPrefixLen(s, tag) {
+      const max = Math.min(s.length, tag.length - 1);
+      for (let n = max; n > 0; --n) {
+        if (s.endsWith(tag.slice(0, n))) return n;
+      }
+      return 0;
+    }
+
+    let queue = [];
+    let curTokenIdx = 0;
+    let playing = false;
+    let intervalTimer = null;
+    let cppBuffer = [];
+    let inThink = false;
+    let assembledSpeech = "";
+    let t0 = 0;
+
+    const presetPrompts = [
+      "Your keys are waiting on the counter by the door.",
+      "Awesome work! <split_emoji> See you soon!",
+      "<think>Analyzing coordinates: keys at table top.</think>The keys are right on your table.",
+      "你好！世界很大，我们一起探索。"
+    ];
+
+    function setScenario(idx) {
+      document.getElementById('promptText').value = presetPrompts[idx];
+      if (idx === 1 || idx === 2) switchTab(2);
+      else switchTab(0);
+      resetState();
+      buildTokenQueue();
+    }
+
+    function buildTokenQueue() {
+      const txt = document.getElementById('promptText').value;
+      if (txt.includes("<split_emoji>")) {
+        queue = [
+          { str: "Awesome ", bytes: [0x41, 0x77, 0x65, 0x73, 0x6f, 0x6d, 0x65, 0x20] },
+          { str: "work! ", bytes: [0x77, 0x6f, 0x72, 0x6b, 0x21, 0x20] },
+          { str: "[SPLIT_EMOJI_P1]", bytes: [0xF0, 0x9F, 0x98] },
+          { str: "[SPLIT_EMOJI_P2]", bytes: [0x80, 0x20] },
+          { str: "See ", bytes: [0x53, 0x65, 0x65, 0x20] },
+          { str: "you ", bytes: [0x79, 0x6f, 0x75, 0x20] },
+          { str: "soon!", bytes: [0x73, 0x6f, 0x6f, 0x6e, 0x21] }
+        ];
+      } else {
+        const words = txt.match(/\S+\s*/g) || [txt];
+        const enc = new TextEncoder();
+        queue = words.map(w => ({ str: w, bytes: Array.from(enc.encode(w)) }));
+      }
+      document.getElementById('tokenCounter').innerText = `0 / ${queue.length} Tokens`;
+    }
+
+    function resetState() {
+      pauseStream();
+      curTokenIdx = 0;
+      cppBuffer = [];
+      inThink = false;
+      assembledSpeech = "";
+      t0 = 0;
+      document.getElementById('speechText').innerText = "";
+      document.getElementById('hexContainer').innerHTML = "[Standby: Waiting for token]";
+      document.getElementById('logContainer').innerHTML = "Ready. Step through or play to see C++ branches execute.";
+      document.getElementById('accumLabel').innerText = "0B in buffer";
+      document.getElementById('ttftBadge').innerText = "TTFT: -";
+      setNodeState('nodeGD', 'IDLE', '');
+      setNodeState('nodeKT', 'IDLE', '');
+      setNodeState('nodeCPP', 'IDLE', '');
+      setNodeState('nodeMNN', 'IDLE', '');
+      highlightArrow('');
+    }
+
+    function setNodeState(id, text, type) {
+      const n = document.getElementById(id);
+      n.className = "mini-node " + type;
+      n.querySelector('.mini-node-val').innerText = text;
+    }
+
+    function stepToken() {
+      if (curTokenIdx >= queue.length) {
+        pauseStream();
+        setNodeState('nodeGD', 'DONE', 'success');
+        setNodeState('nodeKT', 'IDLE', '');
+        setNodeState('nodeCPP', 'FLUSHED', 'success');
+        setNodeState('nodeMNN', 'EOS', 'active');
+        highlightArrow('s12');
+        document.getElementById('logContainer').innerHTML = `<span style="color: var(--accent-green);">✓ Stream completed successfully. 0 bytes lost. All UTF-8 boundaries preserved.</span>`;
+        return false;
+      }
+
+      if (curTokenIdx === 0) {
+        t0 = performance.now();
+        highlightArrow('s4');
+      }
+
+      const tok = queue[curTokenIdx];
+      curTokenIdx++;
+      document.getElementById('tokenCounter').innerText = `${curTokenIdx} / ${queue.length} Tokens`;
+
+      // 1. MNN Emits
+      setNodeState('nodeMNN', `TOK ${curTokenIdx}`, 'active');
+      highlightArrow('s5');
+
+      // 2. Render Hex View
+      let hexHtml = tok.bytes.map(b => {
+        let cls = "byte-tag";
+        if ((b & 0xC0) === 0xC0) cls += " byte-lead";
+        else if ((b & 0xC0) === 0x80) cls += " byte-continuation";
+        else cls += " byte-ascii";
+        return `<span class="${cls}">0x${b.toString(16).toUpperCase().padStart(2, '0')}</span>`;
+      }).join(' ');
+      document.getElementById('hexContainer').innerHTML = hexHtml;
+
+      // 3. C++ TokenStream xsputn()
+      cppBuffer.push(...tok.bytes);
+      document.getElementById('accumLabel').innerText = `${cppBuffer.length}B in buffer`;
+
+      const dang = danglingUtf8(cppBuffer);
+      let log = "";
+
+      if (dang > 0) {
+        log += `<span style="color: var(--accent-orange);">⚠ [danglingUtf8] Incomplete sequence (${dang} byte). Buffering in C++ buffer.</span><br/>`;
+        setNodeState('nodeCPP', `HOLD ${dang}B`, 'warning');
+      } else {
+        log += `<span style="color: var(--accent-green);">✓ [danglingUtf8] Clean UTF-8 boundary confirmed.</span><br/>`;
+        setNodeState('nodeCPP', 'STREAMING', 'active');
+      }
+
+      const emitLen = cppBuffer.length - dang;
+      const emitBytes = cppBuffer.slice(0, emitLen);
+      cppBuffer = cppBuffer.slice(emitLen);
+
+      const dec = new TextDecoder('utf-8');
+      const textChunk = dec.decode(new Uint8Array(emitBytes));
+
+      let speechChunk = "";
+      if (textChunk.length > 0) {
+        if (textChunk.includes("<think>")) {
+          inThink = true;
+          log += `<span style="color: var(--accent-purple);">⚡ [stripThink] Entering &lt;think&gt;. Output muted.</span><br/>`;
+        }
+        if (textChunk.includes("</think>")) {
+          inThink = false;
+          const parts = textChunk.split("</think>");
+          speechChunk = parts[1] || "";
+          log += `<span style="color: var(--accent-green);">✓ [stripThink] Exited &lt;/think&gt;. Output unmuted.</span><br/>`;
+        } else if (inThink) {
+          log += `<span style="color: var(--text-muted);">• [stripThink] Suppressing thought: "${textChunk}"</span><br/>`;
+        } else {
+          const pLen = tagPrefixLen(textChunk, "<think>");
+          if (pLen > 0) {
+            log += `<span style="color: var(--accent-amber);">⚠ [tagPrefixLen] Matches &lt;think&gt; prefix. Holding back ${pLen} chars.</span><br/>`;
+            speechChunk = textChunk.slice(0, textChunk.length - pLen);
+          } else {
+            speechChunk = textChunk;
+          }
+        }
+      }
+
+      document.getElementById('logContainer').innerHTML = log;
+
+      if (speechChunk.length > 0) {
+        if (document.getElementById('ttftBadge').innerText === "TTFT: -") {
+          const ttft = Math.round(performance.now() - t0);
+          document.getElementById('ttftBadge').innerText = `TTFT: ${ttft}ms`;
+        }
+        highlightArrow('s8');
+        setNodeState('nodeKT', 'DISPATCH', 'active');
+        setNodeState('nodeGD', 'SPEAKING', 'success');
+        assembledSpeech += speechChunk;
+        document.getElementById('speechText').innerText = assembledSpeech;
+      } else {
+        highlightArrow('s6');
+        setNodeState('nodeKT', 'WAITING', '');
+        setNodeState('nodeGD', 'LISTENING', 'warning');
+      }
+
+      return true;
+    }
+
+    function togglePlay() {
+      if (playing) {
+        pauseStream();
+      } else {
+        if (curTokenIdx >= queue.length) {
+          resetState();
+          buildTokenQueue();
+        }
+        playing = true;
+        document.getElementById('playBtn').innerText = "⏸ Pause";
+        loopRun();
+      }
+    }
+
+    function pauseStream() {
+      playing = false;
+      document.getElementById('playBtn').innerText = "▶ Play Stream";
+      if (intervalTimer) clearTimeout(intervalTimer);
+    }
+
+    function loopRun() {
+      if (!playing) return;
+      const spd = parseInt(document.getElementById('speedSlider').value);
+      if (stepToken()) {
+        intervalTimer = setTimeout(loopRun, spd);
+      } else {
+        pauseStream();
+      }
+    }
+
+    document.getElementById('speedSlider').oninput = function() {
+      document.getElementById('speedDisplay').innerText = `${this.value}ms`;
+    };
+
+    // Initialize View
+    buildTokenQueue();
+    switchTab(0);
+  </script>
+</body>
+</html>
