@@ -3351,7 +3351,17 @@
       return GDL_KING_WEN[row][col];
     }}
 
-    function renderGdlEngineHtml() {{
+    
+  // ── GDL Studio Global State Variables ──
+  var gdlActiveBits = 0b011000;
+  var gdlActiveTab = 0;
+  var gdlNoiseSigma = 0.35;
+  var gdlSpectralCutoff = 6;
+  var gdlDiffusionStep = 3;
+  var gdlSimCurl = 0.88;
+  var gdlWenNumber = 24;
+  var gdlLines = [1,0,0,1,1,0];
+function renderGdlEngineHtml() {
       return `
         <div class="gdl-container">
           <!-- Sub-Navigation -->
@@ -3770,179 +3780,179 @@
 <span style="color: #c084fc;">#include</span> <span style="color: #38bdf8;">&lt;array&gt;</span>
 <span style="color: #c084fc;">#include</span> <span style="color: #38bdf8;">&lt;cmath&gt;</span>
 
-<span style="color: #f59e0b;">namespace</span> <span style="color: #38bdf8;">ix64::gdl</span> {{
+<span style="color: #f59e0b;">namespace</span> <span style="color: #38bdf8;">ix64::gdl</span> {
 
-<span style="color: #f59e0b;">inline void</span> <span style="color: #60a5fa;">fwht_inplace</span>(<span style="color: #f59e0b;">float</span>* a, <span style="color: #f59e0b;">int</span> n = 64) {{
-    <span style="color: #f59e0b;">for</span> (<span style="color: #f59e0b;">int</span> h = 1; h &lt; n; h &lt;&lt;= 1) {{
-        <span style="color: #f59e0b;">for</span> (<span style="color: #f59e0b;">int</span> i = 0; i &lt; n; i += (h &lt;&lt; 1)) {{
-            <span style="color: #f59e0b;">for</span> (<span style="color: #f59e0b;">int</span> j = i; j &lt; i + h; ++j) {{
+<span style="color: #f59e0b;">inline void</span> <span style="color: #60a5fa;">fwht_inplace</span>(<span style="color: #f59e0b;">float</span>* a, <span style="color: #f59e0b;">int</span> n = 64) {
+    <span style="color: #f59e0b;">for</span> (<span style="color: #f59e0b;">int</span> h = 1; h &lt; n; h &lt;&lt;= 1) {
+        <span style="color: #f59e0b;">for</span> (<span style="color: #f59e0b;">int</span> i = 0; i &lt; n; i += (h &lt;&lt; 1)) {
+            <span style="color: #f59e0b;">for</span> (<span style="color: #f59e0b;">int</span> j = i; j &lt; i + h; ++j) {
                 <span style="color: #f59e0b;">float</span> x = a[j];
                 <span style="color: #f59e0b;">float</span> y = a[j + h];
                 a[j] = x + y;
                 a[j + h] = x - y;
-            }}
-        }}
-    }}
-}}
+            }
+        }
+    }
+}
 
 <span style="color: #64748b;">// Spectral Filter using Hypercube Laplacian Eigenvalues λ_k = 2k</span>
-<span style="color: #f59e0b;">inline void</span> <span style="color: #60a5fa;">q6_spectral_filter</span>(<span style="color: #f59e0b;">float</span>* prob_64, <span style="color: #f59e0b;">int</span> max_hamming_cutoff = 3) {{
+<span style="color: #f59e0b;">inline void</span> <span style="color: #60a5fa;">q6_spectral_filter</span>(<span style="color: #f59e0b;">float</span>* prob_64, <span style="color: #f59e0b;">int</span> max_hamming_cutoff = 3) {
     <span style="color: #60a5fa;">fwht_inplace</span>(prob_64, 64);
     
-    <span style="color: #f59e0b;">for</span> (<span style="color: #f59e0b;">int</span> i = 0; i &lt; 64; ++i) {{
+    <span style="color: #f59e0b;">for</span> (<span style="color: #f59e0b;">int</span> i = 0; i &lt; 64; ++i) {
         <span style="color: #f59e0b;">int</span> hamming = __builtin_popcount(i);
         <span style="color: #f59e0b;">float</span> weight = (hamming &lt;= max_hamming_cutoff) ? 1.0f : 0.0f;
         prob_64[i] *= (weight / 64.0f);
-    }}
+    }
     
     <span style="color: #60a5fa;">fwht_inplace</span>(prob_64, 64);
-}}
+}
 
 <span style="color: #64748b;">// =========================================================================</span>
 <span style="color: #64748b;">// JNI Hook in ixmnn_jni.cpp: Logit Biasing Before Sampling</span>
 <span style="color: #64748b;">// =========================================================================</span>
-<span style="color: #f59e0b;">void</span> <span style="color: #60a5fa;">apply_q6_logit_bias</span>(<span style="color: #f59e0b;">float</span>* logits, <span style="color: #f59e0b;">int</span> vocab_size, <span style="color: #f59e0b;">const float</span>* gdl_prior_64, <span style="color: #f59e0b;">float</span> beta) {{
+<span style="color: #f59e0b;">void</span> <span style="color: #60a5fa;">apply_q6_logit_bias</span>(<span style="color: #f59e0b;">float</span>* logits, <span style="color: #f59e0b;">int</span> vocab_size, <span style="color: #f59e0b;">const float</span>* gdl_prior_64, <span style="color: #f59e0b;">float</span> beta) {
     <span style="color: #64748b;">// Injected right before MNN::Sampler::sampleTopP()</span>
     <span style="color: #64748b;">// Projects 64-node topological attractors to constrain generation without prompt bloat</span>
-}}
+}
 
-}} <span style="color: #64748b;">// namespace ix64::gdl</span>
+} <span style="color: #64748b;">// namespace ix64::gdl</span>
               </div>
             </div>
 
           </div>
         </div>
       `;
-    }}
+    }
 
-    function switchGdlTab(idx) {{
+    function switchGdlTab(idx) {
       gdlActiveTab = idx;
-      for (let i = 0; i < 6; i++) {{
-        const btn = document.getElementById(`gdlTab${{i}}`);
-        const view = document.getElementById(`gdlView${{i}}`);
-        if (btn) {{
+      for (let i = 0; i < 6; i++) {
+        const btn = document.getElementById(`gdlTab${i}`);
+        const view = document.getElementById(`gdlView${i}`);
+        if (btn) {
           if (i === idx) btn.classList.add('active');
           else btn.classList.remove('active');
-        }}
-        if (view) {{
+        }
+        if (view) {
           if (i === idx) view.style.display = 'flex';
           else view.style.display = 'none';
-        }}
-      }}
+        }
+      }
       if (idx === 1) renderQ6HypercubeSvg();
       if (idx === 2) updateFwhtSim();
       if (idx === 3) updateSheafSim();
-    }}
+    }
 
-    function initGdlEngine() {{
+    function initGdlEngine() {
       switchGdlTab(0);
       renderQ6HypercubeSvg();
       updateGdlHud();
       updateFwhtSim();
       updateSheafSim();
-    }}
+    }
 
-    const GDL_STAGE_DATA = {{
-      telemetry: {{
+    const GDL_STAGE_DATA = {
+      telemetry: {
         title: "1. Multimodal Telemetry Grounding",
         desc: "Binds real-time device sensors to the 6 lines: IMU, MediaPipe pose, and metabolic decay drive Lines 0-2 (Lower Trigram); camera FIND, speech, and peer presence drive Lines 3-5 (Upper Trigram).",
         group: "SE(3) × ℝ⁶ Local State Manifold",
         kernel: "scripts/organs/creature_organ.gd",
         complexity: "O(1) Sensor Polling",
         latency: "< 0.2 ms"
-      }},
-      cartesian: {{
+      },
+      cartesian: {
         title: "2. Cartesian Product Factorization (Q₃ □ Q₃)",
         desc: "Factorizes the 6-hypercube into Lower Trigram (Inner Body) and Upper Trigram (Outer World). Equivalent to K₈ complete pairing graph, anchoring self-state before external reasoning.",
         group: "Q₃ □ Q₃ ≅ Q₆ (Cartesian Graph Product)",
         kernel: "packages/core/src/trigram-graph.ts",
         complexity: "8 × 8 Matrix Indexing",
         latency: "< 0.05 µs"
-      }},
-      fwht: {{
+      },
+      fwht: {
         title: "3. Spectral Hypercube Denoising (FWHT)",
         desc: "Analytic Graph Fourier Transform via Walsh-Hadamard functions. Filters noisy MNN GTE-768 text embeddings into crisp hypercube attractors with zero matrix multiplications.",
         group: "Walsh-Hadamard H₆ Eigenbasis",
         kernel: "include/q6_spectral.hpp",
         complexity: "384 Butterfly Adds (0 Mults)",
         latency: "1.2 µs (ARM NEON)"
-      }},
-      sheaf: {{
+      },
+      sheaf: {
         title: "4. Cellular Sheaf Laplacian (ℒ_ℱ)",
         desc: "Replaces naive scalar GNN diffusion with line-specific restriction maps ℱ_{v⊴e_k}. Prevents oversmoothing feature collapse, preserving distinct harmonic agent modes.",
         group: "Cellular Sheaf Cohomology H⁰(ℱ)",
         kernel: "android_plugin/ixmnn/src/main/cpp/sheaf.hpp",
         complexity: "Sparse Graph GEMM (Degree 6)",
         latency: "< 12 µs"
-      }},
-      hodge: {{
+      },
+      hodge: {
         title: "5. Discrete Hodge Decomposition De-Looper",
         desc: "Decomposes dialogue attention flow into Exact (gradient), Co-exact (curl), and Harmonic components. Nullifies the curl component to break repetitive hallucination loops.",
         group: "Discrete Exterior Calculus (DEC) Δ₁",
         kernel: "include/hodge_dec.hpp",
         complexity: "1-Form Hodge Projection",
         latency: "< 0.8 µs"
-      }},
-      mnn_hook: {{
+      },
+      mnn_hook: {
         title: "6. MNN C++ Logit Bias & KV Parallel Transport",
         desc: "Direct logit biasing in ixmnn_jni.cpp: logits' = logits + β · U h. Binds KV-cache through Lie group rotations exp(Ω_k), updating memory across turns in O(1) without recomputation.",
         group: "SO(d) Lie Group Parallel Transport",
         kernel: "ixmnn_jni.cpp (around sampleTopP)",
         complexity: "O(V) Vector Add + In-place Rotation",
         latency: "< 25 µs"
-      }},
-      tensegrity: {{
+      },
+      tensegrity: {
         title: "7. 3D Tensegrity Ball Body Cl(3,0)",
         desc: "Hexy's 6-strut tensegrity ball is the physical hexagram: strut i represents line i+1 (yang stands out thick, yin draws back). Rendered in 3 draw calls via MultiMeshes.",
         group: "Clifford Geometric Algebra Cl(3,0)",
         kernel: "scripts/creature/ball_geometry.gd",
         complexity: "3 Draw Calls (MultiMesh SubViewport)",
         latency: "0.15 ms / frame"
-      }}
-    }};
+      }
+    };
 
-    function inspectGdlStage(stageKey) {{
+    function inspectGdlStage(stageKey) {
       const data = GDL_STAGE_DATA[stageKey];
       if (!data) return;
       document.getElementById('gdlStageInspector').innerHTML = `
         <div style="font-weight: 700; color: #38bdf8; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 4px;">
-          ${{data.title}}
+          ${data.title}
         </div>
         <div style="color: #cbd5e1; line-height: 1.45; font-size: 0.74rem;">
-          ${{data.desc}}
+          ${data.desc}
         </div>
         <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #94a3b8;">
-          <div><span style="color: #38bdf8;">Group Symmetry:</span> <span>${{data.group}}</span></div>
-          <div><span style="color: #c084fc;">C++ Kernel:</span> <span>${{data.kernel}}</span></div>
-          <div><span style="color: #4ade80;">Complexity:</span> <span>${{data.complexity}}</span></div>
-          <div><span style="color: #fbbf24;">Latency:</span> <span>${{data.latency}}</span></div>
+          <div><span style="color: #38bdf8;">Group Symmetry:</span> <span>${data.group}</span></div>
+          <div><span style="color: #c084fc;">C++ Kernel:</span> <span>${data.kernel}</span></div>
+          <div><span style="color: #4ade80;">Complexity:</span> <span>${data.complexity}</span></div>
+          <div><span style="color: #fbbf24;">Latency:</span> <span>${data.latency}</span></div>
         </div>
       `;
-    }}
+    }
 
-    function toggleGdlLine(lineIdx) {{
+    function toggleGdlLine(lineIdx) {
       gdlActiveBits ^= (1 << lineIdx);
       updateGdlHud();
       renderQ6HypercubeSvg();
       updateFwhtSim();
-    }}
+    }
 
-    function updateGdlHud() {{
+    function updateGdlHud() {
       const wen = getGdlHexNumber(gdlActiveBits);
-      const hexInfo = GDL_NAMES[wen] || {{ zh: "復", pinyin: "fù", en: "Return", pt: "Retorno" }};
+      const hexInfo = GDL_NAMES[wen] || { zh: "復", pinyin: "fù", en: "Return", pt: "Retorno" };
       
       const titleElem = document.getElementById('gdlHudTitle');
-      if (titleElem) titleElem.textContent = `${{wen}} · ${{hexInfo.zh}} ${{hexInfo.pinyin}} · ${{hexInfo.en}}`;
+      if (titleElem) titleElem.textContent = `${wen} · ${hexInfo.zh} ${hexInfo.pinyin} · ${hexInfo.en}`;
       
       const bitsElem = document.getElementById('gdlHudBits');
-      if (bitsElem) {{
+      if (bitsElem) {
         let bitStr = "";
         for (let i = 5; i >= 0; i--) bitStr += ((gdlActiveBits >> i) & 1);
-        bitsElem.textContent = `Bits: 0b${{bitStr}}`;
-      }}
+        bitsElem.textContent = `Bits: 0b${bitStr}`;
+      }
 
       const wenElem = document.getElementById('gdlHudWen');
-      if (wenElem) wenElem.textContent = `King Wen #${{wen}}`;
+      if (wenElem) wenElem.textContent = `King Wen #${wen}`;
 
       const lowerVal = gdlActiveBits & 7;
       const upperVal = (gdlActiveBits >> 3) & 7;
@@ -3950,37 +3960,37 @@
       const tUpper = GDL_TRIGRAMS[upperVal];
 
       const lowerElem = document.getElementById('gdlHudLower');
-      if (lowerElem) lowerElem.textContent = `${{tLower.symbol}} ${{tLower.zh}} ${{tLower.py}} (${{tLower.en}})`;
+      if (lowerElem) lowerElem.textContent = `${tLower.symbol} ${tLower.zh} ${tLower.py} (${tLower.en})`;
 
       const upperElem = document.getElementById('gdlHudUpper');
-      if (upperElem) upperElem.textContent = `${{tUpper.symbol}} ${{tUpper.zh}} ${{tUpper.py}} (${{tUpper.en}})`;
+      if (upperElem) upperElem.textContent = `${tUpper.symbol} ${tUpper.zh} ${tUpper.py} (${tUpper.en})`;
 
       // Update Line buttons
-      for (let i = 0; i < 6; i++) {{
-        const btn = document.getElementById(`lineBtn${{i}}`);
-        const glyph = document.getElementById(`lineGlyph${{i}}`);
+      for (let i = 0; i < 6; i++) {
+        const btn = document.getElementById(`lineBtn${i}`);
+        const glyph = document.getElementById(`lineGlyph${i}`);
         const isYang = ((gdlActiveBits >> i) & 1) === 1;
-        if (btn && glyph) {{
-          if (isYang) {{
+        if (btn && glyph) {
+          if (isYang) {
             btn.classList.add('yang');
             glyph.textContent = "─────";
-          }} else {{
+          } else {
             btn.classList.remove('yang');
             glyph.textContent = "-- --";
-          }}
-        }}
-      }}
+          }
+        }
+      }
 
       // Composed Sentence from reading_words.gd logic
       const sentenceElem = document.getElementById('gdlHudSentence');
-      if (sentenceElem) {{
+      if (sentenceElem) {
         const movingLine = 1; // Body
         const needName = GDL_LINE_NAMES[movingLine - 1];
-        sentenceElem.textContent = `"${{needName}} is the line that moved — it has been quiet since morning · a little would be welcome"`;
-      }}
-    }}
+        sentenceElem.textContent = `"${needName} is the line that moved — it has been quiet since morning · a little would be welcome"`;
+      }
+    }
 
-    function renderQ6HypercubeSvg() {{
+    function renderQ6HypercubeSvg() {
       const nodesGroup = document.getElementById('q6NodesGroup');
       const edgesGroup = document.getElementById('q6EdgesGroup');
       const activeEdgesGroup = document.getElementById('q6ActiveEdgesGroup');
@@ -3988,72 +3998,72 @@
 
       // Generate Coxeter 2D projection of 64 vertices
       const coords = [];
-      for (let i = 0; i < 64; i++) {{
+      for (let i = 0; i < 64; i++) {
         let x = 0, y = 0;
-        for (let k = 0; k < 6; k++) {{
+        for (let k = 0; k < 6; k++) {
           const bit = (i >> k) & 1;
           const val = bit ? 1 : -1;
           const angle = (2 * Math.PI * k) / 6.0;
           x += val * Math.cos(angle) * 22;
           y += val * Math.sin(angle) * 22;
-        }}
-        coords.push({{ x, y }});
-      }}
+        }
+        coords.push({ x, y });
+      }
 
       // Draw Edges if empty
-      if (edgesGroup.children.length === 0) {{
+      if (edgesGroup.children.length === 0) {
         let edgeHtml = "";
-        for (let i = 0; i < 64; i++) {{
-          for (let k = 0; k < 6; k++) {{
+        for (let i = 0; i < 64; i++) {
+          for (let k = 0; k < 6; k++) {
             const j = i ^ (1 << k);
-            if (i < j) {{
-              edgeHtml += `<line x1="${{coords[i].x}}" y1="${{coords[i].y}}" x2="${{coords[j].x}}" y2="${{coords[j].y}}" />`;
-            }}
-          }}
-        }}
+            if (i < j) {
+              edgeHtml += `<line x1="${coords[i].x}" y1="${coords[i].y}" x2="${coords[j].x}" y2="${coords[j].y}" />`;
+            }
+          }
+        }
         edgesGroup.innerHTML = edgeHtml;
-      }}
+      }
 
       // Draw Nodes if empty
-      if (nodesGroup.children.length === 0) {{
+      if (nodesGroup.children.length === 0) {
         let nodeHtml = "";
-        for (let i = 0; i < 64; i++) {{
-          nodeHtml += `<circle id="q6node_${{i}}" cx="${{coords[i].x}}" cy="${{coords[i].y}}" r="3.2" fill="rgba(148,163,184,0.35)" style="cursor: pointer;" onclick="selectQ6Node(${{i}})" />`;
-        }}
+        for (let i = 0; i < 64; i++) {
+          nodeHtml += `<circle id="q6node_${i}" cx="${coords[i].x}" cy="${coords[i].y}" r="3.2" fill="rgba(148,163,184,0.35)" style="cursor: pointer;" onclick="selectQ6Node(${i})" />`;
+        }
         nodesGroup.innerHTML = nodeHtml;
-      }}
+      }
 
       // Highlight active node & its 6 Hamming-1 neighbors
       const activeCoord = coords[gdlActiveBits];
       const glow = document.getElementById('q6ActiveGlow');
       const dot = document.getElementById('q6ActiveDot');
-      if (glow && dot && activeCoord) {{
+      if (glow && dot && activeCoord) {
         glow.setAttribute('cx', activeCoord.x);
         glow.setAttribute('cy', activeCoord.y);
         dot.setAttribute('cx', activeCoord.x);
         dot.setAttribute('cy', activeCoord.y);
-      }}
+      }
 
       // Render the 6 incident Hamming-1 edges in amber
       let activeEdgesHtml = "";
-      for (let k = 0; k < 6; k++) {{
+      for (let k = 0; k < 6; k++) {
         const neighbor = gdlActiveBits ^ (1 << k);
-        activeEdgesHtml += `<line x1="${{activeCoord.x}}" y1="${{activeCoord.y}}" x2="${{coords[neighbor].x}}" y2="${{coords[neighbor].y}}" />`;
-        const nodeElem = document.getElementById(`q6node_${{neighbor}}`);
+        activeEdgesHtml += `<line x1="${activeCoord.x}" y1="${activeCoord.y}" x2="${coords[neighbor].x}" y2="${coords[neighbor].y}" />`;
+        const nodeElem = document.getElementById(`q6node_${neighbor}`);
         if (nodeElem) nodeElem.setAttribute('fill', '#fbbf24');
-      }}
+      }
       activeEdgesGroup.innerHTML = activeEdgesHtml;
-    }}
+    }
 
-    function selectQ6Node(idx) {{
+    function selectQ6Node(idx) {
       gdlActiveBits = idx;
       updateGdlHud();
       renderQ6HypercubeSvg();
       updateFwhtSim();
-    }}
+    }
 
     // FWHT Simulation
-    function updateFwhtSim() {{
+    function updateFwhtSim() {
       const noiseSlider = document.getElementById('fwhtNoiseSlider');
       const cutoffSlider = document.getElementById('fwhtCutoffSlider');
       if (noiseSlider) gdlNoiseSigma = parseFloat(noiseSlider.value);
@@ -4063,33 +4073,33 @@
       if (noiseVal) noiseVal.textContent = gdlNoiseSigma.toFixed(2);
 
       const cutoffVal = document.getElementById('fwhtCutoffVal');
-      if (cutoffVal) cutoffVal.textContent = `${{gdlSpectralCutoff}} (Harmonic ${{Math.floor(gdlSpectralCutoff / 2)}})`;
+      if (cutoffVal) cutoffVal.textContent = `${gdlSpectralCutoff} (Harmonic ${Math.floor(gdlSpectralCutoff / 2)})`;
 
       drawFwhtCanvas();
-    }}
+    }
 
-    function runFwhtStep() {{
+    function runFwhtStep() {
       const pill = document.getElementById('fwhtStatusPill');
-      if (pill) {{
+      if (pill) {
         pill.textContent = "Denoising Active (< 1.2 µs)";
         pill.className = "gdl-chip gdl-chip-cyan";
-        setTimeout(() => {{
+        setTimeout(() => {
           pill.textContent = "Attractor Locked";
           pill.className = "gdl-chip gdl-chip-green";
-        }}, 400);
-      }}
+        }, 400);
+      }
       drawFwhtCanvas(true);
-    }}
+    }
 
-    function resetFwhtSim() {{
+    function resetFwhtSim() {
       const noiseSlider = document.getElementById('fwhtNoiseSlider');
       const cutoffSlider = document.getElementById('fwhtCutoffSlider');
       if (noiseSlider) noiseSlider.value = "0.35";
       if (cutoffSlider) cutoffSlider.value = "6";
       updateFwhtSim();
-    }}
+    }
 
-    function drawFwhtCanvas(isFiltered = false) {{
+    function drawFwhtCanvas(isFiltered = false) {
       const canvas = document.getElementById('fwhtCanvas');
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
@@ -4100,7 +4110,7 @@
       const barW = (w - 20) / 64.0;
 
       // Draw bars for 64 nodes
-      for (let i = 0; i < 64; i++) {{
+      for (let i = 0; i < 64; i++) {
         const x = 10 + i * barW;
         const isTarget = (i === gdlActiveBits);
         
@@ -4116,12 +4126,12 @@
         ctx.fillRect(x, h - 25 - barH1, barW - 1, barH1);
 
         // Filtered Bar (Amber)
-        if (isFiltered || gdlSpectralCutoff <= 6) {{
+        if (isFiltered || gdlSpectralCutoff <= 6) {
           const barH2 = Math.min(filteredVal * (h - 40), h - 30);
           ctx.fillStyle = isTarget ? 'rgba(251, 191, 36, 0.95)' : 'rgba(251, 191, 36, 0.15)';
           ctx.fillRect(x + 1, h - 25 - barH2, barW - 3, barH2);
-        }}
-      }}
+        }
+      }
 
       // Baseline
       ctx.strokeStyle = 'rgba(255,255,255,0.15)';
@@ -4130,29 +4140,29 @@
       ctx.moveTo(10, h - 25);
       ctx.lineTo(w - 10, h - 25);
       ctx.stroke();
-    }}
+    }
 
     // Sheaf Simulation
-    function updateSheafSim() {{
+    function updateSheafSim() {
       const slider = document.getElementById('sheafSlider');
       if (slider) gdlDiffusionStep = parseInt(slider.value);
       
       const stepVal = document.getElementById('sheafStepVal');
-      if (stepVal) stepVal.textContent = `Step ${{gdlDiffusionStep}}`;
+      if (stepVal) stepVal.textContent = `Step ${gdlDiffusionStep}`;
 
       const naiveVar = Math.max(0.01, 1.0 / Math.pow(1.9, gdlDiffusionStep));
       const sheafVar = Math.max(0.78, 0.95 - 0.015 * gdlDiffusionStep);
 
       const naiveElem = document.getElementById('naiveVarVal');
-      if (naiveElem) naiveElem.textContent = `${{naiveVar.toFixed(2)}} (Collapse)`;
+      if (naiveElem) naiveElem.textContent = `${naiveVar.toFixed(2)} (Collapse)`;
 
       const sheafElem = document.getElementById('sheafVarVal');
-      if (sheafElem) sheafElem.textContent = `${{sheafVar.toFixed(2)}} (Stable)`;
+      if (sheafElem) sheafElem.textContent = `${sheafVar.toFixed(2)} (Stable)`;
 
       drawSheafCanvas(naiveVar, sheafVar);
-    }}
+    }
 
-    function drawSheafCanvas(naiveVar, sheafVar) {{
+    function drawSheafCanvas(naiveVar, sheafVar) {
       const canvas = document.getElementById('sheafCanvas');
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
@@ -4175,7 +4185,7 @@
       ctx.fill();
 
       // Draw individual points
-      for (let i = 0; i < 24; i++) {{
+      for (let i = 0; i < 24; i++) {
         const angle = (i / 24.0) * Math.PI * 2;
         
         // Naive point (contracts to center)
@@ -4195,65 +4205,65 @@
         ctx.beginPath();
         ctx.arc(px2, py2, 3, 0, Math.PI * 2);
         ctx.fill();
-      }}
+      }
 
       // Labels
       ctx.fillStyle = '#fb7185';
       ctx.font = '10px JetBrains Mono';
       ctx.textAlign = 'center';
-      ctx.fillText(`Naive GCN: Var=${{naiveVar.toFixed(2)}}`, cx1, canvas.height - 15);
+      ctx.fillText(`Naive GCN: Var=${naiveVar.toFixed(2)}`, cx1, canvas.height - 15);
 
       ctx.fillStyle = '#4ade80';
-      ctx.fillText(`Sheaf: Var=${{sheafVar.toFixed(2)}}`, cx2, canvas.height - 15);
-    }}
+      ctx.fillText(`Sheaf: Var=${sheafVar.toFixed(2)}`, cx2, canvas.height - 15);
+    }
 
     // Hodge Simulation
-    function simHodgeLoop() {{
+    function simHodgeLoop() {
       const badge = document.getElementById('hodgeCurlBadge');
       const text = document.getElementById('hodgeStatusText');
-      if (badge) {{
+      if (badge) {
         badge.className = "gdl-chip gdl-chip-rose";
         badge.textContent = "CURL: 0.88 (LOOP TRAPPED)";
-      }}
-      if (text) {{
+      }
+      if (text) {
         text.textContent = "Loop Vortex Active";
         text.setAttribute('fill', '#fb7185');
-      }}
-      for (let i = 0; i < 4; i++) {{
-        const edge = document.getElementById(`hodgeEdge${{i}}`);
-        if (edge) {{
+      }
+      for (let i = 0; i < 4; i++) {
+        const edge = document.getElementById(`hodgeEdge${i}`);
+        if (edge) {
           edge.setAttribute('stroke', '#fb7185');
           edge.setAttribute('marker-end', 'url(#hodgeArrowRed)');
-        }}
-      }}
+        }
+      }
       const exitEdge = document.getElementById('hodgeExitEdge');
       if (exitEdge) exitEdge.setAttribute('opacity', '0.2');
-    }}
+    }
 
-    function applyHodgeProjection() {{
+    function applyHodgeProjection() {
       const badge = document.getElementById('hodgeCurlBadge');
       const text = document.getElementById('hodgeStatusText');
-      if (badge) {{
+      if (badge) {
         badge.className = "gdl-chip gdl-chip-cyan";
         badge.textContent = "CURL: 0.00 (LOOP BROKEN)";
-      }}
-      if (text) {{
+      }
+      if (text) {
         text.textContent = "Hodge Projection: Gradient Resumed";
         text.setAttribute('fill', '#38bdf8');
-      }}
-      for (let i = 0; i < 4; i++) {{
-        const edge = document.getElementById(`hodgeEdge${{i}}`);
-        if (edge) {{
+      }
+      for (let i = 0; i < 4; i++) {
+        const edge = document.getElementById(`hodgeEdge${i}`);
+        if (edge) {
           edge.setAttribute('stroke', '#38bdf8');
           edge.setAttribute('marker-end', 'url(#hodgeArrowBlue)');
-        }}
-      }}
+        }
+      }
       const exitEdge = document.getElementById('hodgeExitEdge');
-      if (exitEdge) {{
+      if (exitEdge) {
         exitEdge.setAttribute('opacity', '1.0');
         exitEdge.setAttribute('stroke-width', '3');
-      }}
-    }}
+      }
+    }
 
 </script>
 </body>
