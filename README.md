@@ -21,11 +21,79 @@ a tangle, felt only as Hexy's vitality — is the long game. See
 `docs/ROADMAP.md` for the honest built/planned/proposed breakdown.
 
 Three docs, three jobs: `docs/ROADMAP.md` is the reasoning and every phase plan,
-written before its code; `docs/SURFACE.md` is the one screen hexy shows and the
-index of what Phase 12 produced; `docs/FIELD.md` is the runbook — tests, export,
-install, driving a phone over adb, and asking a phone why it died.
-`docs/take-format.md` documents `take.json`, the consumer-agnostic clip
-manifest `tools/hexcam_take.py` produces from a take directory.
+written before its code; `docs/SURFACE.md` is the one screen hexy shows, the two
+laws that govern it, and the index of what produced it; `docs/FIELD.md` is the
+runbook — tests, export, install, driving a phone over adb, and asking a phone
+why it died.
+
+The rest are formats and roads: `docs/take-format.md` (`take.json`, the
+consumer-agnostic clip manifest), `docs/room-file.md` (the room file),
+`docs/ar-lens.md` (the lens and the Time Window), `docs/splat-pipeline.md`
+(phones → COLMAP → a splat → a room file).
+
+## What hexy is, and what works today — 2026-09-05
+
+**One screen.** The camera is its background; everything else is an overlay.
+No nesting, no tabs, no modes to discover. Two laws hold it —
+`docs/SURFACE.md`'s **LAW OF THE GLASS** (no feature mounts a fullscreen
+surface; a feature that cannot get its camera does not open, and says why) and
+**LAW OF THE DARK** (nothing hidden, no permission silently off, no dark state
+that does not name itself). Both were bought with defects and both are fenced
+by suites.
+
+**Six doors, twenty-three actions.** VISION · AUDIO · VIDEO · CLOCK · PEERS ·
+SETUP. Six was the owner's number and it held, because the six are *places*
+rather than actions, and each opens a tray of what is behind it.
+
+**Bodies, two ways.** The camera's (MediaPipe, green, `VISION/[ body ]`) and
+the swarm's (phones strapped to limbs, IMU only, out over VMC).
+
+**AR, and only where it earns it.** `VISION/FIND` puts an arrow and a label on
+the thing being hunted, with the bearing measured and the range honestly
+assumed. `VIDEO/[ window ]` is the **Time Window**: a room, as points and
+colours in metres, stood back up in the room it was measured in and faded
+between then and now on one slider. The lens is a surface the doors borrow, not
+a seventh door.
+
+**Swarm organs.** A chirp clock that measures phones against each other to under
+a millisecond, a rave that plays one file on several of them in step, a mocap
+suit, an ear array that locates a clap by TDOA, and a capture rig that writes
+down *proof the shutters agreed* rather than trying to reconstruct anything
+live.
+
+**A creature with a heart, and it says something.** Six needs, decaying on hour
+scales, read as a King Wen hexagram with exactly one changing line, and a
+vitality floored at 0.15 — no red state, ever, as arithmetic rather than as a
+promise. The reading is on the glass now: the ball's own struts are the six
+lines, the number carries its name (`24 · 復 fù · Return`, in the phone's
+locale), and when a line actually moves the creature says one composed sentence
+about it — *"food is the line that moved — it has been quiet since morning"*.
+The sentence is built from the creature's own data. The I-Ching lends the
+sixty-four **names** and nothing else, which is the whole of the loan.
+
+**A metric spine.** Everything that measures is metric and everything that is
+stored is a **format**: `take.json`, the `.kp` sidecar, the room file. hexy depends on formats, never on providers — no file here names a
+company, and the readers cannot tell what wrote the bytes.
+
+### Honest about the evidence
+
+| proven | how far |
+|---|---|
+| **Device-proven** | FIND and LOOK on the Fold; the flat surface and its doors; relaunch under adb; the rig recording real takes; fourteen takes with live keypoint labels |
+| **Headless-proven only** | every swarm organ (chirp clock, rave, mocap suit, ear array, sync manifest); the creature's hexagram; the Time Window and the room file reader; the lens's own primitives |
+| **Not built** | the phone writing its own room file; a person having stood in the Time Window and said whether the ghost lands |
+
+**Correction, 2026-09-05/06.** Two cells above moved. The radio lane is no
+longer this repo's line at all (see `docs/ROADMAP.md` P18f); hexy holds none of
+it. And *the room file on a
+phone's glass at all* is done: `room_20e93bef.ply` went onto the Fold the same
+night it was made. What is left is the only question that was ever worth
+asking — two taps in a real room, and does the ghost counter stand on the
+counter.
+
+58 headless suites. `docs/FIELD.md` §1 runs them; a phase section in
+`docs/ROADMAP.md` that says *device-pending* means exactly that, and means the
+owner's own hands are the missing instrument.
 
 ## What runs today (the two engines)
 
@@ -38,19 +106,35 @@ Around them: an explicit dialog FSM (`turn_machine.gd` — idle/listening/
 thinking/speaking, finding as a parallel open-ended lane, watchdogged), a
 visible transcript (everything heard and said stays on glass), Android
 SpeechRecognizer ears (offline packs, auto-download) and TTS mouth
-(`ixvoice`), and the visible-controls law: five labelled buttons, no gestures,
-consents default ON and persist.
+(`ixvoice`), and the visible-controls law: labelled buttons, no gestures, and
+consents that **default ON**, persist, and are named out loud on the glass when
+one of them is what is blocking a feature (`docs/SURFACE.md`, THE LAW OF THE
+DARK). The five buttons that sentence used to name are six doors now.
 
 FIND's vocabulary is the 80 COCO classes plus synonyms; an unknown word gets
 one honest sentence naming what it *can* find. No pretending.
 
 ## Character
 
-| | v1 (now) | v2 (future) |
+| | v2 (now) | v3 (future) |
 |---|---|---|
-| Body | Hexy: friendly vector hexagon, zero assets | 3DGS animal-monster creatures |
+| Body | Hexy: a **six-strut tensegrity ball** drawn from code, zero assets | 3DGS animal-monster creatures |
 | World | flat color | 3DGS environment reconstructed from the phone camera |
-| Seam | `scripts/hexy.gd` — `notice()` / `glance()` API stays | same API, new body |
+| Seam | `scripts/hexy.gd` — `notice()` / `glance()` / `show_hexagram()` API stays | same API, new body |
+
+**Correction, 2026-09-06.** This table used to say *friendly vector hexagon*,
+and that was true until `6bde8d8`. The hexagon was a picture of the creature's
+state; the ball **is** it. Six struts pivot at their midpoints on a hub, one per
+hexagram line, bottom line first — a yang line stands its strut out, a yin line
+draws it back — so the shape on the glass and the six bars beside it are two
+readings of one number and cannot disagree. The geometry is pure arithmetic in
+`scripts/creature/ball_geometry.gd` (mirrored from `ix64-hexeract`, where it is
+pinned, because the *simulated* shell and the *drawn* shell being two different
+solids would be a lie a test could not catch), and the drawing is one
+`SubViewport`, three draw calls, transforms rebuilt only when the hexagram
+moves. Nothing above the seam changed: `notice()`, `glance()` and
+`show_hexagram()` are the same calls with a different body under them, which was
+the whole point of writing the row that way in the first place.
 
 ## Visits
 
@@ -162,7 +246,7 @@ is the whole feature.
 
 A peer may also be *rotated in place* to their own heading — that is information
 about them, not their position. `hexy.gd` has a `face(deg)` which rotates the
-whole creature under one transform (hexagon, eyes, pupils, mouth, and a nose on
+whole creature under one transform (the ball, eyes, pupils, mouth, and a nose on
 the rim) and undoes it before the label, because a name is written for a reader
 and readers do not tilt their heads. The sweep takes the short way round the
 circle, so crossing north is twenty degrees and not three hundred and forty.
@@ -591,6 +675,7 @@ Godot_v4.7.1 --headless --path . -s res://tests/geo_smoke.gd
 Godot_v4.7.1 --headless --path . -s res://tests/radar_smoke.gd
 Godot_v4.7.1 --headless --path . -s res://tests/peer_mind_smoke.gd
 Godot_v4.7.1 --headless --path . -s res://tests/probe_smoke.gd
+Godot_v4.7.1 --headless --path . -s res://tests/lens_smoke.gd
 ```
 
 Windowed proof of visits, no network needed — fakes two presence events and

@@ -13,6 +13,23 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
+ * THE VERSION THIS AAR ANSWERS TO. Bump the number with ANY change to the seam
+ * this plugin presents to GDScript — a new @UsedByGodot method, a changed
+ * signature, a new or renamed signal — and bump the matching `NEEDS` in every
+ * GDScript seam that binds it (`scripts/seam.gd` lists them).
+ *
+ * WHY IT EXISTS. The AARs are gitignored build output staged by
+ * `./gradlew exportAllAars`. A forgotten stage ships an OLD plugin under a NEW
+ * script, and the failure is silent: the call lands on a method that is not
+ * there, or worse, on one that still is and means something else. The handshake
+ * turns that into one loud line at attach and a degrade to the mock.
+ *
+ * `./gradlew exportAllAars` copies this string into addons/ixmnn/bin/VERSION,
+ * which IS tracked — so what was staged is readable in a diff.
+ */
+const val PLUGIN_VERSION = "ixmnn/1"
+
+/**
  * MNN runtime host for MnnRuntime (scripts/brain/mnn_runtime.gd).
  *
  * One inference runtime for the whole app (the lesson from ix64-avatar's
@@ -62,6 +79,14 @@ class IxMnn(godot: Godot) : GodotPlugin(godot) {
 	private val streaming = AtomicBoolean(false)
 
 	override fun getPluginName() = "IxMnn"
+
+	/**
+	 * THE HANDSHAKE. Asked once by the GDScript seam at attach, compared with
+	 * its own `NEEDS`, and a mismatch degrades that seam to its mock rather
+	 * than letting a stale AAR answer new questions. See [PLUGIN_VERSION].
+	 */
+	@UsedByGodot
+	fun plugin_version(): String = PLUGIN_VERSION
 
 	/**
 	 * PHASE 11b — THERE IS NO CAMERA IN THIS PLUGIN ANY MORE.

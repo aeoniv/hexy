@@ -1,4 +1,4 @@
-# Godot
+﻿# Godot
 .godot/
 *.tmp
 export_presets.cfg
@@ -7,7 +7,7 @@ android/
 
 # Android plugin build state and drop-ins (see android_plugin/README.md).
 # godot-lib.template_release.aar is ~100 MB of engine, mnn-jni/ is ~16 MB of
-# Alibaba's .so files — both are fetched per machine, never vendored.
+# Alibaba's .so files â€” both are fetched per machine, never vendored.
 android_plugin/.gradle/
 android_plugin/.kotlin/
 android_plugin/build/
@@ -18,7 +18,7 @@ android_plugin/libs/*.aar
 android_plugin/libs/mnn-jni/
 android_plugin/hs_err_pid*.log
 
-# Plugin AARs staged for export — build output, same policy as ix64-avatar
+# Plugin AARs staged for export â€” build output, same policy as ix64-avatar
 addons/ixmesh/bin/*.aar
 addons/ixmesh/bin/**/*.aar
 addons/ixmnn/bin/*.aar
@@ -41,11 +41,17 @@ addons/ixvoice/bin/**/*.aar
 # run. Vendoring it would commit a stale picture of the code beside the code.
 graphify-out/
 
-# ixcap: the aar, build output like its five siblings. HexCam's camera plugin —
+# ixcap: the aar, build output like its five siblings. HexCam's camera plugin â€”
 # addons/ixcap/bin/**/.gitkeep is tracked so the export plugin's path exists in
 # a fresh checkout; the 10 kB aar itself is built by
 # `./gradlew :ixcap:assembleRelease :ixcap:assembleDebug`.
 addons/ixcap/bin/*.aar
 addons/ixcap/bin/**/*.aar
+
+# ixlens: the same bargain, for the AR lens plugin. addons/ixlens/bin/**/.gitkeep
+# is tracked so the export plugin's path exists in a fresh checkout; the aar is
+# built by `./gradlew :ixlens:assembleRelease :ixlens:assembleDebug`.
+addons/ixlens/bin/*.aar
+addons/ixlens/bin/**/*.aar
 takes/
 __pycache__/
