@@ -1,4 +1,5 @@
-// q6_spectral.hpp -- Fast Walsh-Hadamard Transform (FWHT) & Q6 Hypercube Spectral Kernel
+﻿// q6_spectral.hpp -- Fast Walsh-Hadamard Transform (FWHT), Q6 Hypercube Spectral Kernel
+//                     & Tier-2 Cellular Sheaf Laplacian over Delta_2(Q6)
 //
 // Pure header-only C++ implementation for Alibaba MNN mobile inference.
 //
@@ -8,6 +9,13 @@
 // - Eigenvectors are analytically the Walsh-Hadamard functions H_6 = H_1^{tensor 6}.
 // - FWHT computes spectral filtering in 384 additions and 0 multiplications.
 // - Latency: ~1.2 us on ARM64 Cortex-A78. Zero dynamic allocations.
+//
+// Tier-2 Cellular Sheaf Laplacian (Bodnar et al., NeurIPS 2022):
+// - Vertex stalk F(v) = R^6 (vitality / line fulfillment states).
+// - Edge stalk F(e) = R^2 (coupled line pairs k and (k+3)%6).
+// - Orthogonal restriction maps F_{v <= e} in SO(2) enforcing harmonic trigram coupling.
+// - Sheaf Dirichlet energy E_F(x) measures cognitive dissonance / state tension.
+// - Sheaf diffusion prevents oversmoothing while regularizing continuous state trajectories.
 
 #pragma once
 
@@ -121,6 +129,83 @@ inline std::array<uint8_t, 6> hamming_neighbors(uint8_t bits) {
         neighbors[i] = (bits ^ (1 << i)) & 0x3F;
     }
     return neighbors;
+}
+
+// =========================================================================
+// Tier-2: Cellular Sheaf Laplacian over Delta_2(Q6)
+// =========================================================================
+
+// Orthogonal restriction map F_{v <= e}: R^6 -> R^2
+// Extracts line k and its harmonic trigram partner (k+3)%6, rotated by theta_k
+inline std::array<float, 2> sheaf_restrict(uint8_t v, int line_k, const std::array<float, 6>& state_6d) {
+    int k = line_k % 6;
+    int k_partner = (k + 3) % 6;
+    float x1 = state_6d[k];
+    float x2 = state_6d[k_partner];
+
+    // Orthogonal rotation angle theta_k = (pi / 3) * k
+    // Sign flips if bit k is set at vertex v, creating non-trivial holonomy
+    float theta = (3.14159265358979323846f / 3.0f) * static_cast<float>(k);
+    if ((v >> k) & 1) {
+        theta = -theta;
+    }
+    float c = std::cos(theta);
+    float s = std::sin(theta);
+
+    return { c * x1 - s * x2, s * x1 + c * x2 };
+}
+
+// Sheaf edge difference (coboundary) delta(x)_e = F_{v <= e} x_v - F_{u <= e} x_u
+inline std::array<float, 2> sheaf_edge_diff(uint8_t u, uint8_t v, int line_k,
+                                            const std::array<float, 6>& x_u,
+                                            const std::array<float, 6>& x_v) {
+    auto r_u = sheaf_restrict(u, line_k, x_u);
+    auto r_v = sheaf_restrict(v, line_k, x_v);
+    return { r_v[0] - r_u[0], r_v[1] - r_u[1] };
+}
+
+// Local Sheaf Dirichlet Energy at vertex u across its 6 incident edges:
+// E_u(x) = sum_{k=0}^5 || F_{v_k <= e_k} x_{v_k} - F_{u <= e_k} x_u ||^2
+inline float sheaf_local_energy(uint8_t u, const std::array<float, 6>& x_u) {
+    float energy = 0.0f;
+    for (int k = 0; k < 6; ++k) {
+        uint8_t v = (u ^ (1 << k)) & 0x3F;
+        // Construct neighbor state by inverting line k vitality
+        std::array<float, 6> x_v = x_u;
+        x_v[k] = 1.0f - x_u[k];
+        auto diff = sheaf_edge_diff(u, v, k, x_u, x_v);
+        energy += (diff[0] * diff[0] + diff[1] * diff[1]);
+    }
+    return energy;
+}
+
+// Single-step Sheaf Laplacian diffusion: x_u <- x_u - alpha * (L_F x)_u
+// Prevents oversmoothing by diffusing along orthogonal sheaf holonomy orbits
+inline std::array<float, 6> sheaf_diffuse_step(uint8_t u, const std::array<float, 6>& x_u, float alpha = 0.1f) {
+    std::array<float, 6> grad{};
+    for (int k = 0; k < 6; ++k) {
+        uint8_t v = (u ^ (1 << k)) & 0x3F;
+        std::array<float, 6> x_v = x_u;
+        x_v[k] = 1.0f - x_u[k];
+
+        auto diff = sheaf_edge_diff(u, v, k, x_u, x_v);
+        int k_partner = (k + 3) % 6;
+
+        float theta = (3.14159265358979323846f / 3.0f) * static_cast<float>(k);
+        if ((u >> k) & 1) theta = -theta;
+        float c = std::cos(theta);
+        float s = std::sin(theta);
+
+        // Adjoint restriction F_{u <= e}^T
+        grad[k] += (c * diff[0] + s * diff[1]);
+        grad[k_partner] += (-s * diff[0] + c * diff[1]);
+    }
+
+    std::array<float, 6> result = x_u;
+    for (int i = 0; i < 6; ++i) {
+        result[i] = std::max(0.0f, std::min(1.0f, x_u[i] + alpha * grad[i]));
+    }
+    return result;
 }
 
 // Global topological prior state for Tier-1 I-Ching coprocessor

@@ -425,6 +425,77 @@ static func hamming_neighbors(bits: int) -> PackedInt32Array:
 	return neighbors
 
 
+# =============================================================================
+# TIER-2: CELLULAR SHEAF LAPLACIAN OVER Delta_2(Q6)
+# =============================================================================
+
+## Orthogonal restriction map F_{v <= e}: R^6 -> R^2
+## Projects line k and its harmonic trigram partner (k+3)%6 with SO(2) rotation
+static func sheaf_restrict(v: int, line_k: int, state_6d: PackedFloat32Array) -> Vector2:
+	var k := line_k % 6
+	var k_partner := (k + 3) % 6
+	var x1 := state_6d[k] if k < state_6d.size() else 0.5
+	var x2 := state_6d[k_partner] if k_partner < state_6d.size() else 0.5
+	var theta := (PI / 3.0) * float(k)
+	if ((v >> k) & 1) != 0:
+		theta = -theta
+	var c := cos(theta)
+	var s := sin(theta)
+	return Vector2(c * x1 - s * x2, s * x1 + c * x2)
+
+
+## Local Sheaf Dirichlet Energy (Cognitive Dissonance / Disagreement)
+## E_u(x) = sum_{k=0..5} || F_{v_k <= e_k} x_{v_k} - F_{u <= e_k} x_u ||^2
+static func sheaf_local_energy(u: int, state_6d: PackedFloat32Array) -> float:
+	var energy := 0.0
+	for k in range(6):
+		var v := (u ^ (1 << k)) & 0x3F
+		var x_v := state_6d.duplicate()
+		if k < x_v.size():
+			x_v[k] = 1.0 - x_v[k]
+		var r_u := sheaf_restrict(u, k, state_6d)
+		var r_v := sheaf_restrict(v, k, x_v)
+		var diff := r_v - r_u
+		energy += diff.length_squared()
+	return energy
+
+
+## Single-step Sheaf Laplacian diffusion: x_u <- x_u - alpha * (L_F x)_u
+## Regularizes continuous vitality trajectory while preventing oversmoothing
+static func sheaf_diffuse_step(u: int, state_6d: PackedFloat32Array, alpha: float = 0.1) -> PackedFloat32Array:
+	var grad := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+	for k in range(6):
+		var v := (u ^ (1 << k)) & 0x3F
+		var x_v := state_6d.duplicate()
+		if k < x_v.size():
+			x_v[k] = 1.0 - x_v[k]
+		var r_u := sheaf_restrict(u, k, state_6d)
+		var r_v := sheaf_restrict(v, k, x_v)
+		var diff := r_v - r_u
+		var k_partner := (k + 3) % 6
+		var theta := (PI / 3.0) * float(k)
+		if ((u >> k) & 1) != 0:
+			theta = -theta
+		var c := cos(theta)
+		var s := sin(theta)
+		grad[k] += (c * diff.x + s * diff.y)
+		grad[k_partner] += (-s * diff.x + c * diff.y)
+
+	var res := PackedFloat32Array()
+	res.resize(6)
+	for i in range(6):
+		var val := state_6d[i] if i < state_6d.size() else 0.5
+		res[i] = clampf(val + alpha * grad[i], 0.0, 1.0)
+	return res
+
+
+## Sheaf resonance metric between two hexagram states in [0.0, 1.0]
+static func sheaf_resonance(a: int, b: int) -> float:
+	var d := hamming_distance(a, b)
+	var trigram_align := 1.0 if ((a ^ b) & 0b001001) == 0 else 0.7
+	return clampf((1.0 - float(d) / 6.0) * trigram_align, 0.0, 1.0)
+
+
 func _mock_chat(prompt: String) -> String:
 	if not _scripted.is_empty():
 		return _scripted.pop_front()

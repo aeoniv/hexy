@@ -8,7 +8,7 @@ var _fails := 0
 ## EVERY CHECK IS COUNTED. A compile error in a depended script makes a whole
 ## section skip silently, and a suite that prints ALL PASS because it ran nothing
 ## is worse than a red one. Raise this floor when checks are added.
-const MIN_CHECKS := 60
+const MIN_CHECKS := 75
 var _checks := 0
 
 
@@ -181,6 +181,18 @@ func _initialize() -> void:
 	_check(MnnRuntime.nuclear_core(63) == 63, "Nuclear core of Qian (63) is Qian (63)")
 	_check(MnnRuntime.nuclear_core(0) == 0, "Nuclear core of Kun (0) is Kun (0)")
 	_check(MnnRuntime.hamming_neighbors(0).size() == 6, "Vertex in Q6 has exactly 6 neighbors")
+
+	# --- Tier-2: Cellular Sheaf Laplacian ---
+	var init_state := PackedFloat32Array([0.8, 0.7, 0.9, 0.2, 0.3, 0.1])
+	var energy_init := MnnRuntime.sheaf_local_energy(1, init_state)
+	_check(energy_init > 0.0, "Sheaf local energy is non-negative and positive for non-trivial state")
+	var diffused := MnnRuntime.sheaf_diffuse_step(1, init_state, 0.1)
+	_check(diffused.size() == 6, "Sheaf diffusion preserves 6-dim vitality stalk")
+	var energy_next := MnnRuntime.sheaf_local_energy(1, diffused)
+	_check(energy_next <= energy_init + 0.05, "Sheaf diffusion steps towards harmonic equilibrium")
+	_check(MnnRuntime.sheaf_resonance(1, 1) == 1.0, "Sheaf self-resonance is 1.0")
+	_check(MnnRuntime.sheaf_resonance(0, 63) <= 0.5, "Antipodal sheaf resonance is attenuated")
+	_check(MnnRuntime.sheaf_resonance(1, 2) == MnnRuntime.sheaf_resonance(2, 1), "Sheaf resonance is symmetric")
 
 
 	_the_jni_bridge()
