@@ -8,7 +8,7 @@ var _fails := 0
 ## EVERY CHECK IS COUNTED. A compile error in a depended script makes a whole
 ## section skip silently, and a suite that prints ALL PASS because it ran nothing
 ## is worse than a red one. Raise this floor when checks are added.
-const MIN_CHECKS := 50
+const MIN_CHECKS := 60
 var _checks := 0
 
 
@@ -83,6 +83,52 @@ func _initialize() -> void:
 	_check(MnnRuntime.MODEL_QWEN3_1_7B == "qwen3-1.7b-mnn", "model constant Qwen3-1.7B")
 	_check(MnnRuntime.MODEL_QWEN2_5_1_5B == "qwen2.5-1.5b-mnn", "model constant Qwen2.5-1.5B")
 	_check(MnnRuntime.MODEL_QWEN2_5_3B == "qwen2.5-3b-mnn", "model constant Qwen2.5-3B")
+	_check(MnnRuntime.MODEL_QWEN3_5_0_8B == "qwen3.5-0.8b-mnn", "model constant Qwen3.5-0.8B")
+	_check(MnnRuntime.CHAT_MODELS.has(MnnRuntime.MODEL_QWEN3_5_0_8B),
+		"the 0.8B is a legal directory for this seam")
+	_check(MnnRuntime.CHAT_MODELS.has(MnnRuntime.CHAT_MODEL),
+		"...and the old one did not leave the list")
+
+	# WHICH MIND, AND HOW IT IS CHOSEN. `chat_start()` with a name opens that
+	# directory; with none it reads HEXY_CHAT_MODEL; with neither it is the 0.6B,
+	# which is the whole of "no behaviour change for a phone that never sets it".
+	var m_pick := MnnRuntime.new()
+	m_pick.chat_start()
+	_check(m_pick.chat_model() == MnnRuntime.CHAT_MODEL,
+		"an unasked chat_start is still the 0.6B")
+	OS.set_environment(MnnRuntime.ENV_CHAT_MODEL, MnnRuntime.MODEL_QWEN3_5_0_8B)
+	var m_env := MnnRuntime.new()
+	m_env.chat_start()
+	_check(m_env.chat_model() == MnnRuntime.MODEL_QWEN3_5_0_8B,
+		"HEXY_CHAT_MODEL is the knob and it moves the seam")
+	var m_named := MnnRuntime.new()
+	m_named.chat_start(MnnRuntime.CHAT_MODEL)
+	_check(m_named.chat_model() == MnnRuntime.CHAT_MODEL,
+		"...AND A NAMED DIRECTORY BEATS IT - main.gd asks ModelStore, not the env")
+	OS.set_environment(MnnRuntime.ENV_CHAT_MODEL, "")
+
+	# THE PROMPT SWITCH IS FENCED BY FAMILY. `/no_think` is a command to Qwen3
+	# and a sentence to Qwen3.5, whose thinking lives in llm_config.json instead.
+	_check(MnnRuntime._wants_no_think(MnnRuntime.MODEL_QWEN3_0_6B),
+		"the 0.6B still gets /no_think")
+	_check(MnnRuntime._wants_no_think(MnnRuntime.MODEL_QWEN3_1_7B),
+		"...and so does the 1.7B")
+	_check(not MnnRuntime._wants_no_think(MnnRuntime.MODEL_QWEN3_5_0_8B),
+		"AND THE 0.8B NEVER DOES - the dash in \"qwen3-\" is the fence")
+	_check(not MnnRuntime._wants_no_think(MnnRuntime.MODEL_QWEN2_5_1_5B),
+		"...nor does Qwen2.5")
+
+	# AND NEITHER MODEL EVER SPEAKS ITS REASONING. Whatever directory is loaded,
+	# what reaches a mouth carries no tag and no residue.
+	for dir: String in [MnnRuntime.CHAT_MODEL, MnnRuntime.MODEL_QWEN3_5_0_8B]:
+		var m_dir := MnnRuntime.new()
+		m_dir.chat_start(dir)
+		m_dir.set_scripted(["<think>weighing it</think>go left at the fork"])
+		var said: Array = []
+		m_dir.chat_done.connect(func(t: String): said.append(t))
+		m_dir.chat_stream("which way")
+		_check(said.size() == 1 and String(said[0]) == "go left at the fork",
+			"%s answers with no <think> residue" % dir)
 
 	# Topological hex prior configuration
 	var m_prior := MnnRuntime.new()

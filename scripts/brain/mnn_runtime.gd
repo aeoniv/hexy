@@ -33,10 +33,41 @@ const MODEL_QWEN3_0_6B := "qwen3-0.6b-mnn"
 const MODEL_QWEN3_1_7B := "qwen3-1.7b-mnn"
 const MODEL_QWEN2_5_1_5B := "qwen2.5-1.5b-mnn"
 const MODEL_QWEN2_5_3B := "qwen2.5-3b-mnn"
+## PHASE 11c — THE 0.8B. `taobao-mnn/Qwen3.5-0.8B-MNN`, ~548 MB pushed, and it
+## is ONE DIRECTORY THAT IS ALSO EYES: `visual.mnn` rides beside `llm.mnn`, so
+## the pack that answers is the pack that looks. MNN 3.6.1 already runs it —
+## hybrid attention landed in 3.4.1 — so nothing under `libs/mnn-jni` moves.
+const MODEL_QWEN3_5_0_8B := "qwen3.5-0.8b-mnn"
+
+## EVERY DIRECTORY THIS SEAM WILL OPEN. `chat_start` does not refuse a name that
+## is not here — the loader's answer is the only truth about what is on disk —
+## but a name off this list is a typo until somebody adds it, and the smoke
+## walks this list rather than keeping a second copy of it.
+const CHAT_MODELS := [
+	MODEL_QWEN3_0_6B,
+	MODEL_QWEN3_1_7B,
+	MODEL_QWEN3_5_0_8B,
+	MODEL_QWEN2_5_1_5B,
+	MODEL_QWEN2_5_3B,
+]
+
+## THE KNOB, AND IT IS ONE STRING. Set it and a `chat_start()` with no argument
+## opens that directory instead of [constant CHAT_MODEL]; unset, nothing about a
+## 0.6B phone changes. Callers that already name a directory (main.gd asks
+## [ModelStore.chat_model_name]) are untouched — an explicit name always wins.
+const ENV_CHAT_MODEL := "HEXY_CHAT_MODEL"
+
 const MOCK_DIM := 64
 ## Qwen3 reasons out loud by default and burns the whole token budget doing it;
 ## the model's own soft switch turns that off. Model-specific, so it lives next
 ## to the model name and is only ever appended to a real Qwen3 prompt.
+##
+## QWEN3.5 HAS NO SUCH SWITCH. It decides by `jinja.context.enable_thinking` in
+## its own `llm_config.json` (shipped `true`, and that file is the place to turn
+## it off) and otherwise by emitting the `<think>` tags this seam already
+## separates. A literal " /no_think" is not a command there, it is a sentence
+## the model reads. `begins_with("qwen3")` would have caught `qwen3.5-*` too;
+## [method _wants_no_think] is the fence.
 const QWEN_NO_THINK := " /no_think"
 
 var _android: Object = null
@@ -148,8 +179,22 @@ func embed_dim() -> int:
 	return _dim
 
 
+## THE PROMPT SWITCH, FENCED BY FAMILY. True only for the Qwen3 line, which is
+## the only line that reads `/no_think` as a command rather than as words. The
+## dash is what does the work: "qwen3-" excludes "qwen3.5-0.8b-mnn".
+static func _wants_no_think(dir: String) -> bool:
+	return dir.begins_with("qwen3-")
+
+
 ## Loads the chat model. Slow on device (hundreds of MB of weights).
-func chat_start(dir: String = CHAT_MODEL) -> bool:
+##
+## An empty `dir` means "whatever [constant ENV_CHAT_MODEL] says, else the usual
+## one", so a phone can be pointed at another pack without a rebuild.
+func chat_start(dir: String = "") -> bool:
+	if dir == "":
+		dir = OS.get_environment(ENV_CHAT_MODEL).strip_edges()
+	if dir == "":
+		dir = CHAT_MODEL
 	_chat_model = dir
 	if available():
 		_chat_ready = _android.call("chat_start", dir)
@@ -176,7 +221,7 @@ func chat_ready() -> bool:
 func chat(prompt: String) -> String:
 	if available():
 		var p := prompt
-		if _chat_model.begins_with("qwen3"):
+		if _wants_no_think(_chat_model):
 			p += QWEN_NO_THINK
 		return _android.call("chat", p)
 	if not _chat_ready:
@@ -198,7 +243,7 @@ func chat_stream(prompt: String) -> bool:
 		if not _can_stream:
 			return false
 		var p := prompt
-		if _chat_model.begins_with("qwen3"):
+		if _wants_no_think(_chat_model):
 			p += QWEN_NO_THINK
 		_streaming = true
 		if bool(_android.call("chat_stream", p)):

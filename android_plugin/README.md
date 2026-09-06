@@ -89,11 +89,22 @@ device).
 |---|---|---|
 | embed | `taobao-mnn/gte_sentence-embedding_multilingual-base-MNN` | 768-dim, ~450 MB. MNN's `Embedding` class loads a module with output `sentence_embeddings`, which BERT-style exports have and the `Qwen3-Embedding-*-MNN` exports do not — those will not load through this API. |
 | chat | `taobao-mnn/Qwen3-0.6B-MNN` | int4, ~450 MB of weights. Chosen because it fits the A22's 4 GB; `Qwen3-1.7B-MNN` (1.2 GB) is untried — the Fold 4 has the RAM for it but nothing here has proven that yet. |
+| chat | `taobao-mnn/Qwen3.5-0.8B-MNN` | int4, ~548 MB pushed (`llm.mnn.weight` 470 MB + `visual.*` 63 MB + a 5.3 MB `llm.mnn.json` the 0.6B has no equivalent of — push all of them or it will not load). MULTIMODAL: one directory is both mouth and eyes, so once it is smoked on device it can retire the 1.71 GB Qwen2-VL pack for Phase 9 vision. Runs on the pinned MNN 3.6.1 as-is (hybrid attention since 3.4.1). Directory `qwen3.5-0.8b-mnn`; `-Model chat35` pushes it. |
 
 `<think>...</think>` is stripped in the JNI layer — Hexy speaks one line, and
 the reasoning is not the line. Qwen3's own `/no_think` switch is appended in
 `mnn_runtime.gd`, next to the model name, because without it the whole token
 budget goes into reasoning and no answer ever arrives.
+
+Qwen3.5 does not have that switch and must not be sent it — `/no_think` there
+is a sentence the model reads, not a command. It decides by
+`jinja.context.enable_thinking` in its own `llm_config.json` (shipped `true`)
+and by the `<think>` tags the seam already separates, so the gate in
+`mnn_runtime.gd` is `qwen3-`, with the dash, and `qwen3.5-*` falls outside it.
+
+The embed row does not move with the chat row. `gte` stays because MNN's
+`Embedding` class loads a module whose output is named `sentence_embeddings`
+and the `Qwen3-Embedding-*-MNN` exports do not have one.
 
 ### DEVICE — 2026-08-17
 
