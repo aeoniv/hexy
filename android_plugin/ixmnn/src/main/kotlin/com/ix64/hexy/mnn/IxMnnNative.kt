@@ -65,4 +65,5 @@ internal object IxMnnNative {
 	// MediaPipe detector in ixbody now; MNN here is chat and embeddings.
 
 	external fun nativeLlmRelease(handle: Long)
+	external fun nativeSetHexPrior(handle: Long, hexBits: Int, beta: Float): Boolean
 }

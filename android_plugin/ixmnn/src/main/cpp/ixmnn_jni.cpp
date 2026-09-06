@@ -27,6 +27,7 @@
 #include <MNN/expr/Expr.hpp>
 #include <MNN/expr/ExprCreator.hpp>
 #include <llm/llm.hpp>
+#include "q6_spectral.hpp"
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "IxMnnNative", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "IxMnnNative", __VA_ARGS__)
@@ -560,6 +561,16 @@ JNIEXPORT void JNICALL
 Java_com_ix64_hexy_mnn_IxMnnNative_nativeLlmRelease(JNIEnv*, jobject, jlong handle) {
     auto* llm = reinterpret_cast<Llm*>(handle);
     if (llm) Llm::destroy(llm);
+}
+
+
+JNIEXPORT jboolean JNICALL
+Java_com_ix64_hexy_mnn_IxMnnNative_nativeSetHexPrior(JNIEnv*, jobject, jlong handle, jint hexBits, jfloat beta) {
+    if (hexBits < 0 || hexBits > 63) {
+        return JNI_FALSE;
+    }
+    ix64::gdl::setActiveHexPrior(static_cast<uint8_t>(hexBits), static_cast<float>(beta));
+    return JNI_TRUE;
 }
 
 }  // extern "C"
