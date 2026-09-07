@@ -495,6 +495,82 @@ static func sheaf_resonance(a: int, b: int) -> float:
 	var trigram_align := 1.0 if ((a ^ b) & 0b001001) == 0 else 0.7
 	return clampf((1.0 - float(d) / 6.0) * trigram_align, 0.0, 1.0)
 
+# =============================================================================
+# TIER-3: E8 LIE GROUP EMBEDDING & E7 SYMPLECTIC SUBALGEBRA
+# =============================================================================
+
+## Embeds 6-bit hexagram state into an 8D root of the E8 Lie algebra.
+## All roots have squared length 2.0 (norm sqrt(2)) and even coordinate sum.
+## Total roots across both chiralities: 64 * 2 = 128 half-integer spinor roots of E8.
+static func e8_root_embedding(hex_bits: int, yin_chiral: bool = false) -> PackedFloat32Array:
+	var coords := PackedFloat32Array()
+	coords.resize(8)
+	var b := hex_bits & 0x3F
+	var wt := 0
+	var tmp := b
+	while tmp > 0:
+		wt += (tmp & 1)
+		tmp >>= 1
+
+	for i in range(6):
+		coords[i] = -0.5 if (((b >> i) & 1) != 0) else 0.5
+
+	if (wt % 2) != 0:
+		# 3 - wt is even -> x6 + x7 must be 0
+		coords[6] = -0.5 if yin_chiral else 0.5
+		coords[7] = 0.5 if yin_chiral else -0.5
+	else:
+		# 3 - wt is odd -> x6 + x7 must be +/- 1
+		coords[6] = -0.5 if yin_chiral else 0.5
+		coords[7] = -0.5 if yin_chiral else 0.5
+
+	return coords
+
+
+## Inner product between two 8D E8 root vectors in R^8
+static func e8_inner_product(a: PackedFloat32Array, b: PackedFloat32Array) -> float:
+	assert(a.size() == 8 and b.size() == 8, "e8_inner_product requires 8D vectors")
+	var sum := 0.0
+	for i in range(8):
+		sum += a[i] * b[i]
+	return sum
+
+
+## Tests whether a hexagram is one of the 8 pure doubled trigrams (Cartan diagonal)
+static func is_pure_cartan_hexagram(hex_bits: int) -> bool:
+	var lower := hex_bits & 0x07
+	var upper := (hex_bits >> 3) & 0x07
+	return lower == upper
+
+
+## Chong Gua Transposition (swaps upper and lower trigrams)
+static func chong_gua_transpose(hex_bits: int) -> int:
+	var lower := hex_bits & 0x07
+	var upper := (hex_bits >> 3) & 0x07
+	return (lower << 3) | upper
+
+
+## E7 Symplectic bilinear form Omega(a, b) on the 56 composite hexagrams
+## Skew-symmetric: Omega(a, b) = -Omega(b, a), non-zero on Chong Gua conjugate pairs
+static func e7_symplectic_form(a: int, b: int) -> float:
+	a &= 0x3F
+	b &= 0x3F
+	if is_pure_cartan_hexagram(a) or is_pure_cartan_hexagram(b):
+		return 0.0
+	if b != chong_gua_transpose(a):
+		return 0.0
+	var lower := a & 0x07
+	var upper := (a >> 3) & 0x07
+	return 1.0 if (lower > upper) else -1.0
+
+
+## E8 Harmonic Attention Kernel between two hexagrams: K(a, b) = exp(beta * <r_a, r_b>)
+static func e8_harmonic_kernel(a: int, b: int, beta: float = 1.0) -> float:
+	var r_a := e8_root_embedding(a, false)
+	var r_b := e8_root_embedding(b, false)
+	return exp(beta * e8_inner_product(r_a, r_b))
+
+
 
 func _mock_chat(prompt: String) -> String:
 	if not _scripted.is_empty():

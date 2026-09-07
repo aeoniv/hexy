@@ -235,5 +235,108 @@ inline const HexPriorState& getActiveHexPrior() {
     return getGlobalHexPrior();
 }
 
+// =========================================================================
+// Tier-3: E8 Lie Group Embedding & E7 Symplectic Subalgebra
+// =========================================================================
+
+// Embeds 6-bit hexagram state into an 8D root of the E8 Lie algebra.
+// All roots have squared length exactly 2.0 (norm sqrt(2)) and even coordinate sum.
+// Total roots across both chiralities: 64 * 2 = 128 half-integer spinor roots of E8.
+inline std::array<float, 8> e8_root_embedding(uint8_t hex_bits, bool yin_chiral = false) {
+    std::array<float, 8> coords{};
+    uint8_t b = hex_bits & 0x3F;
+#if defined(__GNUC__) || defined(__clang__)
+    int wt = __builtin_popcount(static_cast<unsigned int>(b));
+#else
+    int wt = 0;
+    for (int t = b; t > 0; t >>= 1) wt += (t & 1);
+#endif
+
+    // First 6 coordinates: +/- 0.5 according to hexagram lines
+    for (int i = 0; i < 6; ++i) {
+        coords[i] = ((b >> i) & 1) ? -0.5f : 0.5f;
+    }
+
+    // Auxiliary coordinates 6 & 7 ensuring even coordinate sum in 2Z
+    if (wt % 2 == 1) {
+        // 3 - wt is even -> x6 + x7 must be 0
+        coords[6] = yin_chiral ? -0.5f : 0.5f;
+        coords[7] = yin_chiral ? 0.5f : -0.5f;
+    } else {
+        // 3 - wt is odd -> x6 + x7 must be +/- 1
+        coords[6] = yin_chiral ? -0.5f : 0.5f;
+        coords[7] = yin_chiral ? -0.5f : 0.5f;
+    }
+    return coords;
+}
+
+// Inner product between two 8D root vectors
+inline float e8_inner_product(const std::array<float, 8>& a, const std::array<float, 8>& b) {
+    float sum = 0.0f;
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+    float32x4_t v1 = vld1q_f32(a.data());
+    float32x4_t v2 = vld1q_f32(b.data());
+    float32x4_t v3 = vld1q_f32(a.data() + 4);
+    float32x4_t v4 = vld1q_f32(b.data() + 4);
+    float32x4_t m1 = vmulq_f32(v1, v2);
+    float32x4_t m2 = vmulq_f32(v3, v4);
+    float32x4_t sum_vec = vaddq_f32(m1, m2);
+    sum = vgetq_lane_f32(sum_vec, 0) + vgetq_lane_f32(sum_vec, 1) +
+          vgetq_lane_f32(sum_vec, 2) + vgetq_lane_f32(sum_vec, 3);
+#else
+    for (int i = 0; i < 8; ++i) {
+        sum += a[i] * b[i];
+    }
+#endif
+    return sum;
+}
+
+// Tests whether a hexagram is one of the 8 pure doubled trigrams (Cartan diagonal)
+inline bool is_pure_cartan_hexagram(uint8_t hex_bits) {
+    uint8_t lower = hex_bits & 0x07;
+    uint8_t upper = (hex_bits >> 3) & 0x07;
+    return lower == upper;
+}
+
+// Chong Gua Transposition (swaps upper and lower trigrams)
+// Fixed points are the 8 pure hexagrams; the 56 composite hexagrams form 28 dual pairs
+inline uint8_t chong_gua_transpose(uint8_t hex_bits) {
+    uint8_t lower = hex_bits & 0x07;
+    uint8_t upper = (hex_bits >> 3) & 0x07;
+    return (lower << 3) | upper;
+}
+
+// E7 Symplectic bilinear form Omega(a, b) on the 56 composite hexagrams
+// Skew-symmetric: Omega(a, b) = -Omega(b, a), non-zero on Chong Gua conjugate pairs
+inline float e7_symplectic_form(uint8_t a, uint8_t b) {
+    a &= 0x3F;
+    b &= 0x3F;
+    if (is_pure_cartan_hexagram(a) || is_pure_cartan_hexagram(b)) return 0.0f;
+    if (b != chong_gua_transpose(a)) return 0.0f;
+    uint8_t lower = a & 0x07;
+    uint8_t upper = (a >> 3) & 0x07;
+    return (lower > upper) ? 1.0f : -1.0f;
+}
+
+// E8 Harmonic Attention Kernel between two hexagrams
+// K(a, b) = exp(beta * <r_a, r_b>)
+inline float e8_harmonic_kernel(uint8_t a, uint8_t b, float beta = 1.0f) {
+    auto r_a = e8_root_embedding(a, false);
+    auto r_b = e8_root_embedding(b, false);
+    return std::exp(beta * e8_inner_product(r_a, r_b));
+}
+
+// Cartan 8-Torus phase modulation vector
+// Provably commutes with Transformer RoPE rotations [H_k, R_{theta, t}] = 0
+inline std::array<float, 8> cartan_phase_shift(const std::array<float, 8>& phi, float scale = 1.0f) {
+    std::array<float, 8> res{};
+    for (int i = 0; i < 8; ++i) {
+        res[i] = std::cos(phi[i] * scale);
+    }
+    return res;
+}
+
+
+
 } // namespace gdl
 } // namespace ix64

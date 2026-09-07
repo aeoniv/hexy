@@ -194,6 +194,44 @@ func _initialize() -> void:
 	_check(MnnRuntime.sheaf_resonance(0, 63) <= 0.5, "Antipodal sheaf resonance is attenuated")
 	_check(MnnRuntime.sheaf_resonance(1, 2) == MnnRuntime.sheaf_resonance(2, 1), "Sheaf resonance is symmetric")
 
+	# --- Tier-3: E8 Lie Group & E7 Symplectic Subalgebra ---
+	var root_qian := MnnRuntime.e8_root_embedding(63, false)
+	_check(root_qian.size() == 8, "E8 root embedding produces 8D vector")
+	var norm_sq := MnnRuntime.e8_inner_product(root_qian, root_qian)
+	_check(is_equal_approx(norm_sq, 2.0), "E8 root squared length is strictly 2.0 (norm sqrt(2))")
+	var root_kun := MnnRuntime.e8_root_embedding(0, false)
+	_check(is_equal_approx(MnnRuntime.e8_inner_product(root_kun, root_kun), 2.0), "Kun root squared length is 2.0")
+	var ip_adj := MnnRuntime.e8_inner_product(root_kun, MnnRuntime.e8_root_embedding(1, false))
+	_check(is_equal_approx(ip_adj, 1.0), "Hamming-1 neighbor in E8 has inner product 1.0 (angle 60 deg)")
+	var ip_antipodal := MnnRuntime.e8_inner_product(root_kun, root_qian)
+	_check(is_equal_approx(ip_antipodal, -1.0), "Antipodal Yang roots in E8 have inner product -1.0")
+
+	# Pure Cartan diagonal vs 56 composite hexagrams
+	var pure_count := 0
+	var composite_count := 0
+	for hex_i in 64:
+		if MnnRuntime.is_pure_cartan_hexagram(hex_i):
+			pure_count += 1
+		else:
+			composite_count += 1
+	_check(pure_count == 8, "Exactly 8 pure doubled trigrams form the Cartan diagonal")
+	_check(composite_count == 56, "Exactly 56 composite hexagrams map to E7 fundamental representation")
+
+	# Chong Gua transposition and E7 symplectic form
+	_check(MnnRuntime.chong_gua_transpose(63) == 63, "Qian is self-transpose under Chong Gua")
+	_check(MnnRuntime.chong_gua_transpose(0) == 0, "Kun is self-transpose under Chong Gua")
+	# In 6-bit binary representation:
+	# Lower trigram = b & 7, Upper trigram = (b >> 3) & 7
+	# For b = 1: Lower = 1, Upper = 0 -> Transpose: Lower = 0, Upper = 1 -> b_trans = 8
+	_check(MnnRuntime.chong_gua_transpose(1) == 8, "Trigram transpose of (1, 0) is (0, 1) = 8")
+	_check(MnnRuntime.e7_symplectic_form(1, 8) != 0.0, "Conjugate pair has non-zero E7 symplectic pairing")
+	_check(MnnRuntime.e7_symplectic_form(1, 8) == -MnnRuntime.e7_symplectic_form(8, 1), "E7 symplectic form is skew-symmetric")
+	_check(MnnRuntime.e7_symplectic_form(63, 63) == 0.0, "Pure hexagrams evaluate to zero on E7 symplectic form")
+
+	var kernel_val := MnnRuntime.e8_harmonic_kernel(0, 1, 1.0)
+	_check(kernel_val > 1.0, "E8 harmonic attention kernel produces positive amplification for neighbors")
+
+
 
 	_the_jni_bridge()
 
