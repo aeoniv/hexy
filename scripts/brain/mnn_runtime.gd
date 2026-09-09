@@ -24,12 +24,6 @@ signal chat_token(text: String)
 signal chat_done(text: String)
 
 ## Default model directories — the names push_mnn_model.ps1 writes.
-const Seam = preload("res://scripts/seam.gd")
-## THE AAR THIS SCRIPT WAS WRITTEN AGAINST. Compared with the plugin's own
-## `plugin_version()` at attach; see `scripts/seam.gd` for why a mismatch is
-## worth a loud line and a degrade rather than a shrug.
-const NEEDS := "ixmnn/1"
-
 const EMBED_MODEL := "gte-embedding-mnn"
 const CHAT_MODEL := "qwen3-0.6b-mnn"
 const MOCK_DIM := 64
@@ -67,12 +61,6 @@ var _can_stream := false
 func _init() -> void:
 	if Engine.has_singleton("IxMnn"):
 		_android = Engine.get_singleton("IxMnn")
-		# THE VERSION HANDSHAKE. A stale ixmnn under a fresh script is the silent
-		# failure `scripts/seam.gd` exists for; on a mismatch this runtime keeps
-		# the desktop road (no plugin, honest about it) and says why, once.
-		if not Seam.check(_android, NEEDS, "mnn"):
-			_android = null
-			return
 		# THE PLUGIN'S SIGNALS, FORWARDED AS OUR OWN. Both are guarded on
 		# `_streaming`, because two MnnRuntime instances exist on a phone
 		# (main.gd's `_mind` and `_agent_mind`) and both are connected to the one

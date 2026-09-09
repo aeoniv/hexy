@@ -107,7 +107,7 @@ func _initialize() -> void:
 func _the_jni_bridge() -> void:
 	print("--- the jni bridge ---")
 	var src := FileAccess.get_file_as_string(
-		"res://../android_plugin/ixmnn/src/main/cpp/ixmnn_jni.cpp")
+		("res://android_plugin/ixmnn/src/main/cpp/ixmnn_jni.cpp" if FileAccess.file_exists("res://android_plugin/ixmnn/src/main/cpp/ixmnn_jni.cpp") else "res://../android_plugin/ixmnn/src/main/cpp/ixmnn_jni.cpp"))
 	if src == "":
 		_check(true, "(no C++ in this checkout - nothing to audit)")
 		return
