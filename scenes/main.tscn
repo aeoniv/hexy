@@ -1,6 +1,310 @@
-[gd_scene load_steps=2 format=3 uid="uid://c1hexymain0"]
+[gd_scene load_steps=7 format=3 uid="uid://c1hexymain0"]
 
-[ext_resource type="Script" path="res://scripts/main_test.gd" id="1_test"]
+[ext_resource type="Script" path="res://scripts/main_app.gd" id="1_app"]
+[ext_resource type="Script" path="res://scripts/creature_ball_3d.gd" id="2_creature"]
+[ext_resource type="Script" path="res://scripts/mobile_hud.gd" id="3_hud"]
+[ext_resource type="Script" path="res://scripts/mandala_dial_2d.gd" id="4_dial"]
 
-[node name="Main" type="Node2D"]
-script = ExtResource("1_test")
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 1
+background_color = Color(0.0588235, 0.0823529, 0.12549, 1)
+glow_enabled = true
+glow_intensity = 0.6
+glow_bloom = 0.25
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_glass"]
+bg_color = Color(0.0784314, 0.117647, 0.180392, 0.8)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.2, 0.5, 0.8, 0.35)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[node name="Main" type="Node"]
+script = ExtResource("1_app")
+
+[node name="SubViewportContainer" type="SubViewportContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+stretch = true
+
+[node name="SubViewport" type="SubViewport" parent="SubViewportContainer"]
+handle_input_locally = false
+size = Vector2i(720, 1280)
+render_target_update_mode = 4
+
+[node name="Camera3D" type="Camera3D" parent="SubViewportContainer/SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 3.2)
+fov = 48.0
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="SubViewportContainer/SubViewport"]
+transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 2, 4, 3)
+light_color = Color(0.9, 0.95, 1, 1)
+light_energy = 1.2
+
+[node name="DirectionalLight3D2" type="DirectionalLight3D" parent="SubViewportContainer/SubViewport"]
+transform = Transform3D(-0.707107, 0, -0.707107, 0, 1, 0, 0.707107, 0, -0.707107, -2, -2, -2)
+light_color = Color(0.2, 0.6, 1, 1)
+light_energy = 0.6
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="SubViewportContainer/SubViewport"]
+environment = SubResource("Environment_1")
+
+[node name="HexyCreature3D" type="Node3D" parent="SubViewportContainer/SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+script = ExtResource("2_creature")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="MobileHUD" type="Control" parent="HUD"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("3_hud")
+
+[node name="TopBar" type="PanelContainer" parent="HUD/MobileHUD"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 16.0
+offset_top = 28.0
+offset_right = -16.0
+offset_bottom = 76.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_glass")
+
+[node name="Margin" type="MarginContainer" parent="HUD/MobileHUD/TopBar"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 8
+
+[node name="HBox" type="HBoxContainer" parent="HUD/MobileHUD/TopBar/Margin"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 20
+text = "🌀 HEXY"
+
+[node name="Spacer" type="Control" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Status" type="Label" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.75, 0.2, 1)
+theme_override_font_sizes/font_size = 14
+text = "MNN: ACTIVE"
+
+[node name="Spacer2" type="Control" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
+custom_minimum_size = Vector2(16, 0)
+layout_mode = 2
+
+[node name="FPS" type="Label" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.9, 0.5, 1)
+theme_override_font_sizes/font_size = 14
+text = "60 FPS"
+
+[node name="HexCard" type="PanelContainer" parent="HUD/MobileHUD"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 16.0
+offset_top = 86.0
+offset_right = -16.0
+offset_bottom = 176.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_glass")
+
+[node name="Margin" type="MarginContainer" parent="HUD/MobileHUD/HexCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="HUD/MobileHUD/HexCard/Margin"]
+layout_mode = 2
+
+[node name="HBox" type="HBoxContainer" parent="HUD/MobileHUD/HexCard/Margin/VBox"]
+layout_mode = 2
+
+[node name="HexChar" type="Label" parent="HUD/MobileHUD/HexCard/Margin/VBox/HBox"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.75, 0.2, 1)
+theme_override_font_sizes/font_size = 32
+text = "乾"
+horizontal_alignment = 1
+
+[node name="VBox" type="VBoxContainer" parent="HUD/MobileHUD/HexCard/Margin/VBox/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="HexTitle" type="Label" parent="HUD/MobileHUD/HexCard/Margin/VBox/HBox/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "#1 乾 The Creative"
+
+[node name="HexSubtitle" type="Label" parent="HUD/MobileHUD/HexCard/Margin/VBox/HBox/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.75, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "Binary: 0b111111"
+
+[node name="MovingLine" type="Label" parent="HUD/MobileHUD/HexCard/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "Moving Line: Line 4 -> Mutating"
+
+[node name="ThoughtBubble" type="PanelContainer" parent="HUD/MobileHUD"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 16.0
+offset_top = 186.0
+offset_right = -16.0
+offset_bottom = 266.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_glass")
+
+[node name="Margin" type="MarginContainer" parent="HUD/MobileHUD/ThoughtBubble"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 8
+
+[node name="ThoughtLabel" type="Label" parent="HUD/MobileHUD/ThoughtBubble/Margin"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "💬 Drag on screen to rotate creature. Spin the dial below to change hexagram."
+autowrap_mode = 2
+
+[node name="MandalaContainer" type="Control" parent="HUD/MobileHUD"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -430.0
+offset_bottom = -130.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="Dial" type="Control" parent="HUD/MobileHUD/MandalaContainer"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -145.0
+offset_top = -145.0
+offset_right = 145.0
+offset_bottom = 145.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("4_dial")
+
+[node name="Controls" type="Control" parent="HUD/MobileHUD"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -120.0
+offset_right = -16.0
+offset_bottom = -72.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="HBox" type="HBoxContainer" parent="HUD/MobileHUD/Controls"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 8
+
+[node name="BtnPrev" type="Button" parent="HUD/MobileHUD/Controls/HBox"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+text = "◀"
+
+[node name="BtnCast" type="Button" parent="HUD/MobileHUD/Controls/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "🪙 Cast Oracle"
+
+[node name="BtnAsk" type="Button" parent="HUD/MobileHUD/Controls/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "🧠 Ask MNN"
+
+[node name="BtnNext" type="Button" parent="HUD/MobileHUD/Controls/HBox"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+text = "▶"
+
+[node name="BottomNav" type="PanelContainer" parent="HUD/MobileHUD"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -62.0
+offset_right = -16.0
+offset_bottom = -14.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_glass")
+
+[node name="HBox" type="HBoxContainer" parent="HUD/MobileHUD/BottomNav"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="TabCompanion" type="Button" parent="HUD/MobileHUD/BottomNav/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "🪐 Hexy"
+flat = true
+
+[node name="TabOracle" type="Button" parent="HUD/MobileHUD/BottomNav/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "🪙 Oracle"
+flat = true
+
+[node name="TabBrain" type="Button" parent="HUD/MobileHUD/BottomNav/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "🧠 Brain"
+flat = true
+
+[node name="TabTelemetry" type="Button" parent="HUD/MobileHUD/BottomNav/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "⚡ Telemetry"
+flat = true
