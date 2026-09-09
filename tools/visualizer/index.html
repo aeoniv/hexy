@@ -1521,6 +1521,94 @@
       line-height: 1.4;
       box-shadow: 0 8px 24px rgba(0,0,0,0.8), 0 0 14px rgba(245, 158, 11, 0.25);
     }
+
+    /* =========================================================================
+       11. Android Plugin & MNN Bridge Inspector (JNI/NDK) Studio
+       ========================================================================= */
+    .jni-container {
+      width: 1040px;
+      min-height: 620px;
+      max-height: 88vh;
+      background: rgba(10, 15, 29, 0.97);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 14px 44px rgba(0, 0, 0, 0.75), 0 0 28px rgba(16, 185, 129, 0.15);
+      animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .jni-subnav {
+      display: flex;
+      background: rgba(4, 7, 18, 0.75);
+      border-bottom: 1px solid var(--card-border);
+      padding: 8px 16px;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .jni-body {
+      flex: 1;
+      padding: 14px 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .jni-split {
+      display: grid;
+      grid-template-columns: 1.15fr 1.05fr;
+      gap: 14px;
+    }
+    .jni-card {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .jni-card-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 6px;
+    }
+    .jni-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.72rem;
+    }
+    .jni-table th {
+      text-align: left;
+      color: #94a3b8;
+      padding: 5px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      font-size: 0.68rem;
+    }
+    .jni-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: #e2e8f0;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .mem-bar-track {
+      height: 12px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 6px;
+      display: flex;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+    .mem-bar-seg {
+      height: 100%;
+      transition: width 0.3s;
+    }
 </style>
 </head>
 <body>
@@ -1581,6 +1669,7 @@
           <button class="tab-btn engine-tab" id="tab7" onclick="switchTab(7)" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.45); background: rgba(56, 189, 248, 0.14); box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);">8. 🌀 I-Ching GDL & Q₆-GNN Engine</button>
           <button class="tab-btn engine-tab" id="tab10" onclick="switchTab(10)" style="color: #a855f7; border-color: rgba(168, 85, 247, 0.45); background: rgba(168, 85, 247, 0.14); box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);">9. 🪐 Creature Tensegrity 3D & Telemetry</button>
           <button class="tab-btn engine-tab" id="tab11" onclick="switchTab(11)" style="color: #f59e0b; border-color: rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.14); box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);">10. 🪙 64 Hexagram Oracle & Mandala</button>
+          <button class="tab-btn engine-tab" id="tab12" onclick="switchTab(12)" style="color: #10b981; border-color: rgba(16, 185, 129, 0.45); background: rgba(16, 185, 129, 0.14); box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);">11. ⚡ Android Plugin & MNN Bridge (JNI/NDK)</button>
 
         </div>
 
@@ -2913,7 +3002,7 @@
 
     function switchTab(idx) {
       activeTab = idx;
-      for (let i = 0; i <= 11; i++) {
+      for (let i = 0; i <= 12; i++) {
         const tab = document.getElementById(`tab${i}`);
         if (tab) {
           if (i === idx) tab.classList.add('active');
@@ -2945,6 +3034,10 @@
       else if (idx === 11) {
         mount.innerHTML = renderOracleMandalaHtml();
         initOracleMandala();
+      }
+      else if (idx === 12) {
+        mount.innerHTML = renderJniBridgeInspectorHtml();
+        initJniBridgeInspector();
       }
 
       closePopover();
@@ -6761,6 +6854,265 @@ function renderGdlEngineHtml() {
         const movingStr = movingLines.length > 0 ? `Lines ${movingLines.join(', ')} moving` : 'No moving lines';
         preview.textContent = `[ORACLE CAST] Primary: #${pWen} ${pHex.zh} ${pHex.name}. Moving: ${movingStr}. Resultant: #${mWen} ${mHex.zh} ${mHex.name}. Hexy posture: Grounded adaptation to environment.`;
       }
+    }
+
+    // =========================================================================
+    // 11. ⚡ Android Plugin & MNN Bridge Inspector (JNI/NDK) (Tab 12)
+    // Pure inspection of android_plugin/ixmnn (ixmnn_jni.cpp & IxMnn.kt)
+    // =========================================================================
+
+    const JNI_METHODS = [
+      { name: "nativeEmbeddingCreate", sig: "(Ljava/lang/String;)J", returns: "jlong (handle)", desc: "MNN::Transformer::Embedding create instance from config.json", file: "ixmnn_jni.cpp L339" },
+      { name: "nativeEmbeddingDim", sig: "(J)I", returns: "jint (1024)", desc: "Returns embedding dimension from GTE model config", file: "ixmnn_jni.cpp L357" },
+      { name: "nativeEmbed", sig: "(JLjava/lang/String;)[F", returns: "jfloatArray", desc: "Runs GTE forward pass, L2 normalize, returns float vector", file: "ixmnn_jni.cpp L364" },
+      { name: "nativeEmbeddingRelease", sig: "(J)V", returns: "void", desc: "Deletes MNN::Transformer::Embedding native instance", file: "ixmnn_jni.cpp L396" },
+      { name: "nativeLlmCreate", sig: "(Ljava/lang/String;)J", returns: "jlong (handle)", desc: "Creates MNN::Transformer::Llm, loads weights, sets max_tokens=192", file: "ixmnn_jni.cpp L407" },
+      { name: "nativeChat", sig: "(JLjava/lang/String;)Ljava/lang/String;", returns: "jstring", desc: "Synchronous evaluation on dedicated worker thread, stripThink()", file: "ixmnn_jni.cpp L434" },
+      { name: "nativeChatStream", sig: "(JLjava/lang/String;Ljava/lang/String;)V", returns: "void", desc: "Streaming tokens via jniEmit JniSink, uses cached gOnChatToken([B)V", file: "ixmnn_jni.cpp L486" },
+      { name: "nativeLlmRelease", sig: "(J)V", returns: "void", desc: "Deletes MNN::Transformer::Llm native instance, frees KV buffer", file: "ixmnn_jni.cpp L542" }
+    ];
+
+    const DEVICE_RAM_PROFILES = {
+      "phone4": { name: "Mid Phone (4GB RAM)", total: 4096, appLimit: 512, os: 2100, allowedModel: "qwen3-0.6b-mnn" },
+      "phone6": { name: "Upper Phone (6GB RAM)", total: 6144, appLimit: 768, os: 2400, allowedModel: "qwen3-0.6b-mnn" },
+      "tablet8": { name: "Tablet (8GB RAM)", total: 8192, appLimit: 1200, os: 2800, allowedModel: "qwen3-1.7b-mnn" },
+      "pc16": { name: "Desktop / Flagship (16GB RAM)", total: 16384, appLimit: 2800, os: 3500, allowedModel: "qwen2.5-3b-mnn" }
+    };
+
+    let jniActiveProfileKey = "phone4";
+    let jniSimulatedTokens = [];
+    let jniTokenStreamTimer = null;
+
+    function renderJniBridgeInspectorHtml() {
+      return `
+        <div class="jni-container">
+          <div class="jni-subnav">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #10b981; display: flex; align-items: center; gap: 6px;">
+              ⚡ Android Plugin & MNN Bridge Inspector (JNI/NDK)
+            </span>
+            <span class="creature-chip creature-chip-green">PLUGIN_VERSION = "ixmnn/1"</span>
+            <span class="creature-chip creature-chip-cyan">MNN vendored tag 3.6.1</span>
+            <span class="creature-chip creature-chip-amber">Zero Per-Frame Reflection</span>
+
+            <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
+              <span style="font-size: 0.72rem; color: #94a3b8;">Device RAM:</span>
+              <select id="selRamProfile" onchange="switchRamProfile(this.value)" style="background: #0f172a; border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 0.72rem; padding: 3px 8px; border-radius: 4px;">
+                <option value="phone4">Mid Phone (4GB RAM)</option>
+                <option value="phone6">Upper Phone (6GB RAM)</option>
+                <option value="tablet8">Tablet (8GB RAM)</option>
+                <option value="pc16">Desktop / Flagship (16GB RAM)</option>
+              </select>
+              <button class="btn" style="padding: 4px 10px; font-size: 0.72rem; border-color: #10b981; color: #10b981;" onclick="runJniStreamingSimulation()">▶ Test JNI Token Stream</button>
+            </div>
+          </div>
+
+          <div class="jni-body">
+            <div class="jni-split">
+
+              <!-- Left Panel: JNI Lifecycle, Global Class Cache, Thread Model -->
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+
+                <!-- Global Cache Card -->
+                <div class="jni-card">
+                  <div class="jni-card-title">
+                    <span>1. JNI_OnLoad & Global Reference Cache</span>
+                    <span class="creature-chip creature-chip-green">Hot-Path Optimized</span>
+                  </div>
+                  <div style="font-size: 0.72rem; color: #cbd5e1; line-height: 1.45;">
+                    Per-token reflection (e.g. calling <code>FindClass</code> on every streamed token) causes severe frame drops and crashes background threads in Android. 
+                    Hexy's <code>ixmnn_jni.cpp</code> resolves classes <b>once</b> in <code>JNI_OnLoad</code>:
+                  </div>
+                  <div style="background: rgba(0,0,0,0.4); border-radius: 6px; padding: 8px 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: #38bdf8; line-height: 1.4;">
+                    // Cached at library load time:<br>
+                    jclass <b style="color: #fbbf24;">gNativeClass</b> = env-&gt;NewGlobalRef(local);<br>
+                    jmethodID <b style="color: #4ade80;">gOnChatToken</b> = env-&gt;GetStaticMethodID(gNativeClass, "onChatToken", "([B)V");
+                  </div>
+                </div>
+
+                <!-- Single Worker Thread Serializer -->
+                <div class="jni-card">
+                  <div class="jni-card-title">
+                    <span>2. Threading Model: Single-Thread Serializer</span>
+                    <span class="creature-chip creature-chip-amber">Executors.newSingleThreadExecutor</span>
+                  </div>
+                  <div style="font-size: 0.72rem; color: #cbd5e1; line-height: 1.45;">
+                    MNN's <code>Llm</code> and <code>Executor</code> are thread-local and non-reentrant. 
+                    <code>IxMnn.kt</code> serializes all embed and chat calls through a dedicated daemon worker thread (<code>name="ixmnn"</code>):
+                  </div>
+                  <div style="background: rgba(0,0,0,0.4); border-radius: 6px; padding: 8px 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: #cbd5e1; line-height: 1.4;">
+                    Godot Main Thread (60 FPS) &rarr; Non-blocking GDScript signal emit<br>
+                    &darr; (Blocks worker only)<br>
+                    <span style="color: #4ade80;">Worker Thread [ixmnn]</span> &rarr; JNI nativeChatStream() &rarr; MNN C++ libllm.so
+                  </div>
+                </div>
+
+                <!-- Live JNI Token Stream Terminal -->
+                <div class="jni-card" style="flex: 1;">
+                  <div class="jni-card-title">
+                    <span>3. JNI Callback Live Terminal (onChatToken [B &rarr; UTF-8)</span>
+                    <span id="jniStreamPill" class="creature-chip creature-chip-cyan">Standby</span>
+                  </div>
+                  <div id="jniStreamOutput" style="flex: 1; min-height: 90px; background: rgba(0,0,0,0.5); border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); padding: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #4ade80; line-height: 1.4; overflow-y: auto;">
+                    // Press "▶ Test JNI Token Stream" to simulate C++ jniEmit() dispatching byte chunks into GDScript...
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Right Panel: Memory Budgeting, RAM Table & Exported Methods -->
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+
+                <!-- RAM Budget Card -->
+                <div class="jni-card">
+                  <div class="jni-card-title">
+                    <span id="lblRamDeviceTitle">Mobile Device RAM Budget</span>
+                    <span class="creature-chip creature-chip-cyan" id="lblRamAllowedModel">qwen3-0.6b-mnn</span>
+                  </div>
+
+                  <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #94a3b8;">
+                    <span>System & OS</span>
+                    <span>App Headroom</span>
+                    <span>Model Weights</span>
+                    <span>KV-Cache</span>
+                  </div>
+
+                  <div class="mem-bar-track">
+                    <div class="mem-bar-seg" id="segOs" style="width: 50%; background: #475569;" title="OS & Background"></div>
+                    <div class="mem-bar-seg" id="segApp" style="width: 15%; background: #0284c7;" title="App & Godot Engine"></div>
+                    <div class="mem-bar-seg" id="segModel" style="width: 25%; background: #10b981;" title="MNN Model Weights"></div>
+                    <div class="mem-bar-seg" id="segKv" style="width: 10%; background: #f59e0b;" title="KV Cache Buffer"></div>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.68rem;">
+                    <div style="background: rgba(0,0,0,0.3); padding: 6px 8px; border-radius: 4px;">
+                      <span style="color: #94a3b8;">Max Allowed Model:</span><br>
+                      <b style="color: #10b981;" id="txtAllowedModel">qwen3-0.6b-mnn (~400 MB)</b>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.3); padding: 6px 8px; border-radius: 4px;">
+                      <span style="color: #94a3b8;">Embedding Dimension:</span><br>
+                      <b style="color: #38bdf8;">1024 floats (GTE MNN)</b>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Exported Methods Table -->
+                <div class="jni-card" style="flex: 1;">
+                  <div class="jni-card-title">
+                    <span>4. Native C++ Exported Symbols (ixmnn_jni.cpp)</span>
+                    <span style="font-size: 0.68rem; color: #94a3b8;">8 JNIEXPORT methods</span>
+                  </div>
+
+                  <div style="max-height: 220px; overflow-y: auto;">
+                    <table class="jni-table">
+                      <thead>
+                        <tr>
+                          <th>Method Name</th>
+                          <th>Signature</th>
+                          <th>Returns</th>
+                          <th>Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${JNI_METHODS.map(m => `
+                          <tr>
+                            <td style="color: #10b981; font-weight: bold;">${m.name}</td>
+                            <td style="color: #94a3b8;">${m.sig}</td>
+                            <td style="color: #fbbf24;">${m.returns}</td>
+                            <td style="color: #cbd5e1; font-size: 0.68rem;">${m.desc}</td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Safety Laws Card -->
+                <div class="jni-card">
+                  <div class="jni-card-title">
+                    <span>Constitutional Android Law</span>
+                    <span class="creature-chip creature-chip-green">Enforced</span>
+                  </div>
+                  <div style="font-size: 0.68rem; color: #cbd5e1; line-height: 1.4;">
+                    <b>1. Models Never Ride in APK:</b> Models are stored in external files (<code>tools/push_mnn_model.ps1</code>). Missing model cleanly degrades to mock.<br>
+                    <b>2. Handshake Verification:</b> <code>PLUGIN_VERSION = "ixmnn/1"</code> is verified on connect. Version mismatch immediately degrades.<br>
+                    <b>3. Strip Reasoning:</b> <code>stripThink()</code> ensures <code>&lt;think&gt;...&lt;/think&gt;</code> blocks never leak into single-line voice synthesizers.
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function initJniBridgeInspector() {
+      switchRamProfile(jniActiveProfileKey);
+    }
+
+    function switchRamProfile(key) {
+      jniActiveProfileKey = key;
+      const prof = DEVICE_RAM_PROFILES[key] || DEVICE_RAM_PROFILES["phone4"];
+
+      const devTitle = document.getElementById('lblRamDeviceTitle');
+      if (devTitle) devTitle.textContent = `${prof.name} Memory Budget`;
+
+      const allowBadge = document.getElementById('lblRamAllowedModel');
+      if (allowBadge) allowBadge.textContent = prof.allowedModel;
+
+      const txtModel = document.getElementById('txtAllowedModel');
+      if (txtModel) txtModel.textContent = `${prof.allowedModel} (${prof.total >= 8192 ? '~1.1GB' : '~400MB'})`;
+
+      // Update segment widths
+      const osPct = (prof.os / prof.total) * 100;
+      const appPct = (prof.appLimit / prof.total) * 100;
+      const modelMb = prof.total >= 8192 ? 1100 : 400;
+      const modelPct = (modelMb / prof.total) * 100;
+      const kvPct = (120 / prof.total) * 100;
+
+      const sOs = document.getElementById('segOs');
+      if (sOs) sOs.style.width = `${osPct}%`;
+      const sApp = document.getElementById('segApp');
+      if (sApp) sApp.style.width = `${appPct}%`;
+      const sModel = document.getElementById('segModel');
+      if (sModel) sModel.style.width = `${modelPct}%`;
+      const sKv = document.getElementById('segKv');
+      if (sKv) sKv.style.width = `${kvPct}%`;
+    }
+
+    function runJniStreamingSimulation() {
+      const term = document.getElementById('jniStreamOutput');
+      const pill = document.getElementById('jniStreamPill');
+      if (!term) return;
+
+      term.innerHTML = `<span style="color: #38bdf8;">[Native JNI_OnLoad]</span> gNativeClass held globally.<br><span style="color: #fbbf24;">[Worker Thread]</span> nativeChatStream(handle, prompt="Hello Hexy") started...<br>`;
+      if (pill) {
+        pill.textContent = "Streaming Active (< 15ms TTFT)";
+        pill.className = "creature-chip creature-chip-green";
+      }
+
+      if (jniTokenStreamTimer) clearInterval(jniTokenStreamTimer);
+
+      const tokens = [" The", " sky", " is", " clear", " today.", " Steps", " are", " steady", " and", " the", " cords", " hold."];
+      let tIdx = 0;
+
+      jniTokenStreamTimer = setInterval(() => {
+        if (tIdx < tokens.length) {
+          const tok = tokens[tIdx];
+          term.innerHTML += `<span style="color: #94a3b8;">jniEmit()</span> -> <span style="color: #4ade80;">"${tok}"</span> (bytes: ${tok.length})<br>`;
+          term.scrollTop = term.scrollHeight;
+          tIdx++;
+        } else {
+          clearInterval(jniTokenStreamTimer);
+          term.innerHTML += `<span style="color: #38bdf8;">[GDScript Signal]</span> chat_done("The sky is clear today. Steps are steady and the cords hold.")<br>`;
+          term.scrollTop = term.scrollHeight;
+          if (pill) {
+            pill.textContent = "Standby (Done)";
+            pill.className = "creature-chip creature-chip-cyan";
+          }
+        }
+      }, 90);
     }
 </script>
 </body>
