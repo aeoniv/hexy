@@ -20,16 +20,28 @@ A proposed 機 (jī) economy layer — signed receipts for mesh favors, settled 
 a tangle, felt only as Hexy's vitality — is the long game. See
 `docs/ROADMAP.md` for the honest built/planned/proposed breakdown.
 
-Three docs, three jobs: `docs/ROADMAP.md` is the reasoning and every phase plan,
-written before its code; `docs/SURFACE.md` is the one screen hexy shows, the two
-laws that govern it, and the index of what produced it; `docs/FIELD.md` is the
-runbook — tests, export, install, driving a phone over adb, and asking a phone
-why it died.
+## Where facts live
 
-The rest are formats and roads: `docs/take-format.md` (`take.json`, the
-consumer-agnostic clip manifest), `docs/room-file.md` (the room file),
-`docs/ar-lens.md` (the lens and the Time Window), `docs/splat-pipeline.md`
-(phones → COLMAP → a splat → a room file).
+**Every fact has exactly one home. Everything else links to it.** This README is
+the front door: it says what the thing is and points at the page that owns each
+class of fact. When this file and a home disagree, the home is right.
+
+| Fact class | Single home | What it holds |
+|---|---|---|
+| Phase history, reasoning, rulings | [`docs/ROADMAP.md`](docs/ROADMAP.md) | every phase plan written before its code, and its DEVICE/TESTED/UNBUILT status |
+| Dated device measurement runs (ms, MB, logcat) | [`docs/ROADMAP.md`](docs/ROADMAP.md) | the phase section that made the measurement owns the table and the log |
+| Plugin versions and the `NEEDS` handshake | `addons/<plugin>/bin/VERSION` + [`android_plugin/README.md`](android_plugin/README.md) | the staged string is the machine truth; the README carries the singleton contract |
+| Model table, pack sizes, RAM gates | [`android_plugin/README.md`](android_plugin/README.md) § Models | which model, how big, which lane, which phone |
+| Build, export, install, adb, shoot procedures | [`docs/FIELD.md`](docs/FIELD.md) | the runbook — every road on it has been walked |
+| The one screen and the two laws | [`docs/SURFACE.md`](docs/SURFACE.md) | LAW OF THE GLASS, LAW OF THE DARK, and the commit index behind them |
+| Refactor plan, target architecture, metrics | [`docs/plans/refactor.md`](docs/plans/refactor.md) | the survey numbers, the moves, the milestone gates |
+
+The rest are formats and roads: [`docs/take-format.md`](docs/take-format.md)
+(`take.json`, the consumer-agnostic clip manifest),
+[`docs/room-file.md`](docs/room-file.md) (the room file),
+[`docs/ar-lens.md`](docs/ar-lens.md) (the lens and the Time Window),
+[`docs/splat-pipeline.md`](docs/splat-pipeline.md) (phones → COLMAP → a splat →
+a room file).
 
 ## What hexy is, and what works today — 2026-09-05
 
@@ -91,16 +103,22 @@ night it was made. What is left is the only question that was ever worth
 asking — two taps in a real room, and does the ghost counter stand on the
 counter.
 
-58 headless suites. `docs/FIELD.md` §1 runs them; a phase section in
-`docs/ROADMAP.md` that says *device-pending* means exactly that, and means the
-owner's own hands are the missing instrument.
+60 headless suites, all green. [`docs/FIELD.md`](docs/FIELD.md) §1 owns how to
+run them and is the only place the count is kept; a phase section in
+[`docs/ROADMAP.md`](docs/ROADMAP.md) that says *device-pending* means exactly
+that, and means the owner's own hands are the missing instrument.
 
 ## What runs today (the two engines)
 
 | Engine | Carries | Status |
 |---|---|---|
 | **MediaPipe** (`ixbody` plugin) | **FIND** — EfficientDet-Lite0 int8 (4.6 MB, embedded), continuous detector + IoU tracker + spoken guidance; **body sense** — face landmarks at 5% duty | the critical path |
-| **MNN** (`ixmnn` plugin) | chat mouth (qwen3-1.7b on 8 GiB+ phones, 0.6b below — game dialogue and simple asks, streaming); memory embeddings (gte, 768-d); one-shot **LOOK** (qwen2-vl describes a frame in ~15 s, Fold only, never in the find loop) | demoted but needed |
+| **MNN** (`ixmnn` plugin) | chat mouth (game dialogue and simple asks, streaming) and memory embeddings (768-d). **LOOK is no longer MNN's** — Phase 11b deleted the qwen2-vl lane and Phase 12 made LOOK the same 4.6 MB detector FIND uses | demoted but needed |
+
+Which model, how big, which lane, and which phone it is allowed on live in one
+place: [`android_plugin/README.md`](android_plugin/README.md) § Models. The
+measured cost of each — load ms, first turn ms, RSS/PSS — lives in the phase
+that measured it, [`docs/ROADMAP.md`](docs/ROADMAP.md) Phase 11c.
 
 Around them: an explicit dialog FSM (`turn_machine.gd` — idle/listening/
 thinking/speaking, finding as a parallel open-ended lane, watchdogged), a
@@ -113,154 +131,6 @@ DARK). The five buttons that sentence used to name are six doors now.
 
 FIND's vocabulary is the 80 COCO classes plus synonyms; an unknown word gets
 one honest sentence naming what it *can* find. No pretending.
-
-
-## Geometric Deep Learning Coprocessor ($Q_6$-GDL & $E_8$ Lie Group Architecture)
-
-Hexy's intelligence architecture is structured as a **Dual-Speed Cognitive Hierarchy** operating across two tightly coupled subsystems:
-
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           DUAL-SPEED COGNITIVE HIERARCHY                        │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│  SYSTEM 1: FAST REFLEX COPROCESSOR (I-Ching Q₆ GDL)                             │
-│  • Latency: ~1.2 µs | Power: 0 W | Frequency: 60 FPS | Allocations: 0 (C++ NEON)│
-│  • Grounding: Homeostatic equilibrium across 6 bodily & world needs             │
-│  • Manifold: 6-Hypercube graph Q₆ ≅ Q₃(Inner Body) □ Q₃(Outer World)            │
-│  • Sheaf Holonomy: Prevents persona oversmoothing via ker(ℒ_ℱ) = {0}            │
-│  • E₈ Root Embedding: 128 half-integer spinor roots on S⁷                       │
-│  • E₇ Symplectic Form: 56 composite hexagrams & 28 Chong Gua dual pairs        │
-└──────────────────────────────────────┬──────────────────────────────────────────┘
-                                       │ Logit Prior Bias: logits' = logits + β · U h
-                                       │ Cartan 8-Torus KV-Cache Parallel Transport
-┌──────────────────────────────────────▼──────────────────────────────────────────┐
-│  SYSTEM 2: SLOW DELIBERATION (Alibaba MNN Engine)                               │
-│  • Latency: 1.2–3.0 s | Hardware: Mobile CPU/GPU (ARM Cortex-A78)              │
-│  • Models: Qwen3-0.6B, Qwen3.5-0.8B (hybrid visual), Qwen3-1.7B, Qwen2.5-1.5B/3B│
-│  • Reasoning: Dual-stream demuxing partitions <think> contemplation from speech │
-│  • The Fence (_wants_no_think): Soft-switch gated to qwen3-, blocked on qwen3.5 │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-### 1. Dual-Stream `<think>` Separation & The Fence
-
-* **Model Lineage & Soft-Switch Gating**:
-  Qwen3 (`qwen3-0.6b-mnn`, `qwen3-1.7b-mnn`) responds to the soft-switch ` /no_think` to suppress chain-of-thought overhead. In contrast, Qwen3.5 (`qwen3.5-0.8b-mnn`) does not recognize ` /no_think` as a command; appending it causes the model to read it as literal conversation text. Method `_wants_no_think(dir)` serves as the architectural fence:
-  ```gdscript
-  static func _wants_no_think(dir: String) -> bool:
-      return dir.begins_with("qwen3-")
-  ```
-* **Real-Time Stream Partitioning**:
-  Method `MnnRuntime.partition_think(text)` isolates internal contemplation from spoken response:
-  - Tokens within `<think>...</think>` are routed to the `chat_thought` signal (observable on the glass/hud for auditing).
-  - Outside tokens are routed cleanly to `chat_token` and `chat_done` for speech synthesis (`ixvoice`), ensuring the mouth never blurts internal deliberation.
-
----
-
-### 2. Tier 1: Fast Walsh-Hadamard Transform (FWHT) & Cayley Graph Filtering
-
-* **$Q_6$ Hypercube Spectral Kernel**:
-  The 64 hexagram states form the vertices of the 6-hypercube graph $Q_6 = (\mathbb{F}_2^6, E)$ with 192 edges (Hamming distance 1). Graph Laplacian eigenvectors are analytically the Walsh-Hadamard functions $H_6 = H_1^{\otimes 6}$.
-* **$O(N \log N)$ In-Place Transform**:
-  `fwht_inplace(prob_64)` executes in 6 butterfly stages requiring exactly $6 	imes 64 = 384$ additions and **0 multiplications** (~$1.2\,\mu	ext{s}$ on ARM Cortex-A78 with NEON SIMD vectorization):
-  $$y = H_6 x, \quad x = rac{1}{64} H_6 y$$
-* **Discrete Cayley Algebra**:
-  - **Hamming Distance**: $d_H(a, b) = 	ext{popcount}(a \oplus b) \in \{0..6\}$.
-  - **Pangtong Operator ($\sim x$)**: Bitwise NOT inverts all 6 lines, jumping to the antipodal vertex across the hypercube.
-  - **Huguaci Nuclear Core Projection**:
-    $$\pi_{	ext{nuclear}}(b) = ((b \gg 1) \& 7) \mid (((b \gg 2) \& 7) \ll 3)$$
-    Maps the 64 states into 16 stable nuclear core attractors.
-* **Native MNN Logit Biasing**:
-  `IxMnnNative.setHexPrior(hex_bits, beta)` passes spectral topological heat directly into the mobile JNI sampler hook, steering token logits in $O(1)$ without prompt token re-encoding:
-  $$	ext{logits}' = 	ext{logits} + eta \cdot U h$$
-
----
-
-### 3. Tier 2: Cellular Sheaf Laplacian over $\Delta_2(Q_6)$
-
-* **Harmonic Stalk Structure**:
-  - Vertex stalk: $\mathcal{F}(v) = \mathbb{R}^6$ (continuous vitality / fulfillment levels across all 6 lines).
-  - Edge stalk: $\mathcal{F}(e) = \mathbb{R}^2$ (coupled harmonic line pairs $k$ and $(k+3) \pmod 6$).
-* **Orthogonal Restriction Maps & Non-Trivial Holonomy**:
-  For each directed incidence $v 	rianglelefteq e_k$, the restriction map $\mathcal{F}_{v 	rianglelefteq e} \in SO(2)$ couples line $k$ to its trigram harmonic partner:
-  $$\mathcal{F}_{v 	rianglelefteq e} = egin{pmatrix} \cos	heta_k & -\sin	heta_k \ \sin	heta_k & \cos	heta_k \end{pmatrix}, \quad 	heta_k = rac{\pi}{3} k (-1)^{v_k}$$
-* **Sheaf Dirichlet Energy (Cognitive Dissonance)**:
-  Measures internal tension and disagreement across adjacent line pairs:
-  $$E_u(\mathbf{x}) = \sum_{k=0}^5 \| \mathcal{F}_{v_k 	rianglelefteq e_k} \mathbf{x}_{v_k} - \mathcal{F}_{u 	rianglelefteq e_k} \mathbf{x}_u \|^2$$
-* **Trivial Kernel & Anti-Oversmoothing**:
-  Because the sheaf holonomy around 4-cycles in $Q_6$ has no fixed vectors, $\ker(\mathcal{L}_\mathcal{F}) = \{0\}$. Unlike standard graph Laplacians where continuous diffusion collapses into the uniform constant stationary state (bland corporate assistant persona), Cellular Sheaf diffusion preserves sharp, distinct character archetypes indefinitely.
-
----
-
-### 4. Tier 3: $E_8$ Lie Group Embedding & $E_7$ Symplectic Subalgebra
-
-* **The 240 Roots of $E_8$ in $\mathbb{R}^8$**:
-  The exceptional Lie algebra $\mathfrak{e}_8$ (dimension 248, rank 8) decomposes under its maximal compact subalgebra $\mathfrak{so}(16)$ as:
-  $$\mathfrak{e}_8 \cong \mathfrak{so}(16) \oplus \mathbf{128}_s$$
-  The 240 roots decompose with exact I-Ching correspondence:
-  - **128 Half-Integer Spinor Roots**: Exactly $2 	imes 64$ chiral hexagram roots on $S^7$:
-    $$\mathbf{r}(b) = rac{1}{2} \left( (-1)^{b_0}, (-1)^{b_1}, (-1)^{b_2}, (-1)^{b_3}, (-1)^{b_4}, (-1)^{b_5}, (-1)^{p(b)}, \pm 1 ight)$$
-    Every root satisfies $\|\mathbf{r}\|^2 = 2.0$ (root length $\sqrt{2}$) and coordinate sum $\sum x_i \in 2\mathbb{Z}$.
-    Inner product on the root sphere directly encodes Hamming metric:
-    $$\langle \mathbf{r}_A, \mathbf{r}_B angle \in \{-2, -1, 0, 1, 2\}, \quad \langle \mathbf{r}_A, \mathbf{r}_B angle = 1 \iff d_H(A, B) = 1 	ext{ (angle } 60^\circ	ext{)}$$
-  - **112 Integer Roots ($D_8 = \mathfrak{so}(16)$)**:
-    When two hexagram roots $\mathbf{r}_A, \mathbf{r}_B$ have inner product $1$, their difference vector $\Delta \mathbf{r} = \mathbf{r}_A - \mathbf{r}_B$ has squared norm $2.0$ and exactly two non-zero coordinates $\pm 1$:
-    $$\Delta \mathbf{r} \in \{ \pm e_i \pm e_j : 0 \le i < j \le 7 \}$$
-    **Every single-line transition between hexagrams is mediated by an integer root in the adjoint representation of $\mathfrak{so}(16)$!**
-* **$E_7 	imes SU(2)$ Decomposition & The 56 Composite Hexagrams**:
-  Under $\mathfrak{e}_8 \supset \mathfrak{e}_7 \oplus \mathfrak{su}(2)$, the adjoint representation splits as:
-  $$\mathbf{248} 	o (\mathbf{133}, \mathbf{1}) \oplus (\mathbf{1}, \mathbf{3}) \oplus (\mathbf{56}, \mathbf{2})$$
-  The 64 hexagrams partition into:
-  - **8 Pure Hexagrams** (doubled trigrams: Qian, Kun, Zhen, Xun, Kan, Li, Gen, Dui): The Cartan diagonal fixed points ($L = U$).
-  - **56 Composite Hexagrams**: Isomorphic to the 56-dimensional fundamental representation $\mathbf{56}$ of $E_7$!
-* **Chong Gua Transposition & $E_7$ Symplectic Invariant**:
-  Swapping lower and upper trigrams ($b^	op = (L \ll 3) \mid U$) partitions the 56 composite hexagrams into $56 / 2 = 28$ conjugate dual pairs (isomorphic to $\dim \mathfrak{so}(8) = inom{8}{2} = 28$).
-  Carries an intrinsic non-degenerate skew-symmetric symplectic form $\Omega \in 	ext{Sp}(56, \mathbb{R})$:
-  $$\Omega(a, b) = egin{cases} +1 & 	ext{if } b = a^	op 	ext{ and } L_a > U_a \ -1 & 	ext{if } b = a^	op 	ext{ and } L_a < U_a \ 0 & 	ext{otherwise} \end{cases}$$
-  Measuring directional energetic imbalance between inner self and outer world.
-* **The Gosset $4_{21}$ Polytope & Attention Modulation**:
-  The convex hull of the 240 roots forms the Gosset $4_{21}$ polytope. Each root connects to exactly **56 nearest neighbors** at distance $\sqrt{2}$. The $E_8$ harmonic attention kernel:
-  $$K_{E_8}(a, b) = \exp\left(eta \cdot \langle \mathbf{r}_a, \mathbf{r}_b angleight)$$
-  naturally privileges the 56 adjacent states while damping orthogonal directions.
-* **The Lie Group RoPE Collision Theorem & The Cartan Commutation Resolution**:
-  - *The Collision Problem*: In modern LLMs (Qwen2.5 / Qwen3.5), Rotary Position Embeddings (RoPE) rotate subvectors by $R_{\Theta, t} \in SO(2)^{d/2}$. General non-abelian Lie group rotations $\exp(\Omega)$ do **not commute** with RoPE:
-    $$[\Omega, \log R_{\Theta, t}] 
-eq 0 \implies R_{\Theta, t} \exp(\Omega) K 
-eq \exp(\Omega) R_{\Theta, t} K$$
-    Arbitrary KV-cache rotations destroy positional phase alignment, causing catastrophic perplexity collapse.
-  - *The Cartan Commutation Resolution*: The 8-dimensional Cartan subalgebra $\mathfrak{h} \subset \mathfrak{e}_8$ generates the maximal torus $T^8 = U(1)^8 \subset E_8$. Because its generators share the 2D invariant planes with RoPE:
-    $$[\mathfrak{h}, \log R_{\Theta, t}] = 0 \iff \exp\left(\sum_{k=1}^8 \phi_k H_kight) R_{\Theta, t} = R_{\Theta, t} \exp\left(\sum_{k=1}^8 \phi_k H_kight) \quad orall t \in \mathbb{R}$$
-  - *Conclusion*: Continuous phase modulation in the KV cache across context turns is **mathematically safe and translation-invariant if and only if restricted to the Cartan 8-torus of $E_8$**.
-
----
-
-### 5. Where the I-Ching GDL Engine Thrives over Native MNN Alone
-
-| Capability Dimension | Native MNN Alone (Raw LLM) | With I-Ching GDL Coprocessor | Where It Thrives |
-|---|---|---|---|
-| **1. State Memory & Continuity** | Ephemeral / Leaky (sliding-window pruning loses character grounding) | $O(1)$ 6-bit topological anchor ($h \in \mathbb{F}_2^6$) + spectral heat curve | Infinite-turn persona consistency with zero memory growth |
-| **2. Persona Oversmoothing** | Collapses into bland corporate assistant ("I'd be happy to help!") | Cellular Sheaf Holonomy: $\ker(\mathcal{L}_\mathcal{F}) = \{0\}$ prevents Dirichlet decay | Sharp, distinct archetypes that never homogenize |
-| **3. Dialogue Loop Breaking** | Blunt scalar penalty (1.15x) suppresses words and breaks grammar | Discrete Hodge 1-form vortex projection ($\ker(d_1)$) + Pangtong jump ($\sim x$) | Instantly escapes repetitive loops with clean phrasing |
-| **4. Mobile Latency & Battery** | Conditioning via prompt eats 30+ tokens ($2\,	ext{s}$ on mobile, heats battery) | 384 butterfly additions, 0 mults, $1.2\,\mu	ext{s}$ on ARM Cortex-A78 | 10,000x faster state transitions with 0% battery consumption |
-| **5. Explainability & Auditing** | Black box neural weights; impossible to audit mood changes | Explicit 6D Coxeter coordinates, Yao line transitions, nuclear core | 100% mathematically auditable state inspection |
-
----
-
-### 6. Automated Verification & Smoke Suite
-
-The full pipeline is audited by automated smoke suites passing **98 out of 98 checks** (floor 75):
-```
-Godot_v4.7.1 --headless --path . -s res://tests/mnn_smoke.gd
-```
-- **Checks 1–25**: MNN initialization, embedding honesty, and streaming fidelity.
-- **Checks 26–45**: Qwen3 / Qwen3.5 model constants, the `_wants_no_think` fence, and dual-stream `<think>` demuxing.
-- **Checks 46–58**: Tier-1 FWHT ($O(N \log N)$), spectral low-pass filter, and Cayley algebra (Hamming, Pangtong, Huguaci).
-- **Checks 59–67**: Tier-2 Cellular Sheaf Laplacian over $\Delta_2(Q_6)$, Dirichlet energy, harmonic diffusion, and sheaf resonance.
-- **Checks 68–79**: Tier-3 $E_8$ root coordinate embeddings ($\|\mathbf{r}\|^2 = 2.0$), $E_7$ fundamental 56-state classification, Chong Gua transposition, and skew-symmetric symplectic form $\Omega$.
-- **Checks 80–98**: The JNI Bridge fences (global class cache, JVM caching, thread attach safety).
-
 
 ## Character
 
@@ -515,106 +385,24 @@ no real sensor has ever printed `pose=upright`. See `docs/ROADMAP.md` item 8.
 
 For two releases the dial did not orient, and neither the pose remap nor the
 declination was at fault. The values were correct; **they were emitted before
-anything was listening, and then never repeated.**
+anything was listening, and then never repeated.** The listener connected 1.49 s
+after the plugin started emitting, the 1° delta gate suppressed everything after
+that, and the dial sat on a number assembled entirely from a `0.0` default plus a
+`-21.04` declination.
 
-`IxLoc.onMainResume` starts the rotation-vector listener at Activity resume.
-`scripts/social/geo.gd` connects to `heading_changed` about a second and a half
-later, when Godot has loaded the main scene and calls `start()`. Measured on the
-A22, the gap was **1.49 s** and it swallowed three heading emits, one pose and
-one accuracy level:
+The fix is three rules, and none of them is arithmetic: `start()` is a
+**handshake** that re-announces pose, accuracy, declination and heading; a
+**one-second keepalive** sits beside the delta gate so silence means broken
+rather than unchanged; and `Geo` **disowns a heading that stopped arriving**
+(4 s) and drops back to the north-up map rather than rotate the world by a value
+of unknown age.
 
-```
-53.500  IxLoc  heading: rotation-vector listener registered
-53.607  IxLoc  pose=flat pitch=5.1
-53.607  IxLoc  heading: 63.0 (magnetic)
-53.722  IxLoc  heading: 57.2 (magnetic)
-53.825  IxLoc  heading: 56.0 (magnetic)
-55.000  godot  geo: source=ixloc          <- the first listener connects
-```
-
-Then the phone lay still on the desk, the 1° delta gate in `publishHeading`
-suppressed every later sample, and that was the whole session's heading: three
-values, all lost, none repeatable. GDScript kept the `0.0` it was born with, the
-declination handler added `-21.04` to it, and the dial sat on **339°** — a number
-assembled entirely from a default and a correction, with no measurement anywhere
-in it. A pose line never printed for the same reason.
-
-Three changes, and none of them is arithmetic:
-
-1. **`start()` is a handshake.** It is the one moment the plugin knows GDScript
-   is connected, so pose, accuracy, declination and heading are all re-announced
-   into it and the emit gate is reset. `onMainResume` does the same after a pause
-   re-registers the listener.
-2. **A one-second keepalive.** The delta gate is right about chatter and
-   catastrophic as the only rule — it turns the stream into a one-shot. A still
-   phone now sends one sample a second instead of none, so no listener can ever
-   again hold a value that nothing will correct.
-3. **`Geo` disowns a heading that stopped arriving** (`HEADING_STALE_MS`, 4 s =
-   four keepalives). The radar drops out of heads-up and becomes the north-up map
-   it was before the compass existed. Rotating the world by a number of unknown
-   age is the one option that is actually dishonest, and it is what the dial did
-   for two releases. Recovery is automatic: one sample and it is back.
-
-`registerListener`'s **result** is now logged with the sensor's type and name —
-it returns `false` when the platform declines and the old line said "registered"
-either way — unregistration says so out loud, and a summary every five seconds
-carries samples/s seen, samples/s sent, raw, smoothed and pose, so `sent=0` is a
-sentence rather than a silence. `TYPE_GEOMAGNETIC_ROTATION_VECTOR` is a fallback
-for a phone with no gyroscope; `TYPE_GAME_ROTATION_VECTOR` is deliberately
-refused, because it has no magnetometer and therefore no north, and a dial
-pointing confidently at nothing is worse than a dial that will not point.
-
-**The acceptance test is that the two sides print the same number.** Fresh
-install, both phones flat on a desk, ~45 s each:
-
-```
-A22 (R9WT200BA8F)
-  IxLoc  heading: registerListener(TYPE_ROTATION_VECTOR "ROTATION_VECTOR") -> true
-  IxLoc  pose=flat pitch=4.7 (screen tilted off horizontal)
-  IxLoc  heading: announcing state to a fresh listener (start())
-           pose=flat accuracy=3 heading=313.7 magnetic declination=none
-  godot  geo: heading=313.7° (magnetic — no fix yet)
-  IxLoc  heading: 292.7 true (313.7 magnetic -21.04 decl)
-  godot  geo: heading=292.7° (true) = 313.7° magnetic -21.04° decl
-  IxLoc  heading: 50.3 samples/s seen, 1.0/s sent (252/5 in 5.0s)
-           raw=313.7 smoothed=313.7 pose=flat
-
-Fold 4 (RFCT71BW9YV)
-  IxLoc  heading: registerListener(TYPE_ROTATION_VECTOR "Rotation Vector  Non-wakeup") -> true
-  IxLoc  heading: 343.1 true (4.2 magnetic -21.04 decl)
-  godot  geo: heading=343.1° (true) = 4.2° magnetic -21.04° decl
-  IxLoc  heading: 15.1 samples/s seen, 1.0/s sent (76/5 in 5.0s)
-           raw=4.1 smoothed=4.1 pose=flat
-```
-
-Every GDScript receipt paired against the plugin emit before it: **88 pairs
-across three captures, 0 mismatched.** Before the fix the same comparison read
-`kotlin=61.9 gdscript=0.0`. The Fold happens to sit at 4° magnetic, so its true
-heading is 343° — the correction crossing the 0/360 seam, right on both sides.
-
-Sensor rates differ by hardware and the emit rate does not: the A22's
-rotation vector runs at **50.3 Hz** and the Fold's at **15.1 Hz**, and both
-deliver **1.0 heading/s** to GDScript on a motionless desk. The raw values jitter
-by a few tenths of a degree between samples, which is itself the proof that
-samples are flowing rather than one value being repeated.
-
-Backgrounding and reopening the app is also on the log: the listener
-unregisters, twelve seconds pass with no samples, and resume re-registers and
-re-announces — `announcing state to a fresh listener (onMainResume) pose=flat
-accuracy=3 heading=313.7 magnetic declination=-21.04`, received by GDScript
-intact 45 ms later.
-
-**UNBUILT: the stale watchdog has not fired on a phone.** Its logic is pinned by
-`tests/geo_smoke.gd` and `tests/radar_smoke.gd` on an injected clock, and 90 s of
-device log shows it correctly *not* firing while samples flow — but a pause does
-not exercise it (Godot's `_process` is frozen while backgrounded, and the resume
-handshake stamps a fresh sample before the first frame runs). What a desk has
-proven is that it does not false-positive.
-
-**UNBUILT, still: the dial's response to a real turn.** `adb` cannot rotate a
-phone, and nobody lifted either one. Both readings above are a stationary desk.
-That the number is delivered, matches on both sides, and keeps arriving is
-proven; that the dial *follows a body turning* remains untested on hardware.
+The measurement that closed it — both phones, both logs, 88 paired comparisons
+with 0 mismatched — lives in its one home,
+[`docs/ROADMAP.md`](docs/ROADMAP.md) Phase 3 item 10. The rules a future signal
+in that plugin has to obey live in
+[`android_plugin/README.md`](android_plugin/README.md) § `start()` is a
+handshake, not a switch.
 
 ### Compass honesty — states, not crashes, applied to a sensor — DEVICE
 
@@ -754,12 +542,33 @@ refuses an event carrying an image-shaped key or bytes at any depth, and the
 smoke test tries to smuggle both past it. The line below about events and never
 frames is a property of the code rather than a promise about it.
 
+## Code map — where the app is assembled
+
+One screen means one scene, and it used to mean one 4,471-line `scripts/main.gd`
+holding every wire in the app. It is a **shell** now: `main.gd` keeps the scene
+and the lifecycle, and each group of wiring is its own file under
+`scripts/shell/` — `mode_shell_wiring.gd` (the one screen; the five-screen
+`mode_shell.gd`/`mode_bar.gd` it was named for were deleted on 2026-09-07),
+`net_wiring.gd`, `mind_wiring.gd`,
+with the remaining groups landing the same way. Below them, `scripts/adapters/`
+is one adapter per Android plugin over a shared `plugin_adapter.gd`: the only
+place a singleton is fetched and the only place a version handshake is checked.
+Between the adapters and the creature's state there is a seam that is
+deliberately **open and empty**, for a future layer to subscribe to.
+
+The signal style did not change and is not going to: 679 `.connect(` against 6
+`get_node(` and one `$`, and zero import cycles. The plan that moved all of this
+— its survey numbers, its milestones and its metrics — is
+[`docs/plans/refactor.md`](docs/plans/refactor.md).
+
 ## Stack (planned)
 
 - **MediaPipe** models — body sense (pose, face; hands later). **Face is built**
   — `android_plugin/ixbody`, Tasks Vision rather than MNN; ROADMAP Phase 5 has
   the reasoning and the device log
-- **Qwen-VL locate-anything** — world sense (necklace mode; NVIDIA/OWL-ViT retired, see Phase 6)
+- ~~**Qwen-VL locate-anything**~~ — **retired.** The VLM road was cut in Phase 11b
+  and LOOK became a MediaPipe detector in Phase 12; see
+  [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - **MNN** — one on-device runtime for every model
 - **Wireless mesh** — device-to-device events, never frames
 
@@ -779,9 +588,10 @@ HEXY_NAME=beta  Godot_v4.7.1 --path .
 
 ## First-run asset delivery
 
-Hexy's mind is two MNN model dirs — `gte-embedding-mnn` (~430 MB) and
-`qwen3-0.6b-mnn` (~450 MB). Neither is in the APK and neither can be: together
-they are nine times what Play delivers in one package. A stranger who installs
+Hexy's mind is a pair of MNN model dirs — an embedder and a chat pack, sized and
+named in [`android_plugin/README.md`](android_plugin/README.md) § Models, which
+is the only place those sizes are written down. Neither is in the APK and neither
+can be: together they are nine times what Play delivers in one package. A stranger who installs
 this has no `adb`, so on first launch the app fetches them itself from a manifest
 published beside the bytes:
 
@@ -812,19 +622,8 @@ shortcut rather than the only road onto a device.
 
 ## Test
 
-```
-Godot_v4.7.1 --headless --path . -s res://tests/mesh_smoke.gd
-Godot_v4.7.1 --headless --path . -s res://tests/mnn_smoke.gd
-Godot_v4.7.1 --headless --path . -s res://tests/fabric_smoke.gd
-Godot_v4.7.1 --headless --path . -s res://tests/shared_map_smoke.gd
-Godot_v4.7.1 --headless --path . -s res://tests/presence_smoke.gd
-Godot_v4.7.1 --headless --path . -s res://tests/asset_bootstrap_smoke.gd
-Godot_v4.7.1 --headless --path . -s res://tests/geo_smoke.gd
-Godot_v4.7.1 --headless --path . -s res://tests/radar_smoke.gd
-Godot_v4.7.1 --headless --path . -s res://tests/peer_mind_smoke.gd
-Godot_v4.7.1 --headless --path . -s res://tests/probe_smoke.gd
-Godot_v4.7.1 --headless --path . -s res://tests/lens_smoke.gd
-```
+The runbook owns this: [`docs/FIELD.md`](docs/FIELD.md) §1 has the one command
+that runs a suite and the count of suites there are. `tests/` is the index.
 
 Windowed proof of visits, no network needed — fakes two presence events and
 saves `user://visit_shot.png`:

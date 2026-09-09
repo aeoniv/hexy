@@ -63,14 +63,28 @@ const MOCK_DIM := 64
 ## to the model name and is only ever appended to a real Qwen3 prompt.
 ##
 ## QWEN3.5 HAS NO SUCH SWITCH. It decides by `jinja.context.enable_thinking` in
-## its own `llm_config.json` (shipped `true`, and that file is the place to turn
-## it off) and otherwise by emitting the `<think>` tags this seam already
+## its own `config.json` (shipped `true`, and that file — NOT `llm_config.json`,
+## which only carries the name inside its Jinja template — is the place to turn
+## it off; the Fold run of 2026-09-06 pushed it `false`) and otherwise by emitting the `<think>` tags this seam already
 ## separates. A literal " /no_think" is not a command there, it is a sentence
 ## the model reads. `begins_with("qwen3")` would have caught `qwen3.5-*` too;
 ## [method _wants_no_think] is the fence.
 const QWEN_NO_THINK := " /no_think"
 
+## THE HANDSHAKE IS NO LONGER SPELLED HERE. `scripts/seam.gd` is still what
+## runs it; the adapter below is what calls it, with the NEEDS on the next line.
+## THE AAR THIS SCRIPT WAS WRITTEN AGAINST. Compared with the plugin's own
+## `plugin_version()` at attach; see `scripts/seam.gd` for why a mismatch is
+## worth a loud line and a degrade rather than a shrug. This seam was the one
+## of twelve that skipped the handshake — a stale ixmnn under a fresh script
+## answers `has_singleton` true and then loses whichever new method the script
+## needed, silently, which is the exact failure the handshake exists to name.
+const NEEDS := "ixmnn/1"
+## THE ONE DOOR TO IxMnn, shared with `DeviceFacts.plugin_ram`. Refactor R5.
+const MnnAdapterScript = preload("res://scripts/adapters/mnn_adapter.gd")
+
 var _android: Object = null
+var _door := MnnAdapterScript.new(NEEDS, "mnn", "mnn", "mock")
 var _hex_prior_bits: int = -1
 var _hex_prior_beta: float = 0.0
 var _dim := MOCK_DIM
@@ -99,8 +113,15 @@ var _can_stream := false
 
 
 func _init() -> void:
-	if Engine.has_singleton("IxMnn"):
-		_android = Engine.get_singleton("IxMnn")
+	if _door.present():
+		# THE VERSION HANDSHAKE, BEFORE A SINGLE SIGNAL IS CONNECTED, inside the
+		# adapter. On a mismatch it hands back null and this runtime runs its
+		# mock, which says it is a mock — strictly better than a plugin that
+		# lies about its age. `available()` reads `_android != null`, so the
+		# degrade needs nothing else.
+		_android = _door.attach()
+		if _android == null:
+			return
 		# THE PLUGIN'S SIGNALS, FORWARDED AS OUR OWN. Both are guarded on
 		# `_streaming`, because two MnnRuntime instances exist on a phone
 		# (main.gd's `_mind` and `_agent_mind`) and both are connected to the one
@@ -423,153 +444,6 @@ static func hamming_neighbors(bits: int) -> PackedInt32Array:
 	for i in 6:
 		neighbors[i] = (bits ^ (1 << i)) & 0x3F
 	return neighbors
-
-
-# =============================================================================
-# TIER-2: CELLULAR SHEAF LAPLACIAN OVER Delta_2(Q6)
-# =============================================================================
-
-## Orthogonal restriction map F_{v <= e}: R^6 -> R^2
-## Projects line k and its harmonic trigram partner (k+3)%6 with SO(2) rotation
-static func sheaf_restrict(v: int, line_k: int, state_6d: PackedFloat32Array) -> Vector2:
-	var k := line_k % 6
-	var k_partner := (k + 3) % 6
-	var x1 := state_6d[k] if k < state_6d.size() else 0.5
-	var x2 := state_6d[k_partner] if k_partner < state_6d.size() else 0.5
-	var theta := (PI / 3.0) * float(k)
-	if ((v >> k) & 1) != 0:
-		theta = -theta
-	var c := cos(theta)
-	var s := sin(theta)
-	return Vector2(c * x1 - s * x2, s * x1 + c * x2)
-
-
-## Local Sheaf Dirichlet Energy (Cognitive Dissonance / Disagreement)
-## E_u(x) = sum_{k=0..5} || F_{v_k <= e_k} x_{v_k} - F_{u <= e_k} x_u ||^2
-static func sheaf_local_energy(u: int, state_6d: PackedFloat32Array) -> float:
-	var energy := 0.0
-	for k in range(6):
-		var v := (u ^ (1 << k)) & 0x3F
-		var x_v := state_6d.duplicate()
-		if k < x_v.size():
-			x_v[k] = 1.0 - x_v[k]
-		var r_u := sheaf_restrict(u, k, state_6d)
-		var r_v := sheaf_restrict(v, k, x_v)
-		var diff := r_v - r_u
-		energy += diff.length_squared()
-	return energy
-
-
-## Single-step Sheaf Laplacian diffusion: x_u <- x_u - alpha * (L_F x)_u
-## Regularizes continuous vitality trajectory while preventing oversmoothing
-static func sheaf_diffuse_step(u: int, state_6d: PackedFloat32Array, alpha: float = 0.1) -> PackedFloat32Array:
-	var grad := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-	for k in range(6):
-		var v := (u ^ (1 << k)) & 0x3F
-		var x_v := state_6d.duplicate()
-		if k < x_v.size():
-			x_v[k] = 1.0 - x_v[k]
-		var r_u := sheaf_restrict(u, k, state_6d)
-		var r_v := sheaf_restrict(v, k, x_v)
-		var diff := r_v - r_u
-		var k_partner := (k + 3) % 6
-		var theta := (PI / 3.0) * float(k)
-		if ((u >> k) & 1) != 0:
-			theta = -theta
-		var c := cos(theta)
-		var s := sin(theta)
-		grad[k] += (c * diff.x + s * diff.y)
-		grad[k_partner] += (-s * diff.x + c * diff.y)
-
-	var res := PackedFloat32Array()
-	res.resize(6)
-	for i in range(6):
-		var val := state_6d[i] if i < state_6d.size() else 0.5
-		res[i] = clampf(val + alpha * grad[i], 0.0, 1.0)
-	return res
-
-
-## Sheaf resonance metric between two hexagram states in [0.0, 1.0]
-static func sheaf_resonance(a: int, b: int) -> float:
-	var d := hamming_distance(a, b)
-	var trigram_align := 1.0 if ((a ^ b) & 0b001001) == 0 else 0.7
-	return clampf((1.0 - float(d) / 6.0) * trigram_align, 0.0, 1.0)
-
-# =============================================================================
-# TIER-3: E8 LIE GROUP EMBEDDING & E7 SYMPLECTIC SUBALGEBRA
-# =============================================================================
-
-## Embeds 6-bit hexagram state into an 8D root of the E8 Lie algebra.
-## All roots have squared length 2.0 (norm sqrt(2)) and even coordinate sum.
-## Total roots across both chiralities: 64 * 2 = 128 half-integer spinor roots of E8.
-static func e8_root_embedding(hex_bits: int, yin_chiral: bool = false) -> PackedFloat32Array:
-	var coords := PackedFloat32Array()
-	coords.resize(8)
-	var b := hex_bits & 0x3F
-	var wt := 0
-	var tmp := b
-	while tmp > 0:
-		wt += (tmp & 1)
-		tmp >>= 1
-
-	for i in range(6):
-		coords[i] = -0.5 if (((b >> i) & 1) != 0) else 0.5
-
-	if (wt % 2) != 0:
-		# 3 - wt is even -> x6 + x7 must be 0
-		coords[6] = -0.5 if yin_chiral else 0.5
-		coords[7] = 0.5 if yin_chiral else -0.5
-	else:
-		# 3 - wt is odd -> x6 + x7 must be +/- 1
-		coords[6] = -0.5 if yin_chiral else 0.5
-		coords[7] = -0.5 if yin_chiral else 0.5
-
-	return coords
-
-
-## Inner product between two 8D E8 root vectors in R^8
-static func e8_inner_product(a: PackedFloat32Array, b: PackedFloat32Array) -> float:
-	assert(a.size() == 8 and b.size() == 8, "e8_inner_product requires 8D vectors")
-	var sum := 0.0
-	for i in range(8):
-		sum += a[i] * b[i]
-	return sum
-
-
-## Tests whether a hexagram is one of the 8 pure doubled trigrams (Cartan diagonal)
-static func is_pure_cartan_hexagram(hex_bits: int) -> bool:
-	var lower := hex_bits & 0x07
-	var upper := (hex_bits >> 3) & 0x07
-	return lower == upper
-
-
-## Chong Gua Transposition (swaps upper and lower trigrams)
-static func chong_gua_transpose(hex_bits: int) -> int:
-	var lower := hex_bits & 0x07
-	var upper := (hex_bits >> 3) & 0x07
-	return (lower << 3) | upper
-
-
-## E7 Symplectic bilinear form Omega(a, b) on the 56 composite hexagrams
-## Skew-symmetric: Omega(a, b) = -Omega(b, a), non-zero on Chong Gua conjugate pairs
-static func e7_symplectic_form(a: int, b: int) -> float:
-	a &= 0x3F
-	b &= 0x3F
-	if is_pure_cartan_hexagram(a) or is_pure_cartan_hexagram(b):
-		return 0.0
-	if b != chong_gua_transpose(a):
-		return 0.0
-	var lower := a & 0x07
-	var upper := (a >> 3) & 0x07
-	return 1.0 if (lower > upper) else -1.0
-
-
-## E8 Harmonic Attention Kernel between two hexagrams: K(a, b) = exp(beta * <r_a, r_b>)
-static func e8_harmonic_kernel(a: int, b: int, beta: float = 1.0) -> float:
-	var r_a := e8_root_embedding(a, false)
-	var r_b := e8_root_embedding(b, false)
-	return exp(beta * e8_inner_product(r_a, r_b))
-
 
 
 func _mock_chat(prompt: String) -> String:

@@ -34,9 +34,11 @@
 # Qwen2-VL lane for Phase 9 vision and save a gigabyte. Until then it is chat.
 # It also ships `llm.mnn.json` (5.3 MB), which Qwen3-0.6B does not have; MNN
 # 3.6.1 reads it and a pack pushed without it is a pack that will not load.
-# Thinking is not a prompt switch here: `llm_config.json` carries
-# `jinja.context.enable_thinking` (shipped `true`) and the `<think>` tags are
-# separated by the seam. Do NOT append Qwen3's `/no_think` to it.
+# Thinking is not a prompt switch here: `config.json` carries
+# `jinja.context.enable_thinking` (shipped `true`; the Fold run of 2026-09-06
+# pushed it `false` — see Phase 11c) and the `<think>` tags are separated by the
+# seam. It is NOT in `llm_config.json`, which only mentions the name inside its
+# Jinja template. Do NOT append Qwen3's `/no_think` to it.
 #
 # gte-embedding-mnn stays the embed model. Nothing about a chat pack changes
 # that: MNN's `Embedding` class needs an output named `sentence_embeddings` and
@@ -55,15 +57,21 @@
 # Re-download with, per file:
 #   curl -L -o <file> https://huggingface.co/taobao-mnn/<repo>/resolve/main/<file>
 
+# -Model, -Serial and -Root are the SHARED flag block: the same five lane names
+# and the same default root that tools/publish_assets.ps1 takes, so a word means
+# one thing across the tools. The list is stated twice only because PowerShell
+# requires a ValidateSet literal in the param block; tools/_common.ps1 holds the
+# copy both scripts are checked against, along with the adb path and the -s
+# argument shape that used to live only here.
 param(
     [ValidateSet("embed", "chat", "chat35", "vision", "all")][string]$Model = "embed",
     [string]$Serial = "",
-    [string]$Root = "D:\ix64-models\hexy")
+    [string]$Root = "")
 
 $ErrorActionPreference = "Stop"
-$pkg = "app.ix64.hexy"
-$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
-$adbArgs = if ($Serial) { @("-s", $Serial) } else { @() }
+. (Join-Path $PSScriptRoot "_common.ps1")
+if (-not $Root) { $Root = $IxModelRoot }
+$pkg = $IxPackage
 $base = "/storage/emulated/0/Android/data/$pkg/files"
 
 $sets = @{
@@ -82,7 +90,7 @@ $sets = @{
     vision = @{ dir = "qwen2-vl-2b-mnn"
                 files = @() }
 }
-$wanted = if ($Model -eq "all") { @("embed", "chat") } else { @($Model) }
+$wanted = if ($Model -eq "all") { $IxDefaultLanes } else { @($Model) }
 
 foreach ($key in $wanted) {
     $set = $sets[$key]
@@ -99,24 +107,22 @@ foreach ($key in $wanted) {
     }
     if ($files.Count -eq 0) { Write-Error "nothing to push in $src" }
     $dst = "$base/$($set.dir)"
-    & $adb @adbArgs shell "mkdir -p '$dst'" | Out-Null
+    Invoke-IxAdb -Serial $Serial shell "mkdir -p '$dst'" | Out-Null
     foreach ($f in $files) {
         $local = Join-Path $src $f
         if (-not (Test-Path $local)) { Write-Error "missing $local" }
         $size = (Get-Item $local).Length
-        # stat prints nothing when the file is absent, and adb hands PowerShell
-        # a $null rather than an empty string — .Trim() on that is a hard stop.
-        $there = "$(& $adb @adbArgs shell "stat -c %s '$dst/$f' 2>/dev/null")".Trim()
+        $there = Get-IxRemoteSize -Serial $Serial -Path "$dst/$f"
         if ($there -eq "$size") {
             Write-Host "ok    $($set.dir)/$f ($size bytes)"
             continue
         }
         Write-Host "push  $($set.dir)/$f ($size bytes)"
-        & $adb @adbArgs push $local "$dst/$f" | Out-Null
+        Invoke-IxAdb -Serial $Serial push $local "$dst/$f" | Out-Null
     }
 }
 
-& $adb @adbArgs shell "ls -la '$base'"
+Invoke-IxAdb -Serial $Serial shell "ls -la '$base'"
 Write-Host "restart Hexy - logcat should show 'mnn embed: dim=768' (and 'mnn chat: ...' if chat was pushed)."
 if ($wanted -contains "vision") {
     Write-Host "vision: turn the VISION toggle on in the workshop, then run the `"look test`" - the first device run has to confirm the BGR channel order and the box scale."

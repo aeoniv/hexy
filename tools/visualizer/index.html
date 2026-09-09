@@ -4,9 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hexy C++ Native & Alibaba MNN Full Engine Interactive Studio</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Fonts are system-resolved; this page is fully offline (no remote assets). -->
   <style>
     :root {
       --bg: #070a12;
@@ -276,6 +274,325 @@
       height: 540px;
       user-select: none;
       filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.4));
+    }
+
+    /* --- Layers tab: responsive stack diagram --- */
+    .layers-wrap {
+      /* the mount lives inside the pan/zoom canvas, so size against the
+         viewport (as the fixed-width diagrams do) rather than the flex parent */
+      width: min(1160px, 92vw);
+      flex: 0 0 auto;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      align-items: flex-start;
+    }
+    .layers-main { flex: 1 1 520px; min-width: 0; }
+    svg.layers-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      user-select: none;
+      filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.4));
+    }
+    svg.layers-svg .lyr-box { cursor: help; }
+    svg.layers-svg .lyr-box rect { transition: opacity .15s ease; }
+    svg.layers-svg .lyr-box:hover rect.lyr-face { opacity: .78; }
+    .layers-caption {
+      margin: 12px 2px 0;
+      font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      border-left: 2px solid var(--accent-cyan);
+      padding-left: 10px;
+    }
+    .layers-legend {
+      flex: 0 1 300px;
+      min-width: 240px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .layers-legend h4 {
+      margin: 0 0 4px;
+      font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent-purple);
+      letter-spacing: .02em;
+    }
+    .layers-legend .lg-sub {
+      margin: 0 0 12px;
+      font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--accent-amber);
+    }
+    .layers-legend dl { margin: 0; }
+    .layers-legend dt {
+      font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      margin-top: 10px;
+    }
+    .layers-legend dd {
+      margin: 3px 0 0;
+      font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--text-muted);
+    }
+    @media (max-width: 760px) {
+      .layers-legend { flex: 1 1 100%; }
+    }
+
+    /* --- Plan tab: kernel / add-ons / game map --- */
+    .plan-wrap {
+      width: min(1160px, 92vw);
+      flex: 0 0 auto;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      user-select: text;
+    }
+    .plan-sec {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 14px 16px 16px;
+    }
+    .plan-sec > h3 {
+      margin: 0 0 2px;
+      font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent-amber);
+      letter-spacing: .02em;
+    }
+    .plan-sec > .plan-sub {
+      margin: 0 0 12px;
+      font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-muted);
+    }
+    .plan-caption {
+      margin: 10px 2px 0;
+      font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      border-left: 2px solid var(--accent-cyan);
+      padding-left: 10px;
+    }
+    .plan-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 0;
+      border-top: 1px dashed rgba(255, 255, 255, 0.08);
+    }
+    .plan-row:first-of-type { border-top: 0; }
+    .plan-rowlab {
+      flex: 0 0 96px;
+      font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      color: var(--accent-purple);
+    }
+    .plan-node {
+      display: inline-block;
+      padding: 6px 11px;
+      border-radius: 8px;
+      background: #111c2e;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 12px;
+      line-height: 1.35;
+      color: var(--text-main);
+      cursor: help;
+      transition: border-color .15s ease, background .15s ease;
+    }
+    .plan-node:hover { border-color: var(--accent-cyan); background: #16253c; }
+    .plan-node small {
+      display: block;
+      font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      font-size: 9.5px;
+      color: var(--text-muted);
+    }
+    .plan-node.k { border-color: rgba(74, 222, 128, 0.45); }
+    .plan-node.a { border-color: rgba(192, 132, 252, 0.45); }
+    .plan-node.g { border-color: rgba(251, 146, 60, 0.45); }
+    .plan-arrow {
+      font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .plan-up { color: var(--accent-purple); }
+    .plan-tablewrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+    }
+    table.plan-table {
+      border-collapse: collapse;
+      min-width: 860px;
+      width: 100%;
+      font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 11.5px;
+      line-height: 1.45;
+    }
+    table.plan-table th {
+      position: sticky;
+      top: 0;
+      background: #0d1526;
+      text-align: left;
+      padding: 8px 10px;
+      font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--accent-cyan);
+      border-bottom: 1px solid var(--card-border);
+      white-space: nowrap;
+    }
+    table.plan-table td {
+      vertical-align: top;
+      padding: 9px 10px;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    table.plan-table tr:last-child td { border-bottom: 0; }
+    table.plan-table tr:hover td { background: rgba(56, 189, 248, 0.05); }
+    table.plan-table td.plan-line { color: var(--text-main); white-space: nowrap; }
+    .plan-glyph {
+      display: block;
+      font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      font-size: 14px;
+      letter-spacing: .12em;
+      color: var(--accent-amber);
+    }
+    .pill {
+      display: inline-block;
+      padding: 1px 7px;
+      margin: 1px 3px 1px 0;
+      border-radius: 9px;
+      font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      font-size: 9.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: help;
+    }
+    .pill.ship { color: #4ade80; background: rgba(74, 222, 128, 0.14); border: 1px solid rgba(74, 222, 128, 0.5); }
+    .pill.plan { color: #fbbf24; background: rgba(251, 191, 36, 0.14); border: 1px solid rgba(251, 191, 36, 0.5); }
+    .pill.dead { color: #94a3b8; background: rgba(148, 163, 184, 0.12); border: 1px solid rgba(148, 163, 184, 0.45); }
+    .plan-foot {
+      margin-top: 10px;
+      font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      font-size: 10.5px;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+    .plan-cols {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .plan-col {
+      flex: 1 1 300px;
+      min-width: 250px;
+      background: #0d1526;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 12px 13px;
+    }
+    .plan-col h5 {
+      margin: 0 0 8px;
+      font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      font-size: 10.5px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .plan-col.kernel h5 { color: var(--accent-green); }
+    .plan-col.addon h5 { color: var(--accent-purple); }
+    .plan-col.deadcol h5 { color: var(--text-muted); }
+    .plan-col ul { list-style: none; margin: 0; padding: 0; }
+    .plan-col li {
+      padding: 5px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 11.5px;
+      line-height: 1.45;
+      color: var(--text-muted);
+      cursor: help;
+    }
+    .plan-col li:first-child { border-top: 0; }
+    .plan-col li b { color: var(--text-main); font-weight: 600; }
+    .plan-col li code {
+      font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      font-size: 10px;
+      color: var(--accent-blue);
+    }
+    .plan-steps { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; }
+    .plan-step {
+      flex: 1 1 116px;
+      min-width: 104px;
+      background: #111c2e;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 8px;
+      padding: 8px 9px;
+      font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 11.5px;
+      color: var(--text-main);
+      cursor: help;
+    }
+    .plan-step.done { border-color: rgba(74, 222, 128, 0.55); background: rgba(74, 222, 128, 0.09); }
+    .plan-step span {
+      display: block;
+      font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      font-size: 9.5px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+    .plan-gates {
+      margin: 12px 0 0;
+      list-style: none;
+      padding: 0;
+      font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+    .plan-gates li { padding: 4px 0 4px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); }
+    .plan-gates li:first-child { border-top: 0; }
+    .plan-gates b {
+      font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+      font-size: 10.5px;
+      color: var(--accent-amber);
+      margin-right: 6px;
+    }
+    svg.plan-svg {
+      width: 100%;
+      max-width: 460px;
+      height: auto;
+      display: block;
+      user-select: none;
+    }
+    .plan-body { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+    .plan-body .plan-bodysvg { flex: 1 1 300px; min-width: 260px; }
+    .plan-body .plan-bodylegend { flex: 1 1 320px; min-width: 260px; }
+    @media (max-width: 760px) {
+      .plan-rowlab { flex: 1 1 100%; }
     }
 
     /* SVG Interactive Nodes */
@@ -1027,7 +1344,9 @@
     <div class="diagram-panel">
       <div class="diagram-nav">
         <div class="tabs-group">
-          <button class="tab-btn active" id="tab0" onclick="switchTab(0)">1. Streaming Sequence UML</button>
+          <button class="tab-btn" id="tab8" onclick="switchTab(8)" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.14); box-shadow: 0 0 10px rgba(251, 191, 36, 0.2);">◆ Layers</button>
+          <button class="tab-btn active" id="tab9" onclick="switchTab(9)" style="color: #4ade80; border-color: rgba(74, 222, 128, 0.45); background: rgba(74, 222, 128, 0.14); box-shadow: 0 0 10px rgba(74, 222, 128, 0.2);">◇ Plan</button>
+          <button class="tab-btn" id="tab0" onclick="switchTab(0)">1. Streaming Sequence UML</button>
           <button class="tab-btn" id="tab1" onclick="switchTab(1)">2. 4-Layer Architecture</button>
           <button class="tab-btn" id="tab2" onclick="switchTab(2)">3. Safety Filters Flow</button>
           <button class="tab-btn engine-tab" id="tab3" onclick="switchTab(3)">4. MNN Transformer Block</button>
@@ -1575,6 +1894,364 @@
     }
 
     // Diagram 2: Architecture Pipeline
+    // Diagram 0: Layers — sensors → oracle → MNN/Qwen → creature
+    function renderLayersSvg() {
+      const F = `font-family="'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif"`;
+      const M = `font-family="'JetBrains Mono', ui-monospace, Consolas, monospace"`;
+      // badge(x, y, label, colour) — right-aligned pill drawn from its left edge
+      const badge = (x, y, label, col, w) => `
+            <rect x="${x}" y="${y}" width="${w}" height="20" rx="10" fill="${col}" fill-opacity="0.16" stroke="${col}" stroke-opacity="0.55" stroke-width="1" />
+            <text x="${x + w / 2}" y="${y + 14}" ${M} font-size="10" font-weight="600" fill="${col}" text-anchor="middle">${label}</text>`;
+      const flow = (y1, y2, col, label) => `
+          <line x1="450" y1="${y1}" x2="450" y2="${y2 - 10}" stroke="${col}" stroke-width="2.5" stroke-dasharray="5 4" />
+          <path d="M 450 ${y2} l -6 -11 h 12 z" fill="${col}" />
+          <text x="466" y="${(y1 + y2) / 2 + 4}" ${M} font-size="11" fill="${col}">${label}</text>`;
+
+      return `
+      <div class="layers-wrap">
+        <div class="layers-main">
+        <svg class="layers-svg" viewBox="0 0 900 700" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Hexy layer stack: sensors to oracle to MNN and Qwen to creature panel">
+
+          <!-- SENSORS -->
+          <g class="lyr-box">
+            <title>android_plugin/ixbody · ixloc · ixmesh · ixvoice · ixlens — Kotlin/C++ Godot plugins</title>
+            <rect class="lyr-face" x="40" y="24" width="820" height="104" rx="12" fill="#0f172a" stroke="#c084fc" stroke-width="2" />
+            <text x="66" y="54" ${F} font-size="15" font-weight="700" fill="#c084fc">SENSORS — Kotlin / C++ plugins</text>
+            <text x="66" y="80" ${M} font-size="11.5" fill="#94a3b8">ixbody pose · ixloc location · ixmesh peers · ixvoice sound · ixlens</text>
+            <text x="66" y="104" ${F} font-size="11.5" fill="#94a3b8">android_plugin/ — the phone's own instruments, already on the device</text>
+            ${badge(752, 40, 'shipped', '#4ade80', 84)}
+          </g>
+
+          ${flow(128, 192, '#c084fc', 'numbers')}
+
+          <!-- ORACLE (proposed) -->
+          <g class="lyr-box">
+            <title>Proposed layer — no code in repo. Would live beside scripts/brain/ as pure GDScript.</title>
+            <rect class="lyr-face" x="40" y="192" width="820" height="112" rx="12" fill="#131022" stroke="#fbbf24" stroke-width="2" stroke-dasharray="9 5" />
+            <text x="66" y="222" ${F} font-size="15" font-weight="700" fill="#fbbf24">ORACLE LAYER — GDScript, pure</text>
+            <text x="66" y="248" ${M} font-size="11.5" fill="#94a3b8">64 states · Q6 hypercube · sub-millisecond · no allocation on the hot path</text>
+            <text x="66" y="272" ${F} font-size="11.5" fill="#94a3b8">reads the numbers, chooses a state, writes a prompt block</text>
+            <text x="66" y="292" ${M} font-size="10.5" fill="#fbbf24" fill-opacity="0.8">NEW — nothing below this line changes</text>
+            ${badge(650, 208, 'proposed, no code in repo', '#fbbf24', 186)}
+          </g>
+
+          ${flow(304, 372, '#fbbf24', 'prompt block + one scalar')}
+
+          <!-- MNN + QWEN -->
+          <g class="lyr-box">
+            <title>scripts/brain/mnn_runtime.gd · libllm / MNN 3.6.1 (C++) · Qwen weights — gate in scripts/net/model_store.gd</title>
+            <rect class="lyr-face" x="40" y="372" width="820" height="164" rx="12" fill="#0f172a" stroke="#fb923c" stroke-width="2" />
+            <text x="66" y="402" ${F} font-size="15" font-weight="700" fill="#fb923c">LANGUAGE RUNTIME — untouched</text>
+            ${badge(600, 388, 'shipped, gated by RAM table', '#4ade80', 236)}
+
+            <rect x="66" y="420" width="240" height="92" rx="8" fill="#111c2e" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="82" y="444" ${F} font-size="12" font-weight="600" fill="#38bdf8">mnn_runtime.gd</text>
+            <text x="82" y="464" ${M} font-size="10" fill="#94a3b8">GDScript</text>
+            <text x="82" y="488" ${M} font-size="10" fill="#94a3b8">scripts/brain/</text>
+
+            <line x1="306" y1="466" x2="330" y2="466" stroke="#fb923c" stroke-width="2" />
+
+            <rect x="330" y="420" width="240" height="92" rx="8" fill="#111c2e" stroke="#22d3ee" stroke-width="1.5" />
+            <text x="346" y="444" ${F} font-size="12" font-weight="600" fill="#22d3ee">libllm / MNN 3.6.1</text>
+            <text x="346" y="464" ${M} font-size="10" fill="#94a3b8">C++ · libMNN.so</text>
+            <text x="346" y="488" ${M} font-size="10" fill="#94a3b8">not modified</text>
+
+            <line x1="570" y1="466" x2="594" y2="466" stroke="#fb923c" stroke-width="2" />
+
+            <rect x="594" y="420" width="240" height="92" rx="8" fill="#111c2e" stroke="#fb7185" stroke-width="1.5" />
+            <text x="610" y="444" ${F} font-size="12" font-weight="600" fill="#fb7185">Qwen weights</text>
+            <text x="610" y="463" ${M} font-size="10" fill="#94a3b8">0.6b default</text>
+            <text x="610" y="478" ${M} font-size="10" fill="#94a3b8">0.8b ≥ 6 GiB</text>
+            <text x="610" y="493" ${M} font-size="10" fill="#94a3b8">1.7b ≥ 8 GiB</text>
+          </g>
+
+          ${flow(536, 600, '#fb923c', 'text')}
+
+          <!-- CREATURE -->
+          <g class="lyr-box">
+            <title>The Godot UI — creature scene and panel</title>
+            <rect class="lyr-face" x="40" y="600" width="820" height="80" rx="12" fill="#0f172a" stroke="#4ade80" stroke-width="2" />
+            <text x="66" y="632" ${F} font-size="15" font-weight="700" fill="#4ade80">CREATURE / PANEL — Godot UI</text>
+            <text x="66" y="658" ${M} font-size="11.5" fill="#94a3b8">what the person actually sees and hears</text>
+          </g>
+        </svg>
+        <p class="layers-caption">C++, MNN and the weights stay untouched; the oracle is a separate GDScript layer that reads numbers and hands Qwen a prompt block.</p>
+        </div>
+
+        <aside class="layers-legend">
+          <h4>The oracle's three concepts</h4>
+          <p class="lg-sub">contemplation, not mechanism</p>
+          <dl>
+            <dt>cast</dt>
+            <dd>sensor-shaped diffusion on Q<sub>6</sub> — the numbers spread over the hypercube and settle.</dd>
+            <dt>reading</dt>
+            <dd>geodesic primary → relating — the intrinsic path between two of the 64 states.</dd>
+            <dt>64 × 2 phases</dt>
+            <dd>the 128 spinor roots of E<sub>8</sub>.</dd>
+          </dl>
+        </aside>
+      </div>
+      `;
+    }
+
+    function renderPlanHtml() {
+      // pills — shipped / planned / dead code, with a repo path in the tooltip
+      const P = (label, kind, tip) =>
+        `<span class="pill ${kind}" title="${tip || kind}">${label}</span>`;
+      const node = (label, sub, cls, tip) =>
+        `<span class="plan-node ${cls}" title="${tip || ''}">${label}${sub ? `<small>${sub}</small>` : ''}</span>`;
+      const arr = '<span class="plan-arrow">&rarr;</span>';
+      const up = '<span class="plan-arrow plan-up">&uarr;</span>';
+
+      // --- 2. tensegrity sketch: 6 struts as spokes, yang solid / yin split ---
+      const cx = 210, cy = 158, ri = 36, ro = 128;
+      let struts = '', cords = '', ends = [];
+      for (let i = 0; i < 6; i++) {
+        const a = (-90 + i * 60) * Math.PI / 180;
+        const x1 = cx + Math.cos(a) * ri, y1 = cy + Math.sin(a) * ri;
+        const x2 = cx + Math.cos(a) * ro, y2 = cy + Math.sin(a) * ro;
+        ends.push([x2, y2]);
+        const yang = (i % 2 === 0);
+        const col = yang ? '#fbbf24' : '#64748b';
+        if (yang) {
+          struts += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${col}" stroke-width="6" stroke-linecap="round" opacity="0.95" />`;
+        } else {
+          const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+          const gx = Math.cos(a) * 11, gy = Math.sin(a) * 11;
+          struts += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${(mx - gx).toFixed(1)}" y2="${(my - gy).toFixed(1)}" stroke="${col}" stroke-width="6" stroke-linecap="round" opacity="0.6" />`;
+          struts += `<line x1="${(mx + gx).toFixed(1)}" y1="${(my + gy).toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${col}" stroke-width="6" stroke-linecap="round" opacity="0.6" />`;
+        }
+        const lx = cx + Math.cos(a) * (ro + 17), ly = cy + Math.sin(a) * (ro + 17) + 4;
+        struts += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="10.5" fill="${col}" text-anchor="middle">${i + 1}${yang ? ' yang' : ' yin'}</text>`;
+      }
+      for (let i = 0; i < 6; i++) {
+        const a = ends[i], b = ends[(i + 1) % 6];
+        cords += `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}" stroke="#22d3ee" stroke-width="1" stroke-opacity="0.55" />`;
+      }
+
+      // --- 3. game map rows ---
+      const rows = [
+        {
+          n: 1, glyph: '&#9473;&#9473;&#9473;', need: 'body', sense: 'ground, motion',
+          door: `${P('VISION: BODY pose', 'ship', 'scripts/body/pose_sense.gd')}${P('practice.json', 'ship', 'scripts/body/practice.gd')}${P('CLOCK: day_seconds', 'ship', 'scripts/clock.gd')}`,
+          solo: 'move: steps and pose held, it rolls with you',
+          group: 'walk together, radar counts who kept pace',
+          collect: 'strides (patina on strut 1)',
+          shows: 'strut 1 long and lit; tumbles at milestones'
+        },
+        {
+          n: 2, glyph: '&#9473; &#9473;', need: 'food', sense: 'things, capture',
+          door: `${P('VISION: FIND', 'ship', 'scripts/brain/finder.gd')}${P('ITEMS 80 classes', 'ship', 'scripts/lens/find_tenant.gd')}${P('LOOK', 'ship', 'scripts/lens/lens_sense.gd')}`,
+          solo: "seek: find today's three things around you",
+          group: 'scavenger hunt, one list shared over mesh',
+          collect: 'things found (80 to gather)',
+          shows: 'strut 2 fills as the list clears'
+        },
+        {
+          n: 3, glyph: '&#9473;&#9473;&#9473;', need: 'breath', sense: 'voice, sound',
+          door: `${P('AUDIO: TALK', 'ship', 'scripts/voice/voice_sense.gd')}${P('say it', 'ship', 'scripts/ui/stage_voice.gd')}${P('SHARE song', 'ship', 'scripts/net/track_pool.gd')}${P('RAVE', 'ship', 'scripts/voice/rave_deck.gd')}${P('LIVE', 'ship', 'scripts/voice/live_deck.gd')}`,
+          solo: 'speak: one real exchange a day, one song shared',
+          group: 'rave, phones in sync; live session as a circle',
+          collect: 'songs shared, raves held',
+          shows: 'strut 3 pulses to the beat; cords loosen'
+        },
+        {
+          n: 4, glyph: '&#9473; &#9473;', need: 'rest', sense: 'rhythm, time',
+          door: `${P('CLOCK: SYNC', 'ship', 'scripts/net/chirp_sync.gd')}${P('CHIRP', 'ship', 'scripts/net/chirp_clock.gd')}${P('CALIB', 'ship', 'scripts/net/chirp_cal.gd')}${P('VIDEO: WINDOW time window', 'ship', 'scripts/lens/window_tenant.gd')}`,
+          solo: 'keep rhythm: set it down at night, wake it by day',
+          group: 'sync clocks by chirp, the rig arms on one tick',
+          collect: 'quiet nights (unbroken)',
+          shows: 'strut 4 dims with the sun; body sags if sleepless'
+        },
+        {
+          n: 5, glyph: '&#9473;&#9473;&#9473;', need: 'focus', sense: 'mind, memory',
+          door: `${P('MIND: chat 0.6b/1.7b', 'ship', 'scripts/brain/mnn_runtime.gd')}${P('0.8b image path', 'dead', 'gated by RAM table &mdash; scripts/net/model_store.gd')}${P('notes.json', 'ship', 'scripts/brain/notes.gd')}${P('embeddings', 'ship', 'scripts/brain/agent_loop.gd')}${P('reading words', 'ship', 'scripts/creature/reading_words.gd')}${P('VIDEO: RIG ARM RING STAGE', 'ship', 'scripts/net/rig_plan.gd')}`,
+          solo: 'reflect: one note, one reading; capture one room',
+          group: 'rig a place together, stand a room back up later',
+          collect: 'rooms captured, notes kept',
+          shows: 'core glows while it thinks; strut 5 steady'
+        },
+        {
+          n: 6, glyph: '&#9473; &#9473;', need: 'connection', sense: 'near, sky',
+          door: `${P('PEERS: RADAR', 'ship', 'scripts/social/radar.gd')}${P('visitors/poke', 'ship', 'scripts/shell/visitor_stage.gd')}${P('PROBE', 'ship', 'scripts/net/probe_meter.gd')}${P('identity', 'ship', 'scripts/social/identity.gd')}${P('favor ledger', 'plan', 'planned &mdash; may reuse scripts/net/ledger.gd')}${P('one phone teaches', 'plan', 'planned &mdash; scripts/net/peer_minds.gd')}${P('blackout mode', 'plan', 'planned &mdash; scripts/net/lan_mesh.gd')}`,
+          solo: 'meet: be near another Hexy, poke back',
+          group: "visitors on each other's screen; favors carried as vitality",
+          collect: 'peers met, favors done',
+          shows: 'strut 6 lit by nearby bodies; visitors walk over'
+        }
+      ];
+      const tableRows = rows.map(r => `
+              <tr>
+                <td class="plan-line"><span class="plan-glyph">${r.glyph}</span><b>${r.n} ${r.need}</b><br /><small>${r.sense}</small></td>
+                <td>${r.door}</td>
+                <td>${r.solo}</td>
+                <td>${r.group}</td>
+                <td>${r.collect}</td>
+                <td>${r.shows}</td>
+              </tr>`).join('');
+
+      // --- 4. add-on manifest ---
+      const addons = [
+        ['Move', 'line 1', 'ixbody', 'BODY pose, practice', 'CAMERA', 'scripts/body/pose_sense.gd &middot; scripts/shell/sense_wiring.gd'],
+        ['Seek', 'line 2', 'ixbody', 'FIND, ITEMS, LOOK', 'CAMERA', 'scripts/brain/finder.gd &middot; scripts/lens/find_tenant.gd'],
+        ['Speak', 'line 3', 'ixvoice', 'TALK SHARE RAVE LIVE', 'MIC', 'scripts/voice/voice_sense.gd &middot; scripts/voice/rave_deck.gd'],
+        ['Rhythm', 'line 4', 'ixvoice', 'SYNC CHIRP CALIB', 'MIC', 'scripts/net/chirp_sync.gd &middot; scripts/net/chirp_cal.gd'],
+        ['Mind', 'line 5', 'ixmnn', 'chat lanes, notes', 'net once', 'scripts/brain/mnn_runtime.gd &middot; scripts/shell/mind_wiring.gd'],
+        ['Near', 'line 6', 'ixmesh + ixloc', 'RADAR visitors PROBE', 'LOC', 'scripts/social/radar.gd &middot; scripts/shell/net_wiring.gd'],
+        ['Capture', 'line 5', 'ixcap + ixlens', 'RIG ARM RING STAGE WINDOW', 'CAMERA', 'scripts/net/rig_plan.gd &middot; scripts/lens/window_tenant.gd'],
+        ['Workshop', 'no line', '&mdash;', 'long-press core, developer only', '&mdash;', 'scripts/ui/workshop.gd &middot; scripts/shell/workshop_wiring.gd']
+      ].map(a => `<li title="${a[5]}"><b>${a[0]}</b> &middot; ${a[1]} &middot; ${a[2]}<br /><code>${a[3]}</code> &middot; ${a[4]}</li>`).join('');
+
+      // --- 5. build order ---
+      const steps = [
+        ['0', 'lattice + test', 'done', 'scripts/oracle/q6_lattice.gd &middot; tests/q6_lattice_smoke.gd'],
+        ['1', 'body &mdash; 3D, hand-set struts', '', 'scripts/creature/ball_geometry.gd'],
+        ['2', 'bind &mdash; lattice &rarr; struts', '', 'scripts/oracle/q6_lattice.gd &rarr; scripts/creature/creature.gd'],
+        ['3', 'add-ons &mdash; manifest per wiring', '', 'scripts/shell/*_wiring.gd'],
+        ['4', 'cast &mdash; shake seeds it', '', 'scripts/body/imu_stream.gd'],
+        ['5', 'physics &mdash; Jolt, cords as springs', '', 'Godot Jolt'],
+        ['6', 'goals &mdash; weekly hexagram', '', 'scripts/creature/hexagram.gd'],
+        ['7', 'rave &mdash; mesh sync', '', 'scripts/net/mesh_fabric.gd']
+      ].map((s, i) => `${i ? '<span class="plan-arrow">&rarr;</span>' : ''}<span class="plan-step ${s[2]}" title="${s[3]}"><b>${s[0]}</b> ${s[1]}${s[2] ? '<span>done</span>' : ''}</span>`).join('');
+
+      return `
+      <div class="plan-wrap">
+
+        <section class="plan-sec">
+          <h3>1 &middot; Three layers</h3>
+          <p class="plan-sub">kernel &middot; add-ons &middot; game</p>
+          <div class="plan-row">
+            <div class="plan-rowlab">KERNEL</div>
+            ${node('Six senses', 'ground motion near&hellip;', 'k', 'scripts/shell/sense_wiring.gd')}
+            ${arr}
+            ${node('Q6 lattice', '64 states, FWHT', 'k', 'scripts/oracle/q6_lattice.gd')}
+            ${arr}
+            ${node('Tensegrity body', '6 struts + core', 'k', 'scripts/creature/ball_geometry.gd')}
+            ${arr}
+            ${node('Voice', 'Qwen, one line', 'k', 'scripts/brain/mnn_runtime.gd')}
+          </div>
+          <div class="plan-row">
+            <div class="plan-rowlab">ADD-ONS</div>
+            ${up}${node('Near', 'mesh radar', 'a', 'scripts/social/radar.gd')}
+            ${up}${node('Light', 'lens', 'a', 'scripts/lens/lens_sense.gd')}
+            ${up}${node('Sky', 'location, day', 'a', 'scripts/social/geo.gd &middot; scripts/clock.gd')}
+            ${up}${node('Sync', 'tap the core', 'a', 'scripts/net/chirp_sync.gd')}
+            ${up}${node('Workshop', 'long-press core', 'a', 'scripts/ui/workshop.gd')}
+          </div>
+          <div class="plan-row">
+            <div class="plan-rowlab">GAME</div>
+            ${node('Collect', '64 hexagrams, weekly goal', 'g', 'scripts/creature/hexagram.gd')}
+            ${node('Body', 'walk, it rolls with you', 'g', 'scripts/body/practice.gd')}
+            ${node('Rave', 'nearby bodies sync struts', 'g', 'scripts/voice/rave_deck.gd')}
+            ${arr}
+            ${node('Ledger', 'offline, patina not counters, nothing dies', 'g', 'scripts/net/ledger.gd')}
+          </div>
+          <p class="plan-caption">Add-ons point up into the kernel, never sideways.</p>
+        </section>
+
+        <section class="plan-sec">
+          <h3>2 &middot; Tensegrity body mapping</h3>
+          <p class="plan-sub">six struts, one core, cords under tension</p>
+          <div class="plan-body">
+            <div class="plan-bodysvg">
+              <svg class="plan-svg" viewBox="0 0 420 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Six-strut tensegrity: three solid yang struts, three split yin struts, cords between the ends, a core at the centre">
+                ${cords}
+                ${struts}
+                <circle cx="${cx}" cy="${cy}" r="26" fill="#111c2e" stroke="#c084fc" stroke-width="2" />
+                <circle cx="${cx}" cy="${cy}" r="26" fill="#c084fc" fill-opacity="0.12" />
+                <text x="${cx}" y="${cy + 4}" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="10.5" fill="#c084fc" text-anchor="middle">core</text>
+                <text x="210" y="310" font-family="'Outfit', system-ui, sans-serif" font-size="10.5" fill="#94a3b8" text-anchor="middle">thin cords = entropy &middot; struts = the six lines</text>
+              </svg>
+            </div>
+            <div class="plan-bodylegend">
+              <div class="plan-cols">
+                <div class="plan-col kernel">
+                  <h5>legend</h5>
+                  <ul>
+                    <li title="scripts/creature/hexagram.gd"><b>Strut</b> = one line &mdash; yang long and lit, yin split and dim.</li>
+                    <li title="scripts/oracle/q6_lattice.gd"><b>Cord tension</b> = entropy &mdash; taut when the reading is sharp, slack when uniform.</li>
+                    <li title="scripts/creature/creature.gd &middot; scripts/ui/workshop.gd"><b>Core</b> = mind &mdash; glows on Qwen, tap to sync, hold for workshop.</li>
+                    <li title="scripts/creature/ball_geometry.gd"><b>Moving line</b> = roll &mdash; one strut shifts, the centre of mass tips.</li>
+                    <li title="scripts/body/imu_stream.gd"><b>Cast</b> = shake &mdash; the gyro trace seeds the lattice.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="plan-sec">
+          <h3>3 &middot; Game map &mdash; six lines, all features</h3>
+          <p class="plan-sub">need &middot; door &middot; quest &middot; collect &middot; what the body shows</p>
+          <div class="plan-tablewrap">
+            <table class="plan-table">
+              <thead>
+                <tr>
+                  <th>line &middot; need</th>
+                  <th>door &middot; features</th>
+                  <th>solo quest</th>
+                  <th>group quest</th>
+                  <th>collect</th>
+                  <th>the body shows</th>
+                </tr>
+              </thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+          </div>
+          <p class="plan-foot">
+            ${P('shipped', 'ship', 'code exists in the repo')} ${P('planned', 'plan', 'no code yet')} ${P('dead code', 'dead', 'exists but unreachable or unwanted')}<br />
+            dead code to decide &mdash; <span title="scripts/net/ledger.gd">ledger.gd</span> / <span title="scripts/net/tangle.gd">tangle.gd</span>, <span title="scripts/ui/mode_shell.gd &middot; scripts/shell/mode_shell_wiring.gd">mode_shell 5-screen</span>, <span title="scripts/net/model_store.gd">0.8b image path</span>.<br />
+            SETUP &middot; WORKSHOP stays behind a long-press on the core.
+          </p>
+        </section>
+
+        <section class="plan-sec">
+          <h3>4 &middot; Kernel vs add-ons</h3>
+          <p class="plan-sub">what cannot detach &middot; what plugs in &middot; what to cut</p>
+          <div class="plan-cols">
+            <div class="plan-col kernel">
+              <h5>Kernel &mdash; cannot detach</h5>
+              <ul>
+                <li title="scripts/creature/creature.gd &middot; scripts/creature/hexagram.gd &middot; scripts/creature/reading_words.gd"><b>Creature</b> &mdash; needs, hexagram, words.</li>
+                <li title="scripts/oracle/q6_lattice.gd"><b>Q6 lattice</b> &mdash; needs &rarr; lines, memory.</li>
+                <li title="scripts/consents.gd &middot; scripts/refusal.gd"><b>Consents + Law</b> &mdash; dark names its cause.</li>
+                <li title="scripts/net/ledger.gd &middot; user:// json + cfg"><b>Ledger files</b> &mdash; <code>user://</code> json + cfg.</li>
+              </ul>
+            </div>
+            <div class="plan-col addon">
+              <h5>Add-ons &mdash; manifest</h5>
+              <p class="plan-sub" style="margin:0 0 6px">name &middot; line fed &middot; strut owned &middot; permission &middot; plugin</p>
+              <ul>${addons}</ul>
+            </div>
+            <div class="plan-col deadcol">
+              <h5>Dead code</h5>
+              <ul>
+                <li title="scripts/net/ledger.gd &middot; scripts/net/tangle.gd"><b>ledger.gd / tangle.gd</b> &rarr; fold into Near?</li>
+                <li title="scripts/ui/mode_shell.gd &middot; scripts/shell/mode_shell_wiring.gd"><b>mode_shell 5 screens</b> &rarr; cut.</li>
+                <li title="scripts/net/model_store.gd"><b>0.8b image path</b> &rarr; Seek, later.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="plan-sec">
+          <h3>5 &middot; Build order</h3>
+          <p class="plan-sub">one gate per step, nothing moves on until it passes</p>
+          <div class="plan-steps">${steps}</div>
+          <ul class="plan-gates">
+            <li><b>1</b> one screenshot on A22 and Fold &mdash; six struts, 60 fps.</li>
+            <li><b>2</b> flip the scene &rarr; a mirrored body.</li>
+            <li><b>3</b> detach an add-on &rarr; its strut goes neutral, no crash.</li>
+            <li><b>4</b> the same shake &rarr; the same hexagram (replayed gyro).</li>
+            <li><b>5</b> one strut shifts &rarr; it tips onto one face and settles.</li>
+            <li><b>6 + 7</b> the ledger survives a reboot; two phones show one hexagram.</li>
+          </ul>
+        </section>
+
+      </div>
+      `;
+    }
+
     function renderArchitectureSvg() {
       return `
         <svg class="interactive-svg" viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg">
@@ -2005,11 +2682,11 @@
       `;
     }
 
-    let activeTab = 0;
+    let activeTab = 9;
 
     function switchTab(idx) {
       activeTab = idx;
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 10; i++) {
         const tab = document.getElementById(`tab${i}`);
         if (tab) {
           if (i === idx) tab.classList.add('active');
@@ -2018,7 +2695,9 @@
       }
 
       const mount = document.getElementById('svgMount');
-      if (idx === 0) mount.innerHTML = renderSequenceSvg();
+      if (idx === 9) mount.innerHTML = renderPlanHtml();
+      else if (idx === 8) mount.innerHTML = renderLayersSvg();
+      else if (idx === 0) mount.innerHTML = renderSequenceSvg();
       else if (idx === 1) mount.innerHTML = renderArchitectureSvg();
       else if (idx === 2) mount.innerHTML = renderSafetyFilterSvg();
       else if (idx === 3) mount.innerHTML = renderTransformerSvg();
@@ -3490,7 +4169,7 @@
 
     // Initialize View
     buildTokenQueue();
-    switchTab(0);
+    switchTab(9);
   
 
     // =========================================================================

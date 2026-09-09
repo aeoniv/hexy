@@ -604,6 +604,15 @@ func is_held(resource: String) -> bool:
 	return _held.has(resource)
 
 
+## HOW MANY DEVICES ARE OUT RIGHT NOW. Not `takes() - releases()`: a steal is a
+## take with no matching release (the loser never released anything), so the
+## difference of those two counters runs one high per steal and the workshop's
+## device row read `68 taken · 67 released` on a phone that was not leaking
+## anything. This is the table itself, which is the only thing that knows.
+func held_now() -> int:
+	return _held.size()
+
+
 func held_by(holder: String) -> Array:
 	var out: Array = []
 	for r: String in RESOURCES:

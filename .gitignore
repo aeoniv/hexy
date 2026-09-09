@@ -9,6 +9,10 @@ android/
 # godot-lib.template_release.aar is ~100 MB of engine, mnn-jni/ is ~16 MB of
 # Alibaba's .so files â€” both are fetched per machine, never vendored.
 android_plugin/.gradle/
+# buildSrc compiles the ix64.android.plugin convention and keeps its own
+# execution history beside it; the source under buildSrc/src is tracked.
+android_plugin/buildSrc/.gradle/
+android_plugin/buildSrc/build/
 android_plugin/.kotlin/
 android_plugin/build/
 android_plugin/*/build/

@@ -23,11 +23,18 @@
 # ix64-avatar (which publishes under models/v1; hexy is under hexy/v1). Public
 # read (allUsers -> roles/storage.objectViewer), writes need the owner's gcloud
 # credentials. See README.md ("First-run asset delivery").
+# -Model and -Root are the SHARED flag block: the same five lane names and the
+# same default root that tools/push_mnn_model.ps1 takes. `vision` validates here
+# and is then refused by name below - a 1.71 GB Fold-only pack has no business in
+# the bucket every phone reads, and saying so out loud beats the parameter binder
+# saying the word does not exist. The list is stated twice only because
+# PowerShell requires a ValidateSet literal in the param block; tools/_common.ps1
+# holds the copy both scripts are checked against.
 param(
-    [ValidateSet("embed", "chat", "chat35", "all")][string]$Model = "all",
+    [ValidateSet("embed", "chat", "chat35", "vision", "all")][string]$Model = "all",
     [string]$Bucket = "ix64-havata-assets",
     [string]$Prefix = "hexy/v1",
-    [string]$Root = "D:\ix64-models\hexy",
+    [string]$Root = "",
     [switch]$ManifestOnly,
     [string]$Out = "")
 
@@ -37,6 +44,9 @@ param(
 # Exit codes are checked explicitly instead, which is the thing that is actually
 # true about whether a transfer worked.
 $ErrorActionPreference = "Continue"
+. (Join-Path $PSScriptRoot "_common.ps1")
+if (-not $Root) { $Root = $IxModelRoot }
+Assert-IxLaneSupported -Model $Model -Supported @("embed", "chat", "chat35", "all") -Why "the vision pack is 1.71 GB and Fold-only; push it over adb with tools/push_mnn_model.ps1 -Model vision"
 # Composite uploads split the object and reassemble it server-side. The bytes are
 # identical, but the object then has no whole-file MD5, and this script's whole
 # claim is about a digest - so it is turned off and the manifest's sha256 is the
