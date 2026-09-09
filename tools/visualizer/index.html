@@ -1413,6 +1413,114 @@
       border-radius: 3px;
       transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
+
+    /* =========================================================================
+       10. The 64 Hexagram Oracle & Mandala Navigator Studio
+       ========================================================================= */
+    .oracle-container {
+      width: 1040px;
+      min-height: 620px;
+      max-height: 88vh;
+      background: rgba(10, 15, 29, 0.97);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 14px 44px rgba(0, 0, 0, 0.75), 0 0 28px rgba(245, 158, 11, 0.15);
+      animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .oracle-subnav {
+      display: flex;
+      background: rgba(4, 7, 18, 0.75);
+      border-bottom: 1px solid var(--card-border);
+      padding: 8px 16px;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .oracle-body {
+      flex: 1;
+      padding: 14px 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .oracle-split {
+      display: grid;
+      grid-template-columns: 1.15fr 1.05fr;
+      gap: 14px;
+    }
+    .oracle-card {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .oracle-card-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 6px;
+    }
+    .coin-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid #fbbf24;
+      background: radial-gradient(circle at 35% 35%, #fbbf24 0%, #b45309 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.95rem;
+      font-weight: 900;
+      color: #0f172a;
+      box-shadow: 0 4px 12px rgba(251, 191, 36, 0.35);
+      transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .coin-circle.yin {
+      border-color: #94a3b8;
+      background: radial-gradient(circle at 35% 35%, #cbd5e1 0%, #475569 100%);
+      color: #0f172a;
+      box-shadow: 0 4px 12px rgba(148, 163, 184, 0.25);
+    }
+    .throw-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.2s;
+    }
+    .throw-row.current-target {
+      border-color: #f59e0b;
+      background: rgba(245, 158, 11, 0.1);
+      box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+    }
+    .throw-row.moving-line {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.08);
+    }
+    .mandala-card-modal {
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid #f59e0b;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.72rem;
+      line-height: 1.4;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.8), 0 0 14px rgba(245, 158, 11, 0.25);
+    }
 </style>
 </head>
 <body>
@@ -1472,6 +1580,7 @@
           <button class="tab-btn engine-tab" id="tab6" onclick="switchTab(6)" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.14); box-shadow: 0 0 10px rgba(251, 191, 36, 0.2);">7. 🎓 Educational Lab & Math Sandbox</button>
           <button class="tab-btn engine-tab" id="tab7" onclick="switchTab(7)" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.45); background: rgba(56, 189, 248, 0.14); box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);">8. 🌀 I-Ching GDL & Q₆-GNN Engine</button>
           <button class="tab-btn engine-tab" id="tab10" onclick="switchTab(10)" style="color: #a855f7; border-color: rgba(168, 85, 247, 0.45); background: rgba(168, 85, 247, 0.14); box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);">9. 🪐 Creature Tensegrity 3D & Telemetry</button>
+          <button class="tab-btn engine-tab" id="tab11" onclick="switchTab(11)" style="color: #f59e0b; border-color: rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.14); box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);">10. 🪙 64 Hexagram Oracle & Mandala</button>
 
         </div>
 
@@ -2804,7 +2913,7 @@
 
     function switchTab(idx) {
       activeTab = idx;
-      for (let i = 0; i <= 10; i++) {
+      for (let i = 0; i <= 11; i++) {
         const tab = document.getElementById(`tab${i}`);
         if (tab) {
           if (i === idx) tab.classList.add('active');
@@ -2832,6 +2941,10 @@
       else if (idx === 10) {
         mount.innerHTML = renderCreatureTensegrityHtml();
         initCreatureTensegrity();
+      }
+      else if (idx === 11) {
+        mount.innerHTML = renderOracleMandalaHtml();
+        initOracleMandala();
       }
 
       closePopover();
@@ -6183,6 +6296,471 @@ function renderGdlEngineHtml() {
           ctx.fillText((el.strutIdx + 1).toString(), midX, midY - 8);
         }
       });
+    }
+
+    // =========================================================================
+    // 10. 🪙 The 64 Hexagram Oracle & Mandala Navigator Engine (Tab 11)
+    // Pure mathematical port of scripts/oracle/cast.gd & scripts/shell/mandala_words.gd
+    // =========================================================================
+
+    // The 12 Mandala Marks (6 Needs in creature order, 6 Drivers in line order)
+    const MANDALA_ROWS = [
+      { kind: "need",   name: "body",       label: "1. Body",       what: "how much you have moved",           fed_by: "motion accelerometer window, vision found", changes: "raises line 1; decays 18h half-life", color: "#38bdf8" },
+      { kind: "need",   name: "food",       label: "2. Food",       what: "hunger this app cannot see",        fed_by: "nothing yet; only clock drains it",         changes: "falls alone; 6h half-life, fastest", color: "#fbbf24" },
+      { kind: "need",   name: "breath",     label: "3. Breath",     what: "calm this app cannot see",          fed_by: "nothing yet; only clock drains it",         changes: "falls alone; decays 12h half-life",  color: "#22c55e" },
+      { kind: "need",   name: "rest",       label: "4. Rest",       what: "still and dark, at night",          fed_by: "motion stillness, clock says night",        changes: "raises line 4; decays 20h half-life", color: "#a855f7" },
+      { kind: "need",   name: "focus",      label: "5. Focus",      what: "attention, gathered away from here", fed_by: "audio heard, motion off-screen window",     changes: "raises line 5; decays 8h half-life",  color: "#ec4899" },
+      { kind: "need",   name: "connection", label: "6. Connection", what: "company, somebody really met",      fed_by: "radar met, attested by a peer",             changes: "raises line 6 by 0.5; 96h half-life",color: "#06b6d4" },
+
+      { kind: "driver", name: "moving",     label: "Dot: Moving",   what: "phone moved more than sway",        fed_by: "motion organ, accelerometer",               changes: "feeds body, up to 0.08 a window",     color: "#38bdf8", state: "lit" },
+      { kind: "driver", name: "screen",     label: "Dot: Screen",   what: "app visible on glass",              fed_by: "creature organ, app visible",               changes: "anti-feeds focus, off-screen grows",  color: "#fbbf24", state: "dim" },
+      { kind: "driver", name: "seen",       label: "Dot: Seen",     what: "vision saw an item class",          fed_by: "vision finder, 80 items model",             changes: "feeds body when class recognized",    color: "#22c55e", state: "hollow" },
+      { kind: "driver", name: "heard",      label: "Dot: Heard",    what: "microphone heard voice sound",      fed_by: "audio organ, voice detector",              changes: "feeds focus, speech detected",        color: "#a855f7", state: "lit" },
+      { kind: "driver", name: "met",        label: "Dot: Met",      what: "peer found within BLE range",       fed_by: "radar mesh, attested signature",           changes: "feeds connection by 0.5 directly",    color: "#ec4899", state: "dim" },
+      { kind: "driver", name: "time",       label: "Dot: Time",     what: "night hours window active",         fed_by: "clock organ, solar time",                  changes: "feeds rest when dark and still",      color: "#06b6d4", state: "lit" }
+    ];
+
+    // Oracle Cast State (Three coins thrown six times)
+    // 6 = Old Yin (moving), 7 = Young Yang, 8 = Young Yin, 9 = Old Yang (moving)
+    let oracleThrows = [7, 8, 9, 8, 7, 6];
+    let oracleThrowIdx = 6; // 0..6 throws complete
+    let oracleCoins = [3, 2, 2]; // 3 coins values (2 = Yin / tails, 3 = Yang / heads)
+    let oracleIsCasting = false;
+    let selectedMandalaIndex = 0; // Selected need/driver to show sentence card
+    let oracleMandalaRotation = 0;
+
+    function renderOracleMandalaHtml() {
+      return `
+        <div class="oracle-container">
+          <!-- Subnav -->
+          <div class="oracle-subnav">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #f59e0b; display: flex; align-items: center; gap: 6px;">
+              🪙 The 64 Hexagram Oracle & Mandala Navigator
+            </span>
+            <span class="creature-chip creature-chip-amber">scripts/oracle/cast.gd (Three Coins × 6 Taps)</span>
+            <span class="creature-chip creature-chip-cyan">scripts/shell/mandala_words.gd (12 Informing Sentences)</span>
+            <span class="creature-chip creature-chip-green" id="oracleStatusPill">Cast Complete · Signed Receipt</span>
+
+            <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
+              <button class="btn" style="padding: 4px 10px; font-size: 0.72rem; border-color: #f59e0b; color: #f59e0b;" onclick="resetOracleCast()">↺ New Cast (6 Taps)</button>
+              <button class="btn" style="padding: 4px 10px; font-size: 0.72rem;" onclick="throwNextCoins()" id="btnThrowCoins">🪙 Throw Coins (Tap)</button>
+            </div>
+          </div>
+
+          <!-- Body -->
+          <div class="oracle-body">
+            <div class="oracle-split">
+
+              <!-- Left Panel: Interactive Mandala Wheel & Sentences -->
+              <div class="oracle-card" style="display: flex; flex-direction: column; gap: 10px;">
+                <div class="oracle-card-title">
+                  <span>Mandala Ring & Informing Card</span>
+                  <span style="font-size: 0.68rem; color: #94a3b8;">Tap any arc (need) or dot (driver)</span>
+                </div>
+
+                <div style="display: flex; gap: 14px; align-items: center;">
+                  <!-- Mandala SVG Wheel -->
+                  <div style="width: 220px; height: 220px; flex-shrink: 0; position: relative;">
+                    <svg id="mandalaWheelSvg" viewBox="0 0 220 220" style="width: 100%; height: 100%; cursor: pointer;">
+                      <!-- Dynamically rendered arcs and dots -->
+                    </svg>
+                  </div>
+
+                  <!-- Active Mandala Sentence Card -->
+                  <div id="mandalaSentenceCard" class="mandala-card-modal" style="flex: 1;">
+                    <!-- Dynamically populated from MANDALA_ROWS -->
+                  </div>
+                </div>
+
+                <!-- Three Coins Toss Visualizer -->
+                <div style="background: rgba(0,0,0,0.35); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.76rem; font-weight: 700; color: #fff;">
+                      Three Coins Current Throw (Sum = 6..9)
+                    </span>
+                    <span style="font-size: 0.68rem; color: #94a3b8;" id="throwSumLabel">
+                      Coins: 3 + 2 + 2 = 7 (Young Yang)
+                    </span>
+                  </div>
+
+                  <div style="display: flex; gap: 16px; justify-content: center; align-items: center; padding: 6px 0;">
+                    <div class="coin-circle" id="coin0">3</div>
+                    <div class="coin-circle yin" id="coin1">2</div>
+                    <div class="coin-circle yin" id="coin2">2</div>
+                  </div>
+
+                  <div style="font-size: 0.68rem; color: #64748b; text-align: center;">
+                    <b>Probabilities:</b> 6 (Old Yin, 1/8) · 7 (Young Yang, 3/8) · 8 (Young Yin, 3/8) · 9 (Old Yang, 1/8)
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Panel: Cast Receipts, Primary & Changed Hexagrams -->
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+
+                <!-- Hexagram Comparison: Primary -> Moving Lines -> Changed -->
+                <div class="oracle-card">
+                  <div class="oracle-card-title">
+                    <span>The Reading: Primary &rarr; Changing Lines &rarr; Resultant</span>
+                    <span class="creature-chip creature-chip-green" id="receiptAidBadge">cast:8f3c2a1e</span>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center;">
+                    <!-- Primary Hexagram -->
+                    <div style="display: flex; flex-direction: column; align-items: center; background: rgba(0,0,0,0.3); border-radius: 6px; padding: 8px;">
+                      <span style="font-size: 0.68rem; color: #94a3b8; text-transform: uppercase;">Primary Figure</span>
+                      <span style="font-size: 1.8rem; font-weight: 900; color: #fbbf24;" id="primaryHexChar">漸</span>
+                      <span style="font-size: 0.74rem; font-weight: 700; color: #fff;" id="primaryHexTitle">#53 Development</span>
+                      <span style="font-size: 0.66rem; color: #38bdf8;" id="primaryTrigramText">Upper ☴ / Lower ☶</span>
+                    </div>
+
+                    <div style="font-size: 1.3rem; color: #f59e0b; font-weight: 900;">&rarr;</div>
+
+                    <!-- Mutated Hexagram -->
+                    <div style="display: flex; flex-direction: column; align-items: center; background: rgba(0,0,0,0.3); border-radius: 6px; padding: 8px;">
+                      <span style="font-size: 0.68rem; color: #94a3b8; text-transform: uppercase;">Future Figure</span>
+                      <span style="font-size: 1.8rem; font-weight: 900; color: #a855f7;" id="mutatedHexChar">遯</span>
+                      <span style="font-size: 0.74rem; font-weight: 700; color: #fff;" id="mutatedHexTitle">#33 Retreat</span>
+                      <span style="font-size: 0.66rem; color: #c084fc;" id="mutatedTrigramText">Upper ☰ / Lower ☶</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- The 6 Throws Stack (Ground Up, Line 1 to 6) -->
+                <div class="oracle-card" style="flex: 1;">
+                  <div class="oracle-card-title">
+                    <span>The Six Throws (Drawn from Ground Up)</span>
+                    <span style="font-size: 0.68rem; color: #f59e0b;" id="oracleProgressText">6 of 6 Throws Complete</span>
+                  </div>
+
+                  <div style="display: flex; flex-direction: column; gap: 5px;" id="oracleThrowsContainer">
+                    <!-- Throws lines dynamically populated -->
+                  </div>
+                </div>
+
+                <!-- Prompt Injection Context to Qwen MNN -->
+                <div class="oracle-card">
+                  <div class="oracle-card-title">
+                    <span>Injected Prompt Context &rarr; MNN Qwen</span>
+                    <span class="creature-chip creature-chip-cyan">chat_stream feed</span>
+                  </div>
+                  <div style="font-size: 0.68rem; color: #94a3b8; font-family: 'JetBrains Mono', monospace; background: rgba(0,0,0,0.4); padding: 6px 8px; border-radius: 4px; line-height: 1.35;" id="oraclePromptPreview">
+                    [ORACLE] Primary: Hexagram 53 漸 Development. Moving: Line 3 (Old Yang 9) & Line 6 (Old Yin 6). Future: Hexagram 33 遯 Retreat. Mind context: Grounded patience in motion.
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function initOracleMandala() {
+      renderMandalaSvgWheel();
+      renderMandalaSentenceCard();
+      renderOracleThrowsList();
+      updateOracleReadings();
+    }
+
+    function renderMandalaSvgWheel() {
+      const svg = document.getElementById('mandalaWheelSvg');
+      if (!svg) return;
+
+      const cx = 110, cy = 110;
+      const rInner1 = 44, rInner2 = 72; // Need arcs
+      const rDot = 92;                  // Driver dots
+
+      let html = `
+        <defs>
+          <filter id="glowGold" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+        <!-- Background decorative rings -->
+        <circle cx="${cx}" cy="${cy}" r="${rDot}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="2 3" />
+        <circle cx="${cx}" cy="${cy}" r="${rInner1}" fill="rgba(15,23,42,0.6)" stroke="rgba(245,158,11,0.25)" stroke-width="1.5" />
+        <text x="${cx}" y="${cy - 4}" font-family="'JetBrains Mono', monospace" font-size="9" fill="#f59e0b" text-anchor="middle" font-weight="bold">HEXY</text>
+        <text x="${cx}" y="${cy + 8}" font-family="'JetBrains Mono', monospace" font-size="7" fill="#94a3b8" text-anchor="middle">ORACLE</text>
+      `;
+
+      // Draw 6 Need Arcs (Inner Ring)
+      for (let i = 0; i < 6; i++) {
+        const row = MANDALA_ROWS[i];
+        const a1 = (i * 60 - 85) * Math.PI / 180;
+        const a2 = ((i + 1) * 60 - 95) * Math.PI / 180;
+
+        const x1_in = cx + Math.cos(a1) * rInner1, y1_in = cy + Math.sin(a1) * rInner1;
+        const x2_in = cx + Math.cos(a2) * rInner1, y2_in = cy + Math.sin(a2) * rInner1;
+        const x1_out = cx + Math.cos(a1) * rInner2, y1_out = cy + Math.sin(a1) * rInner2;
+        const x2_out = cx + Math.cos(a2) * rInner2, y2_out = cy + Math.sin(a2) * rInner2;
+
+        const path = `M ${x1_in} ${y1_in} A ${rInner1} ${rInner1} 0 0 1 ${x2_in} ${y2_in} L ${x2_out} ${y2_out} A ${rInner2} ${rInner2} 0 0 0 ${x1_out} ${y1_out} Z`;
+        const isSel = (selectedMandalaIndex === i);
+        const fillCol = isSel ? row.color : 'rgba(255,255,255,0.06)';
+        const strokeCol = isSel ? '#ffffff' : row.color;
+
+        html += `<path d="${path}" fill="${fillCol}" stroke="${strokeCol}" stroke-width="${isSel ? 2 : 1}" opacity="${isSel ? 0.95 : 0.65}" onclick="selectMandalaItem(${i})" style="cursor: pointer;" />`;
+
+        // Arc Label
+        const midA = (a1 + a2) * 0.5;
+        const lx = cx + Math.cos(midA) * ((rInner1 + rInner2) * 0.5);
+        const ly = cy + Math.sin(midA) * ((rInner1 + rInner2) * 0.5) + 3;
+        html += `<text x="${lx}" y="${ly}" font-family="'JetBrains Mono', monospace" font-size="7" fill="${isSel ? '#0f172a' : '#fff'}" font-weight="bold" text-anchor="middle" pointer-events="none">${row.name.toUpperCase()}</text>`;
+      }
+
+      // Draw 6 Driver Dots (Outer Ring)
+      for (let j = 0; j < 6; j++) {
+        const row = MANDALA_ROWS[6 + j];
+        const a = (j * 60 - 90) * Math.PI / 180;
+        const dx = cx + Math.cos(a) * rDot;
+        const dy = cy + Math.sin(a) * rDot;
+        const isSel = (selectedMandalaIndex === (6 + j));
+
+        let dotFill = "#475569";
+        if (row.state === "lit") dotFill = row.color;
+        else if (row.state === "dim") dotFill = "rgba(255,255,255,0.2)";
+        else if (row.state === "hollow") dotFill = "transparent";
+
+        html += `
+          <g onclick="selectMandalaItem(${6 + j})" style="cursor: pointer;">
+            <circle cx="${dx}" cy="${dy}" r="${isSel ? 7 : 5}" fill="${dotFill}" stroke="${row.color}" stroke-width="${row.state === 'hollow' ? 1.5 : 1}" />
+            ${isSel ? `<circle cx="${dx}" cy="${dy}" r="10" fill="none" stroke="#fbbf24" stroke-width="1.5" />` : ''}
+          </g>
+        `;
+      }
+
+      svg.innerHTML = html;
+    }
+
+    function selectMandalaItem(idx) {
+      selectedMandalaIndex = idx;
+      renderMandalaSvgWheel();
+      renderMandalaSentenceCard();
+    }
+
+    function renderMandalaSentenceCard() {
+      const card = document.getElementById('mandalaSentenceCard');
+      if (!card) return;
+
+      const item = MANDALA_ROWS[selectedMandalaIndex];
+      const isDriver = (item.kind === "driver");
+
+      let legendHtml = isDriver
+        ? `<div style="font-size: 0.65rem; color: #64748b; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 4px;">
+             <b>Legend:</b> lit = feeding now / dim = off or no consent / hollow = no add-on
+           </div>`
+        : "";
+
+      card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 4px; margin-bottom: 6px;">
+          <span style="font-weight: 700; font-size: 0.8rem; color: ${item.color}; text-transform: uppercase;">
+            ${item.kind.toUpperCase()}: ${item.name}
+          </span>
+          <span class="creature-chip" style="background: rgba(255,255,255,0.05); color: #cbd5e1;">${item.label}</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div><b style="color: #94a3b8;">what:</b> <span style="color: #fff;">${item.what}</span></div>
+          <div><b style="color: #94a3b8;">fed by:</b> <span style="color: #38bdf8;">${item.fed_by}</span></div>
+          <div><b style="color: #94a3b8;">changes:</b> <span style="color: #fbbf24;">${item.changes}</span></div>
+          <div><b style="color: #94a3b8;">now:</b> <span style="color: #4ade80;">${isDriver ? `state = ${item.state}` : 'fullness = 73% (active level)'}</span></div>
+        </div>
+        ${legendHtml}
+      `;
+    }
+
+    function throwNextCoins() {
+      if (oracleThrowIdx >= 6) {
+        resetOracleCast();
+      }
+
+      // Throw 3 coins: each coin is 2 (tails) or 3 (heads)
+      // Standard I-Ching coin probabilities: 50% tails (2), 50% heads (3)
+      oracleCoins = [
+        Math.random() < 0.5 ? 2 : 3,
+        Math.random() < 0.5 ? 2 : 3,
+        Math.random() < 0.5 ? 2 : 3
+      ];
+
+      const sum = oracleCoins[0] + oracleCoins[1] + oracleCoins[2]; // 6, 7, 8, or 9
+      oracleThrows[oracleThrowIdx] = sum;
+      oracleThrowIdx++;
+
+      // Update coin circles UI
+      for (let c = 0; c < 3; c++) {
+        const coinEl = document.getElementById(`coin${c}`);
+        if (coinEl) {
+          const val = oracleCoins[c];
+          coinEl.textContent = val.toString();
+          if (val === 3) {
+            coinEl.className = "coin-circle";
+          } else {
+            coinEl.className = "coin-circle yin";
+          }
+        }
+      }
+
+      const sumLabel = document.getElementById('throwSumLabel');
+      if (sumLabel) {
+        let name = "Young Yang (Solid)";
+        if (sum === 6) name = "Old Yin (Broken & Moving)";
+        else if (sum === 8) name = "Young Yin (Broken)";
+        else if (sum === 9) name = "Old Yang (Solid & Moving)";
+        sumLabel.textContent = `Coins: ${oracleCoins[0]} + ${oracleCoins[1]} + ${oracleCoins[2]} = ${sum} (${name})`;
+      }
+
+      renderOracleThrowsList();
+      updateOracleReadings();
+    }
+
+    function resetOracleCast() {
+      oracleThrows = [];
+      oracleThrowIdx = 0;
+      renderOracleThrowsList();
+      updateOracleReadings();
+    }
+
+    function renderOracleThrowsList() {
+      const container = document.getElementById('oracleThrowsContainer');
+      if (!container) return;
+
+      const progressText = document.getElementById('oracleProgressText');
+      if (progressText) {
+        progressText.textContent = `${oracleThrowIdx} of 6 Throws Complete`;
+      }
+
+      const btn = document.getElementById('btnThrowCoins');
+      if (btn) {
+        btn.textContent = oracleThrowIdx >= 6 ? "↺ Cast Finished" : `🪙 Tap ${oracleThrowIdx + 1}/6 to Throw`;
+      }
+
+      const pill = document.getElementById('oracleStatusPill');
+      if (pill) {
+        if (oracleThrowIdx >= 6) {
+          pill.textContent = "Cast Complete · Signed Receipt";
+          pill.className = "creature-chip creature-chip-green";
+        } else {
+          pill.textContent = `Throwing (${oracleThrowIdx}/6 Taps)`;
+          pill.className = "creature-chip creature-chip-amber";
+        }
+      }
+
+      let html = "";
+      for (let i = 5; i >= 0; i--) { // line 6 top, line 1 bottom
+        const hasValue = (i < oracleThrowIdx);
+        const val = hasValue ? oracleThrows[i] : null;
+        const isCurrent = (i === oracleThrowIdx);
+
+        let glyph = "&mdash;&mdash;&mdash;";
+        let desc = "Pending Tap...";
+        let isMoving = false;
+        let isYang = true;
+
+        if (hasValue) {
+          if (val === 6) {
+            glyph = "&#9473; &#9473; &#10005;"; // Old Yin moving
+            desc = "Old Yin (6) &bull; Moving &rarr; Yang";
+            isMoving = true;
+            isYang = false;
+          } else if (val === 7) {
+            glyph = "&#9473;&#9473;&#9473;"; // Young Yang
+            desc = "Young Yang (7) &bull; Static";
+            isYang = true;
+          } else if (val === 8) {
+            glyph = "&#9473; &#9473;"; // Young Yin
+            desc = "Young Yin (8) &bull; Static";
+            isYang = false;
+          } else if (val === 9) {
+            glyph = "&#9473;&#9473;&#9473; &#9675;"; // Old Yang moving
+            desc = "Old Yang (9) &bull; Moving &rarr; Yin";
+            isMoving = true;
+            isYang = true;
+          }
+        }
+
+        const rowCls = isCurrent ? "throw-row current-target" : isMoving ? "throw-row moving-line" : "throw-row";
+
+        html += `
+          <div class="${rowCls}">
+            <div style="display: flex; align-items: center; gap: 8px; width: 140px;">
+              <span class="strut-badge ${isYang ? 'strut-badge-yang' : 'strut-badge-yin'}">${i + 1}</span>
+              <span style="font-size: 0.72rem; font-weight: 700; color: #fff;">${MANDALA_ROWS[i].label}</span>
+            </div>
+
+            <div style="font-family: monospace; font-size: 0.95rem; font-weight: 900; color: ${isMoving ? '#ef4444' : isYang ? '#fbbf24' : '#94a3b8'};">
+              ${hasValue ? glyph : '······'}
+            </div>
+
+            <span style="font-size: 0.68rem; color: ${isMoving ? '#f87171' : '#94a3b8'}; width: 150px; text-align: right;">
+              ${desc}
+            </span>
+          </div>
+        `;
+      }
+      container.innerHTML = html;
+    }
+
+    function updateOracleReadings() {
+      if (oracleThrowIdx === 0) return;
+
+      // Primary bits from 6 throws: 7 and 9 are yang (1), 6 and 8 are yin (0)
+      let primaryBits = 0;
+      let mutatedBits = 0;
+      let movingLines = [];
+
+      for (let i = 0; i < 6; i++) {
+        const val = i < oracleThrowIdx ? oracleThrows[i] : 7;
+        const isYang = (val === 7 || val === 9);
+        if (isYang) primaryBits |= (1 << i);
+
+        // Mutated: 6 flips to yang, 9 flips to yin
+        let mutYang = isYang;
+        if (val === 6) {
+          mutYang = true;
+          movingLines.push(i + 1);
+        } else if (val === 9) {
+          mutYang = false;
+          movingLines.push(i + 1);
+        }
+        if (mutYang) mutatedBits |= (1 << i);
+      }
+
+      const pWen = ballLookupKingWen(primaryBits);
+      const pHex = BALL_HEX_DICTIONARY[pWen] || { zh: "卦", py: "", name: `Hexagram #${pWen}`, meaning: "Primary Reading" };
+
+      const mWen = ballLookupKingWen(mutatedBits);
+      const mHex = BALL_HEX_DICTIONARY[mWen] || { zh: "卦", py: "", name: `Hexagram #${mWen}`, meaning: "Future Reading" };
+
+      const pChar = document.getElementById('primaryHexChar');
+      if (pChar) pChar.textContent = pHex.zh;
+      const pTitle = document.getElementById('primaryHexTitle');
+      if (pTitle) pTitle.textContent = `#${pWen} ${pHex.zh} ${pHex.name}`;
+
+      const mChar = document.getElementById('mutatedHexChar');
+      if (mChar) mChar.textContent = mHex.zh;
+      const mTitle = document.getElementById('mutatedHexTitle');
+      if (mTitle) mTitle.textContent = `#${mWen} ${mHex.zh} ${mHex.name}`;
+
+      const pLow = primaryBits & 7, pUp = (primaryBits >> 3) & 7;
+      const mLow = mutatedBits & 7, mUp = (mutatedBits >> 3) & 7;
+      const tPLow = BALL_TRIGRAM_NAMES[pLow] || { glyph: "" }, tPUp = BALL_TRIGRAM_NAMES[pUp] || { glyph: "" };
+      const tMLow = BALL_TRIGRAM_NAMES[mLow] || { glyph: "" }, tMUp = BALL_TRIGRAM_NAMES[mUp] || { glyph: "" };
+
+      const pTrig = document.getElementById('primaryTrigramText');
+      if (pTrig) pTrig.textContent = `Upper ${tPUp.glyph} / Lower ${tPLow.glyph}`;
+
+      const mTrig = document.getElementById('mutatedTrigramText');
+      if (mTrig) mTrig.textContent = `Upper ${tMUp.glyph} / Lower ${tMLow.glyph}`;
+
+      // Prompt Context Preview
+      const preview = document.getElementById('oraclePromptPreview');
+      if (preview) {
+        const movingStr = movingLines.length > 0 ? `Lines ${movingLines.join(', ')} moving` : 'No moving lines';
+        preview.textContent = `[ORACLE CAST] Primary: #${pWen} ${pHex.zh} ${pHex.name}. Moving: ${movingStr}. Resultant: #${mWen} ${mHex.zh} ${mHex.name}. Hexy posture: Grounded adaptation to environment.`;
+      }
     }
 </script>
 </body>
