@@ -1,13 +1,15 @@
 plugins {
-	id("com.android.library")
-	id("org.jetbrains.kotlin.android")
+	// compileSdk, minSdk, Java/Kotlin 17 and the compileOnly godot-lib
+	// coordinate all live in buildSrc/src/main/kotlin/ix64.android.plugin.gradle.kts.
+	id("ix64.android.plugin")
 }
 
 android {
 	namespace = "com.ix64.hexy.mnn"
-	compileSdk = 35
 	defaultConfig {
-		minSdk = 24
+		// NOT an override of the convention's compileSdk/minSdk: those are
+		// inherited. This is the native half MNN needs and no sibling does —
+		// two ABIs and the STL the prebuilt libMNN.so was built against.
 		ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
 		externalNativeBuild {
 			cmake {
@@ -33,11 +35,6 @@ android {
 		// our own bridge. They are the same library; take one.
 		jniLibs.pickFirsts += "**/libc++_shared.so"
 	}
-	compileOptions {
-		sourceCompatibility = JavaVersion.VERSION_17
-		targetCompatibility = JavaVersion.VERSION_17
-	}
-	kotlinOptions { jvmTarget = "17" }
 	// MNN ships no AAR and no Maven artifact (checked releases up to 3.6.1:
 	// every android asset is a zip of bare .so files). So the runtime arrives
 	// as loose jniLibs unpacked from mnn_<ver>_android_*.zip into libs/mnn-jni/
@@ -46,10 +43,7 @@ android {
 	sourceSets["main"].jniLibs.srcDir(rootProject.file("libs/mnn-jni"))
 }
 
-val godotLib = rootProject.file("libs/godot-lib.template_release.aar")
-
 dependencies {
-	compileOnly(files(godotLib))
 	implementation("androidx.core:core-ktx:1.15.0")
 
 	// The one-shot back lens (IxLens, Phase 6). Same CameraX version ixbody

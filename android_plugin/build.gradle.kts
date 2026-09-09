@@ -1,7 +1,9 @@
-plugins {
-	id("com.android.library") version "8.7.3" apply false
-	id("org.jetbrains.kotlin.android") version "2.0.21" apply false
-}
+// NO `plugins { ... version ... apply false }` BLOCK. AGP 8.7.3 and Kotlin
+// 2.0.21 now arrive on every project's buildscript classpath through
+// `buildSrc/build.gradle.kts`, which is what compiles the `ix64.android.plugin`
+// convention the seven modules apply. Declaring a version here as well is the
+// "plugin is already on the classpath with an unknown version" failure: the
+// versions live in buildSrc and only there.
 
 /**
  * THE COPY THAT USED TO BE A SENTENCE IN A RUNBOOK.

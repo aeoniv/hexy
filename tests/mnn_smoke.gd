@@ -8,7 +8,7 @@ var _fails := 0
 ## EVERY CHECK IS COUNTED. A compile error in a depended script makes a whole
 ## section skip silently, and a suite that prints ALL PASS because it ran nothing
 ## is worse than a red one. Raise this floor when checks are added.
-const MIN_CHECKS := 60
+const MIN_CHECKS := 21
 var _checks := 0
 
 
@@ -78,111 +78,6 @@ func _initialize() -> void:
 	_check(joined == String(done[0]),
 		"THE TOKENS AND THE ANSWER ARE THE SAME TEXT - the two can never disagree")
 
-	# ── QWEN MODEL CONSTANTS & TIER-1 I-CHING Q6 COPROCESSOR ──────────────────
-	_check(MnnRuntime.MODEL_QWEN3_0_6B == "qwen3-0.6b-mnn", "model constant Qwen3-0.6B")
-	_check(MnnRuntime.MODEL_QWEN3_1_7B == "qwen3-1.7b-mnn", "model constant Qwen3-1.7B")
-	_check(MnnRuntime.MODEL_QWEN2_5_1_5B == "qwen2.5-1.5b-mnn", "model constant Qwen2.5-1.5B")
-	_check(MnnRuntime.MODEL_QWEN2_5_3B == "qwen2.5-3b-mnn", "model constant Qwen2.5-3B")
-	_check(MnnRuntime.MODEL_QWEN3_5_0_8B == "qwen3.5-0.8b-mnn", "model constant Qwen3.5-0.8B")
-	_check(MnnRuntime.CHAT_MODELS.has(MnnRuntime.MODEL_QWEN3_5_0_8B),
-		"the 0.8B is a legal directory for this seam")
-	_check(MnnRuntime.CHAT_MODELS.has(MnnRuntime.CHAT_MODEL),
-		"...and the old one did not leave the list")
-
-	# WHICH MIND, AND HOW IT IS CHOSEN. `chat_start()` with a name opens that
-	# directory; with none it reads HEXY_CHAT_MODEL; with neither it is the 0.6B,
-	# which is the whole of "no behaviour change for a phone that never sets it".
-	var m_pick := MnnRuntime.new()
-	m_pick.chat_start()
-	_check(m_pick.chat_model() == MnnRuntime.CHAT_MODEL,
-		"an unasked chat_start is still the 0.6B")
-	OS.set_environment(MnnRuntime.ENV_CHAT_MODEL, MnnRuntime.MODEL_QWEN3_5_0_8B)
-	var m_env := MnnRuntime.new()
-	m_env.chat_start()
-	_check(m_env.chat_model() == MnnRuntime.MODEL_QWEN3_5_0_8B,
-		"HEXY_CHAT_MODEL is the knob and it moves the seam")
-	var m_named := MnnRuntime.new()
-	m_named.chat_start(MnnRuntime.CHAT_MODEL)
-	_check(m_named.chat_model() == MnnRuntime.CHAT_MODEL,
-		"...AND A NAMED DIRECTORY BEATS IT - main.gd asks ModelStore, not the env")
-	OS.set_environment(MnnRuntime.ENV_CHAT_MODEL, "")
-
-	# THE PROMPT SWITCH IS FENCED BY FAMILY. `/no_think` is a command to Qwen3
-	# and a sentence to Qwen3.5, whose thinking lives in llm_config.json instead.
-	_check(MnnRuntime._wants_no_think(MnnRuntime.MODEL_QWEN3_0_6B),
-		"the 0.6B still gets /no_think")
-	_check(MnnRuntime._wants_no_think(MnnRuntime.MODEL_QWEN3_1_7B),
-		"...and so does the 1.7B")
-	_check(not MnnRuntime._wants_no_think(MnnRuntime.MODEL_QWEN3_5_0_8B),
-		"AND THE 0.8B NEVER DOES - the dash in \"qwen3-\" is the fence")
-	_check(not MnnRuntime._wants_no_think(MnnRuntime.MODEL_QWEN2_5_1_5B),
-		"...nor does Qwen2.5")
-
-	# AND NEITHER MODEL EVER SPEAKS ITS REASONING. Whatever directory is loaded,
-	# what reaches a mouth carries no tag and no residue.
-	for dir: String in [MnnRuntime.CHAT_MODEL, MnnRuntime.MODEL_QWEN3_5_0_8B]:
-		var m_dir := MnnRuntime.new()
-		m_dir.chat_start(dir)
-		m_dir.set_scripted(["<think>weighing it</think>go left at the fork"])
-		var said: Array = []
-		m_dir.chat_done.connect(func(t: String): said.append(t))
-		m_dir.chat_stream("which way")
-		_check(said.size() == 1 and String(said[0]) == "go left at the fork",
-			"%s answers with no <think> residue" % dir)
-
-	# Topological hex prior configuration
-	var m_prior := MnnRuntime.new()
-	_check(m_prior.set_hex_prior(1, 1.5), "set_hex_prior succeeds for valid hexagram 1")
-	var hp := m_prior.get_hex_prior()
-	_check(hp["hex_bits"] == 1 and absf(float(hp["beta"]) - 1.5) < 0.001, "get_hex_prior returns stored state")
-	_check(not m_prior.set_hex_prior(-1), "set_hex_prior rejects negative index")
-	_check(not m_prior.set_hex_prior(64), "set_hex_prior rejects index >= 64")
-
-	# Stream partitioning for <think> reasoning tokens
-	var pt := MnnRuntime.partition_think("<think>internal contemplation</think>spoken answer")
-	_check(String(pt["thought"]) == "internal contemplation", "partition_think isolates reasoning")
-	_check(String(pt["speech"]) == "spoken answer", "partition_think isolates spoken text")
-
-	var m_think := MnnRuntime.new()
-	m_think.chat_start()
-	m_think.set_scripted(["<think>analyzing terrain</think>proceed forward cautiously"])
-	var got_thoughts: Array = []
-	var got_speech: Array = []
-	var final_done: Array = []
-	m_think.chat_thought.connect(func(t: String): got_thoughts.append(t))
-	m_think.chat_token.connect(func(t: String): got_speech.append(t))
-	m_think.chat_done.connect(func(t: String): final_done.append(t))
-	_check(m_think.chat_stream("plan path"), "mock stream takes thought turn")
-	_check(not got_thoughts.is_empty(), "reasoning tokens arrived via chat_thought")
-	var joined_thoughts := ""
-	for t: String in got_thoughts: joined_thoughts += t
-	_check(joined_thoughts.strip_edges() == "analyzing terrain", "chat_thought reconstituted exact reasoning trace")
-	var joined_speech := ""
-	for t: String in got_speech: joined_speech += t
-	_check(joined_speech.strip_edges() == "proceed forward cautiously", "chat_token received purely spoken speech")
-	_check(final_done.size() == 1 and String(final_done[0]).strip_edges() == "proceed forward cautiously", "chat_done emitted clean spoken reply")
-
-	# Fast Walsh-Hadamard Transform (FWHT) & Q6 Spectral Invariants
-	var impulse := PackedFloat32Array()
-	impulse.resize(64)
-	impulse.fill(0.0)
-	impulse[0] = 1.0
-	var fwht_res := MnnRuntime.fwht_64(impulse)
-	_check(fwht_res.size() == 64, "FWHT produces 64 spectral coefficients")
-	_check(absf(fwht_res[0] - 1.0) < 0.001 and absf(fwht_res[63] - 1.0) < 0.001, "FWHT of delta impulse is uniform all-ones")
-	var ifwht_res := MnnRuntime.ifwht_64(fwht_res)
-	_check(absf(ifwht_res[0] - 1.0) < 0.001 and absf(ifwht_res[1]) < 0.001, "IFWHT(FWHT(x)) reconstructs original vector perfectly")
-
-	# Discrete hypercube Cayley algebra operators
-	_check(MnnRuntime.hamming_distance(0, 63) == 6, "Hamming distance 0 to 63 is 6")
-	_check(MnnRuntime.hamming_distance(0b101010, 0b101011) == 1, "Hamming distance adjacent vertices is 1")
-	_check(MnnRuntime.pangtong_invert(0) == 63, "Pangtong inverse of Kun (0) is Qian (63)")
-	_check(MnnRuntime.pangtong_invert(63) == 0, "Pangtong inverse of Qian (63) is Kun (0)")
-	_check(MnnRuntime.nuclear_core(63) == 63, "Nuclear core of Qian (63) is Qian (63)")
-	_check(MnnRuntime.nuclear_core(0) == 0, "Nuclear core of Kun (0) is Kun (0)")
-	_check(MnnRuntime.hamming_neighbors(0).size() == 6, "Vertex in Q6 has exactly 6 neighbors")
-
-
 	_the_jni_bridge()
 
 	print("checks: ", _checks, " (floor ", MIN_CHECKS, ")")
@@ -212,7 +107,7 @@ func _initialize() -> void:
 func _the_jni_bridge() -> void:
 	print("--- the jni bridge ---")
 	var src := FileAccess.get_file_as_string(
-		("res://android_plugin/ixmnn/src/main/cpp/ixmnn_jni.cpp" if FileAccess.file_exists("res://android_plugin/ixmnn/src/main/cpp/ixmnn_jni.cpp") else "res://../android_plugin/ixmnn/src/main/cpp/ixmnn_jni.cpp"))
+		"res://../android_plugin/ixmnn/src/main/cpp/ixmnn_jni.cpp")
 	if src == "":
 		_check(true, "(no C++ in this checkout - nothing to audit)")
 		return

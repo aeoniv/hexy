@@ -1,19 +1,6 @@
-# android_plugin — the seven plugins
+# android_plugin — ixloc + ixmesh + ixmnn + ixbody
 
-**Seven** Godot Android plugins, same layout as `ix64-avatar/android_plugin`.
-The count used to read *four* here and it has been wrong since `ixcap`,
-`ixlens` and `ixvoice` landed.
-
-**This file is the single home for plugin facts** — the singleton contract, the
-version handshake strings, and the model table. It is not the home for anything
-else, and it links rather than restates:
-
-| Looking for | Go to |
-|---|---|
-| how to build, stage, export, install | [`../docs/FIELD.md`](../docs/FIELD.md) §3, §3b, §3c, §4, §5 |
-| a dated device measurement run (ms, MB, logcat) | [`../docs/ROADMAP.md`](../docs/ROADMAP.md), in the phase that measured it |
-| why a plugin exists at all, and its ruling | [`../docs/ROADMAP.md`](../docs/ROADMAP.md) |
-| the GDScript side of any door below | `scripts/adapters/` (see *Adapters* at the end) |
+Four Godot Android plugins, same layout as `ix64-avatar/android_plugin`.
 
 | Plugin | Wraps | Status |
 |---|---|---|
@@ -21,14 +8,6 @@ else, and it links rather than restates:
 | `ixmesh` | Google Nearby Connections (P2P_CLUSTER) | on device: singleton registers, advertising + discovery start. Two-device meshing still unverified |
 | `ixmnn` | Alibaba MNN runtime (LLM engine) | on device: real `embed()` and real `chat()` through a JNI bridge this repo owns — see *MNN sessions* below |
 | `ixbody` | CameraX + MediaPipe FaceLandmarker | on device: the front camera bound and unbound on a 1.5 s in 30 s duty cycle, six inferences a window, honest `away` readings. A `watching` reading from a real face: not yet |
-| `ixcap` | CameraX `VideoCapture` — HexCam's recorder | shares CameraX with `ixbody`; the two versions MUST match |
-| `ixlens` | the AR lens surface and the Time Window's camera | see [`../docs/ar-lens.md`](../docs/ar-lens.md) |
-| `ixvoice` | Android SpeechRecognizer ears + TTS mouth, and the chirp clock | the acoustic half of the swarm organs |
-
-The version each of these was last staged at is **not written in this file** —
-it is `addons/<plugin>/bin/VERSION`, which is tracked, and the GDScript
-`const NEEDS` that must match it lives in that plugin's adapter. `docs/FIELD.md`
-§3c is the procedure; `tests/plugin_version_smoke.gd` is the check.
 
 ## Drop-ins required before the first build (both gitignored)
 
@@ -109,24 +88,12 @@ device).
 | Role | Model | Notes |
 |---|---|---|
 | embed | `taobao-mnn/gte_sentence-embedding_multilingual-base-MNN` | 768-dim, ~450 MB. MNN's `Embedding` class loads a module with output `sentence_embeddings`, which BERT-style exports have and the `Qwen3-Embedding-*-MNN` exports do not — those will not load through this API. |
-| chat | `taobao-mnn/Qwen3-0.6B-MNN` | int4, ~450 MB of weights. The floor: it fits the A22's 4 GB and is what every phone falls back to. Directory `qwen3-0.6b-mnn`. |
-| chat | `taobao-mnn/Qwen3-1.7B-MNN` | int4, ~1.2 GB. RAM-gated to 8 GiB+ phones. **No longer untried** — it ran on the Fold (`mind: responder is qwen3-1.7b-mnn`); the run is in [`../docs/ROADMAP.md`](../docs/ROADMAP.md). Directory `qwen3-1.7b-mnn`. |
-| chat | `taobao-mnn/Qwen3.5-0.8B-MNN` | int4, ~548 MB pushed (`llm.mnn.weight` 470 MB + `visual.*` 63 MB + a 5.3 MB `llm.mnn.json` the 0.6B has no equivalent of — push all of them or it will not load). MULTIMODAL: one directory is both mouth and eyes (`is_visual: true`, `image_size: 420`) — but there is no image road to ride: Phase 11b deleted the vision lane, Phase 12 made LOOK a 4.6 MB MediaPipe detector, and `IxMnn` has had no image entry point since. Runs on the pinned MNN 3.6.1 as-is (hybrid attention since 3.4.1). Directory `qwen3.5-0.8b-mnn`; `-Model chat35` pushes it, and `ModelStore.LANE_CHAT_35` (key `chat35`, opt-in, **min RAM 6 GiB since Phase 11d**) is the same pack over the network. CHOSEN WHEN: the weights are on disk and the phone has 6 GiB+ — one row of `ModelStore.CHAT_LANES`, which is read biggest first (1.7b at 8 GiB, 0.8b at 6 GiB, 0.6b the floor at 0) and out-voted only by an explicit `HEXY_CHAT_MODEL`. The A22's 3.8 GB does not clear it, and the measurement that put that bar in — it loaded there by paging into zram while `lmkd` evicted the rest of the phone — is in [`../docs/ROADMAP.md`](../docs/ROADMAP.md) § Phase 11c/11d. Thinking is off via `jinja.context.enable_thinking` in `config.json`, **not** `llm_config.json`. **Measured on both phones 2026-09-06 — the numbers are not repeated here.** Load ms, first turn ms, RSS/PSS, the zram and `lmkd` behaviour on the A22, and both logcats live in their one home: [`../docs/ROADMAP.md`](../docs/ROADMAP.md) § Phase 11c. |
+| chat | `taobao-mnn/Qwen3-0.6B-MNN` | int4, ~450 MB of weights. Chosen because it fits the A22's 4 GB; `Qwen3-1.7B-MNN` (1.2 GB) is untried — the Fold 4 has the RAM for it but nothing here has proven that yet. |
 
 `<think>...</think>` is stripped in the JNI layer — Hexy speaks one line, and
 the reasoning is not the line. Qwen3's own `/no_think` switch is appended in
 `mnn_runtime.gd`, next to the model name, because without it the whole token
 budget goes into reasoning and no answer ever arrives.
-
-Qwen3.5 does not have that switch and must not be sent it — `/no_think` there
-is a sentence the model reads, not a command. It decides by
-`jinja.context.enable_thinking` in its own `config.json` (shipped `true`; NOT `llm_config.json`)
-and by the `<think>` tags the seam already separates, so the gate in
-`mnn_runtime.gd` is `qwen3-`, with the dash, and `qwen3.5-*` falls outside it.
-
-The embed row does not move with the chat row. `gte` stays because MNN's
-`Embedding` class loads a module whose output is named `sentence_embeddings`
-and the `Qwen3-Embedding-*-MNN` exports do not have one.
 
 ### DEVICE — 2026-08-17
 
@@ -184,31 +151,32 @@ needs the same gate.
 
 ## Build
 
-**The procedure is not written here.** It lives in
-[`../docs/FIELD.md`](../docs/FIELD.md) §3 (`./gradlew exportAllAars` — one verb,
-seven modules, both flavours, staged and version-stamped), §3b (the mandatory
-preflight) and §3c (the version handshake). This file used to carry a hand-typed
-`assembleRelease` + `cp` list for five of the seven modules, which is exactly the
-hand-copy FIELD §3 forbids: a forgotten copy ships a stale plugin under fresh
-scripts and the APK builds, installs, runs and answers the previous question.
+```
+JAVA_HOME=".../Android Studio/jbr" ./gradlew :ixloc:assembleRelease :ixmesh:assembleRelease :ixmnn:assembleRelease :ixbody:assembleRelease :ixcap:assembleRelease
+                                   ./gradlew :ixloc:assembleDebug   :ixmesh:assembleDebug   :ixmnn:assembleDebug   :ixbody:assembleDebug   :ixcap:assembleDebug
+cp ixloc/build/outputs/aar/ixloc-release.aar   ../addons/ixloc/bin/release/
+cp ixloc/build/outputs/aar/ixloc-debug.aar     ../addons/ixloc/bin/debug/
+cp ixmesh/build/outputs/aar/ixmesh-release.aar ../addons/ixmesh/bin/release/
+cp ixmesh/build/outputs/aar/ixmesh-debug.aar   ../addons/ixmesh/bin/debug/
+cp ixmnn/build/outputs/aar/ixmnn-release.aar   ../addons/ixmnn/bin/release/
+cp ixmnn/build/outputs/aar/ixmnn-debug.aar     ../addons/ixmnn/bin/debug/
+cp ixbody/build/outputs/aar/ixbody-release.aar ../addons/ixbody/bin/release/
+cp ixbody/build/outputs/aar/ixbody-debug.aar   ../addons/ixbody/bin/debug/
+cp ixcap/build/outputs/aar/ixcap-release.aar   ../addons/ixcap/bin/release/
+cp ixcap/build/outputs/aar/ixcap-debug.aar     ../addons/ixcap/bin/debug/
+```
 
-What belongs here is the *shape* of the build, not the commands:
+`ixcap` is HexCam's camera (CameraX `VideoCapture`). It shares CameraX with
+`ixbody` and the two versions MUST match — two CameraX versions in one APK is
+the dual-registry crash avatar paid for once, resolved silently by Gradle with
+the loser's native symbols missing at runtime.
 
-- **Gradle conventions live in one place** — `buildSrc/`, as the convention
-  plugin **`ix64.android.plugin`** (M3 of [`../docs/plans/refactor.md`](../docs/plans/refactor.md)).
-  `compileSdk`, Java 17, the Kotlin `jvmTarget` and the `godot-lib` `compileOnly`
-  block used to be copied into all seven `*/build.gradle.kts` and one of them had
-  already drifted. A module's own build file now says only what is true of that
-  module. An SDK bump is one edit.
-- `ixcap` is HexCam's camera (CameraX `VideoCapture`). It shares CameraX with
-  `ixbody` and the two versions MUST match — two CameraX versions in one APK is
-  the dual-registry crash avatar paid for once, resolved silently by Gradle with
-  the loser's native symbols missing at runtime.
-- Both `debug/` and `release/` must be filled (avatar's release-export gotcha: a
-  missing release aar kills export at `:checkStandardReleaseAarMetadata`).
-- `gradle.properties` caps the daemon at 1 GB and runs the Kotlin compiler
-  in-process: on an 8 GB machine the default 2 GB daemon plus a separate Kotlin
-  daemon crashed the JVM with a malloc failure.
+Both `debug/` and `release/` must be filled (avatar's release-export gotcha: a
+missing release aar kills export at `:checkStandardReleaseAarMetadata`).
+
+`gradle.properties` caps the daemon at 1 GB and runs the Kotlin compiler
+in-process: on an 8 GB machine the default 2 GB daemon plus a separate Kotlin
+daemon crashed the JVM with a malloc failure.
 
 ## Export plumbing
 
@@ -278,12 +246,13 @@ cleanly.
 ## `start()` is a handshake, not a switch
 
 **An emit before anybody connected is not delayed, it is destroyed.** The
-rotation-vector listener starts from `onMainResume`; `scripts/social/geo.gd`
-connects to `heading_changed` a second and a half later. Everything the plugin
-said in that gap was lost, and the delta gate in `publishHeading` then suppressed
-every later sample on a motionless phone, so the stream was over. The full
-diagnosis and its numbers are in [`../docs/ROADMAP.md`](../docs/ROADMAP.md)
-Phase 3 item 10.
+rotation-vector listener starts from `onMainResume`, at Activity resume;
+`scripts/social/geo.gd` connects to `heading_changed` when Godot has loaded the
+main scene and calls `start()`. On the A22 that gap is **1.49 s**, and it
+swallowed three heading emits, a pose and an accuracy level. The delta gate in
+`publishHeading` then suppressed every later sample on a motionless phone, so the
+stream was over: three values, all lost, none repeatable. GDScript held its
+initial `0.0` for the rest of the session and the dial froze on `0 + declination`.
 
 So `start()` re-announces everything already known — pose, accuracy, declination,
 heading — and resets the emit gate, because it is the one moment the plugin knows
@@ -309,26 +278,30 @@ And two logging rules, because both of these bugs were invisible:
 
 ### DEVICE — 2026-08-18
 
-Both phones, fresh install, flat on a desk, ~45 s each; the acceptance test is
-that the plugin's number and GDScript's number are the same number. **88 paired
-comparisons, 0 mismatched.** The logs, the per-phone sensor rates and the
-pre-fix `kotlin=61.9 gdscript=0.0` reading are not repeated here — they live in
-[`../docs/ROADMAP.md`](../docs/ROADMAP.md) Phase 3 item 10, which owns dated
-device runs.
+Both phones, fresh install, flat on a desk, ~45 s each. The acceptance test is
+that the plugin's number and GDScript's number are the same number:
+
+```
+A22 (R9WT200BA8F)   IxLoc  heading: 292.7 true (313.7 magnetic -21.04 decl)
+                    godot  geo: heading=292.7° (true) = 313.7° magnetic -21.04° decl
+                    IxLoc  heading: 50.3 samples/s seen, 1.0/s sent (252/5 in 5.0s)
+
+Fold 4 (RFCT71BW9YV) IxLoc  heading: 343.1 true (4.2 magnetic -21.04 decl)
+                    godot  geo: heading=343.1° (true) = 4.2° magnetic -21.04° decl
+                    IxLoc  heading: 15.1 samples/s seen, 1.0/s sent (76/5 in 5.0s)
+```
+
+88 paired comparisons across three captures, 0 mismatched. Before the fix the
+same comparison read `kotlin=61.9 gdscript=0.0`. Sensor rates differ by hardware
+(50.3 Hz / 15.1 Hz) and the delivered rate does not (1.0/s, the keepalive).
 
 Nobody lifted or turned either phone — `adb` cannot — so the dial's response to a
 real turn is still UNBUILT.
 
 ## Contract
 
-**The GDScript doors live in `scripts/adapters/`** — one adapter per plugin
-(`body_adapter.gd`, `cap_adapter.gd`, `lens_adapter.gd`, `loc_adapter.gd`,
-`mesh_adapter.gd`, `mnn_adapter.gd`, `voice_adapter.gd`) over a shared
-`plugin_adapter.gd`, which is the only place `Engine.get_singleton` is called and
-the only place `const NEEDS` is checked against `addons/<plugin>/bin/VERSION`
-(M4 of [`../docs/plans/refactor.md`](../docs/plans/refactor.md)). The sense
-scripts (`scripts/net/mesh_peer.gd`, `scripts/brain/mnn_runtime.gd`, …) go
-through their adapter and no longer reach for a singleton themselves. Wire shape = the desktop backends' wire shape: JSON
+The GDScript seams (`scripts/net/mesh_peer.gd`, `scripts/brain/mnn_runtime.gd`)
+are the only callers. Wire shape = the desktop backends' wire shape: JSON
 events on the mesh, FloatArray embeddings from MNN. Desktop fallbacks stay
 forever — they are the test rig, not a stopgap.
 
@@ -337,4 +310,4 @@ forever — they are the test rig, not a stopgap.
 | `IxMesh` | `peer_found(String,String)`, `peer_lost(String)`, `event_received(String,String)`, `peer_proximity(String,String)`, `bandwidth_changed(String,String)`, `probe_done(String,String,double,double)` | `start(String)`, `stop()`, `broadcast(String)`, `connected_peers() -> String`, `probe_send(String,int) -> bool`, `probe_send_chunks(String,int,int) -> bool` |
 | `IxLoc` | `location_changed(double,double,double)` (lat, lon, acc), `heading_changed(double)` (degrees clockwise from **magnetic** north), `declination_changed(double)`, `heading_accuracy_changed(int)`, `pose_changed(String,double)` | `available() -> bool`, `has_fine_permission() -> bool`, `start()` (**also a handshake — see below**), `stop()`, `set_mode(bool)` (true = `PRIORITY_HIGH_ACCURACY` at 2 s, false = balanced at 10 s), `high_accuracy() -> bool` |
 | `IxBody` | `face_seen(double,double,double,double)` (confidence, smile, surprise, blink — all 0..1), `face_gone()`, `body_fault(String)` | `available() -> bool`, `has_camera_permission() -> bool`, `start()` (opens a sampling window; requests CAMERA the first time), `stop()` (unbinds the camera and closes the graph), `is_running() -> bool` |
-| `IxMnn` | `chat_token(String)` (streaming, when the staged aar has it) | `runtime_ready() -> bool`, `embed_start(String) -> int` (dim, 0 = failed), `embed_dim() -> int`, `embed(String) -> FloatArray`, `chat_start(String) -> bool`, `chat_ready() -> bool`, `chat(String) -> String`, `chat_stream(String)`, `set_hex_prior(String)`, `release()`. **Nothing image-shaped** — `ixmnn_jni.cpp` exports no image entry point (Phase 11b/12) |
+| `IxMnn` | — | `runtime_ready() -> bool`, `embed_start(String) -> int` (dim, 0 = failed), `embed_dim() -> int`, `embed(String) -> FloatArray`, `chat_start(String) -> bool`, `chat_ready() -> bool`, `chat(String) -> String`, `release()` |

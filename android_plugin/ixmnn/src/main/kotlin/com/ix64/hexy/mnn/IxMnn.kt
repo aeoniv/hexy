@@ -325,14 +325,6 @@ class IxMnn(godot: Godot) : GodotPlugin(godot) {
 	// and embeddings, which is what it is actually good at.
 
 	@UsedByGodot
-	fun set_hex_prior(hexBits: Int, beta: Float): Boolean {
-		if (chatHandle == 0L) return false
-		return onWorker(false) {
-			IxMnnNative.nativeSetHexPrior(chatHandle, hexBits, beta)
-		}
-	}
-
-	@UsedByGodot
 	fun release(): Unit = onWorker(Unit) {
 		if (embedHandle != 0L) IxMnnNative.nativeEmbeddingRelease(embedHandle)
 		if (chatHandle != 0L) IxMnnNative.nativeLlmRelease(chatHandle)

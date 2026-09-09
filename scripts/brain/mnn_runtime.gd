@@ -21,72 +21,24 @@ class_name MnnRuntime
 ## reply, and it is emitted on every road out of a stream including a failed
 ## one, so a caller never has to time out to find out a stream is over.
 signal chat_token(text: String)
-signal chat_thought(text: String)
 signal chat_done(text: String)
 
-## Default model directories — the names the adb sideload writes.
+## Default model directories — the names push_mnn_model.ps1 writes.
+const Seam = preload("res://scripts/seam.gd")
+## THE AAR THIS SCRIPT WAS WRITTEN AGAINST. Compared with the plugin's own
+## `plugin_version()` at attach; see `scripts/seam.gd` for why a mismatch is
+## worth a loud line and a degrade rather than a shrug.
+const NEEDS := "ixmnn/1"
+
 const EMBED_MODEL := "gte-embedding-mnn"
 const CHAT_MODEL := "qwen3-0.6b-mnn"
-
-## Supported model families
-const MODEL_QWEN3_0_6B := "qwen3-0.6b-mnn"
-const MODEL_QWEN3_1_7B := "qwen3-1.7b-mnn"
-const MODEL_QWEN2_5_1_5B := "qwen2.5-1.5b-mnn"
-const MODEL_QWEN2_5_3B := "qwen2.5-3b-mnn"
-## PHASE 11c — THE 0.8B. `taobao-mnn/Qwen3.5-0.8B-MNN`, ~548 MB pushed, and it
-## is ONE DIRECTORY THAT IS ALSO EYES: `visual.mnn` rides beside `llm.mnn`, so
-## the pack that answers is the pack that looks. MNN 3.6.1 already runs it —
-## hybrid attention landed in 3.4.1 — so nothing under `libs/mnn-jni` moves.
-const MODEL_QWEN3_5_0_8B := "qwen3.5-0.8b-mnn"
-
-## EVERY DIRECTORY THIS SEAM WILL OPEN. `chat_start` does not refuse a name that
-## is not here — the loader's answer is the only truth about what is on disk —
-## but a name off this list is a typo until somebody adds it, and the smoke
-## walks this list rather than keeping a second copy of it.
-const CHAT_MODELS := [
-	MODEL_QWEN3_0_6B,
-	MODEL_QWEN3_1_7B,
-	MODEL_QWEN3_5_0_8B,
-	MODEL_QWEN2_5_1_5B,
-	MODEL_QWEN2_5_3B,
-]
-
-## THE KNOB, AND IT IS ONE STRING. Set it and a `chat_start()` with no argument
-## opens that directory instead of [constant CHAT_MODEL]; unset, nothing about a
-## 0.6B phone changes. Callers that already name a directory (main.gd asks
-## [ModelStore.chat_model_name]) are untouched — an explicit name always wins.
-const ENV_CHAT_MODEL := "HEXY_CHAT_MODEL"
-
 const MOCK_DIM := 64
 ## Qwen3 reasons out loud by default and burns the whole token budget doing it;
 ## the model's own soft switch turns that off. Model-specific, so it lives next
 ## to the model name and is only ever appended to a real Qwen3 prompt.
-##
-## QWEN3.5 HAS NO SUCH SWITCH. It decides by `jinja.context.enable_thinking` in
-## its own `config.json` (shipped `true`, and that file — NOT `llm_config.json`,
-## which only carries the name inside its Jinja template — is the place to turn
-## it off; the Fold run of 2026-09-06 pushed it `false`) and otherwise by emitting the `<think>` tags this seam already
-## separates. A literal " /no_think" is not a command there, it is a sentence
-## the model reads. `begins_with("qwen3")` would have caught `qwen3.5-*` too;
-## [method _wants_no_think] is the fence.
 const QWEN_NO_THINK := " /no_think"
 
-## THE HANDSHAKE IS NO LONGER SPELLED HERE. `scripts/seam.gd` is still what
-## runs it; the adapter below is what calls it, with the NEEDS on the next line.
-## THE AAR THIS SCRIPT WAS WRITTEN AGAINST. Compared with the plugin's own
-## `plugin_version()` at attach; see `scripts/seam.gd` for why a mismatch is
-## worth a loud line and a degrade rather than a shrug. This seam was the one
-## of twelve that skipped the handshake — a stale ixmnn under a fresh script
-## answers `has_singleton` true and then loses whichever new method the script
-## needed, silently, which is the exact failure the handshake exists to name.
-const NEEDS := "ixmnn/1"
-## THE ONE DOOR TO IxMnn, shared with `DeviceFacts.plugin_ram`. Refactor R5.
-const MnnAdapterScript = preload("res://scripts/adapters/mnn_adapter.gd")
-
 var _android: Object = null
-var _door := MnnAdapterScript.new(NEEDS, "mnn", "mnn", "mock")
-var _hex_prior_bits: int = -1
-var _hex_prior_beta: float = 0.0
 var _dim := MOCK_DIM
 var _chat_ready := false
 var _chat_model := ""
@@ -113,14 +65,13 @@ var _can_stream := false
 
 
 func _init() -> void:
-	if _door.present():
-		# THE VERSION HANDSHAKE, BEFORE A SINGLE SIGNAL IS CONNECTED, inside the
-		# adapter. On a mismatch it hands back null and this runtime runs its
-		# mock, which says it is a mock — strictly better than a plugin that
-		# lies about its age. `available()` reads `_android != null`, so the
-		# degrade needs nothing else.
-		_android = _door.attach()
-		if _android == null:
+	if Engine.has_singleton("IxMnn"):
+		_android = Engine.get_singleton("IxMnn")
+		# THE VERSION HANDSHAKE. A stale ixmnn under a fresh script is the silent
+		# failure `scripts/seam.gd` exists for; on a mismatch this runtime keeps
+		# the desktop road (no plugin, honest about it) and says why, once.
+		if not Seam.check(_android, NEEDS, "mnn"):
+			_android = null
 			return
 		# THE PLUGIN'S SIGNALS, FORWARDED AS OUR OWN. Both are guarded on
 		# `_streaming`, because two MnnRuntime instances exist on a phone
@@ -135,16 +86,10 @@ func _init() -> void:
 			and _android.has_signal("chat_done")
 		if _can_stream:
 			_android.connect("chat_token", _on_plugin_token)
-		if _android.has_signal("chat_thought"):
-			_android.connect("chat_thought", _on_plugin_thought)
 			_android.connect("chat_done", _on_plugin_done)
 		else:
 			print("mnn: this plugin cannot stream — the mouth waits for whole answers")
 
-
-func _on_plugin_thought(text: String) -> void:
-	if _streaming:
-		chat_thought.emit(text)
 
 func _on_plugin_token(text: String) -> void:
 	if _streaming:
@@ -200,22 +145,8 @@ func embed_dim() -> int:
 	return _dim
 
 
-## THE PROMPT SWITCH, FENCED BY FAMILY. True only for the Qwen3 line, which is
-## the only line that reads `/no_think` as a command rather than as words. The
-## dash is what does the work: "qwen3-" excludes "qwen3.5-0.8b-mnn".
-static func _wants_no_think(dir: String) -> bool:
-	return dir.begins_with("qwen3-")
-
-
 ## Loads the chat model. Slow on device (hundreds of MB of weights).
-##
-## An empty `dir` means "whatever [constant ENV_CHAT_MODEL] says, else the usual
-## one", so a phone can be pointed at another pack without a rebuild.
-func chat_start(dir: String = "") -> bool:
-	if dir == "":
-		dir = OS.get_environment(ENV_CHAT_MODEL).strip_edges()
-	if dir == "":
-		dir = CHAT_MODEL
+func chat_start(dir: String = CHAT_MODEL) -> bool:
 	_chat_model = dir
 	if available():
 		_chat_ready = _android.call("chat_start", dir)
@@ -242,7 +173,7 @@ func chat_ready() -> bool:
 func chat(prompt: String) -> String:
 	if available():
 		var p := prompt
-		if _wants_no_think(_chat_model):
+		if _chat_model.begins_with("qwen3"):
 			p += QWEN_NO_THINK
 		return _android.call("chat", p)
 	if not _chat_ready:
@@ -264,7 +195,7 @@ func chat_stream(prompt: String) -> bool:
 		if not _can_stream:
 			return false
 		var p := prompt
-		if _wants_no_think(_chat_model):
+		if _chat_model.begins_with("qwen3"):
 			p += QWEN_NO_THINK
 		_streaming = true
 		if bool(_android.call("chat_stream", p)):
@@ -275,20 +206,12 @@ func chat_stream(prompt: String) -> bool:
 		return false
 	_streaming = true
 	var whole := _mock_chat(prompt)
-	var part := partition_think(whole)
-	if part["thought"] != "":
-		for chunk: String in stream_chunks(String(part["thought"])):
-			if not _streaming:
-				return true
-			chat_thought.emit(chunk)
-	for chunk: String in stream_chunks(String(part["speech"])):
-		# A cancel() mid-stream is honoured on the mock too, or the two roads
-		# would disagree about what cancelling means.
+	for chunk: String in stream_chunks(whole):
 		if not _streaming:
 			return true
 		chat_token.emit(chunk)
 	_streaming = false
-	chat_done.emit(String(part["speech"]))
+	chat_done.emit(whole)
 	return true
 
 
@@ -334,118 +257,6 @@ func scripted_left() -> int:
 
 ## Canned reply: enough shape for callers to be written and tested, never
 ## enough to be mistaken for thought.
-
-## Sets active I-Ching hexagram prior on the Q6 hypercube (0..63).
-func set_hex_prior(hex_bits: int, beta: float = 1.0) -> bool:
-	if hex_bits < 0 or hex_bits > 63:
-		return false
-	_hex_prior_bits = hex_bits
-	_hex_prior_beta = maxf(0.0, beta)
-	if available() and _android.has_method("set_hex_prior"):
-		return bool(_android.call("set_hex_prior", hex_bits, beta))
-	return true
-
-
-func get_hex_prior() -> Dictionary:
-	return {
-		"hex_bits": _hex_prior_bits,
-		"beta": _hex_prior_beta
-	}
-
-
-## Partitions text into reasoning thoughts (<think>...</think>) and speech.
-static func partition_think(text: String) -> Dictionary:
-	var open_tag := "<think>"
-	var close_tag := "</think>"
-	var b := text.find(open_tag)
-	var e := text.find(close_tag)
-	if b == -1:
-		return {"thought": "", "speech": text.strip_edges()}
-	if e == -1 or e < b:
-		var thought_part := text.substr(b + open_tag.length()).strip_edges()
-		var speech_part := text.substr(0, b).strip_edges()
-		return {"thought": thought_part, "speech": speech_part}
-	var thought_part := text.substr(b + open_tag.length(), e - (b + open_tag.length())).strip_edges()
-	var speech_part := (text.substr(0, b) + text.substr(e + close_tag.length())).strip_edges()
-	return {"thought": thought_part, "speech": speech_part}
-
-
-## In-place Fast Walsh-Hadamard Transform (FWHT) over 64 elements.
-## O(N log N) = 384 additions, 0 multiplications.
-static func fwht_64(a: PackedFloat32Array) -> PackedFloat32Array:
-	assert(a.size() == 64, "fwht_64 requires exactly 64 elements")
-	var out := a.duplicate()
-	var h := 1
-	while h < 64:
-		var step := h << 1
-		var i := 0
-		while i < 64:
-			for j in range(i, i + h):
-				var x: float = out[j]
-				var y: float = out[j + h]
-				out[j] = x + y
-				out[j + h] = x - y
-			i += step
-		h <<= 1
-	return out
-
-
-## In-place Inverse Fast Walsh-Hadamard Transform (IFWHT): IFWHT(x) = (1/64) * FWHT(x).
-static func ifwht_64(a: PackedFloat32Array) -> PackedFloat32Array:
-	var out := fwht_64(a)
-	for i in 64:
-		out[i] /= 64.0
-	return out
-
-
-## Low-pass spectral filter on the Q6 hypercube Cayley graph.
-static func q6_spectral_filter(prob_64: PackedFloat32Array, max_cutoff: int = 3) -> PackedFloat32Array:
-	assert(prob_64.size() == 64, "q6_spectral_filter requires 64 elements")
-	var spectral := fwht_64(prob_64)
-	for i in 64:
-		var w := 0
-		var tmp := i
-		while tmp > 0:
-			w += (tmp & 1)
-			tmp >>= 1
-		var weight := 1.0 if (w <= max_cutoff) else 0.0
-		spectral[i] *= (weight / 64.0)
-	return fwht_64(spectral)
-
-
-## Hamming distance between two 6-bit states
-static func hamming_distance(a: int, b: int) -> int:
-	var diff := (a ^ b) & 0x3F
-	var d := 0
-	while diff > 0:
-		d += (diff & 1)
-		diff >>= 1
-	return d
-
-
-## Pangtong (旁通) operator: Inverts all 6 lines (antipodal vertex ~x)
-static func pangtong_invert(bits: int) -> int:
-	return (~bits) & 0x3F
-
-
-## Huguaci (互卦) Nuclear Core projection:
-## Lower nuclear trigram = lines 1, 2, 3 (0-indexed)
-## Upper nuclear trigram = lines 2, 3, 4 (0-indexed)
-static func nuclear_core(bits: int) -> int:
-	var lower := (bits >> 1) & 0x07
-	var upper := (bits >> 2) & 0x07
-	return (lower | (upper << 3)) & 0x3F
-
-
-## Returns the 6 adjacent Hamming-1 neighbor states
-static func hamming_neighbors(bits: int) -> PackedInt32Array:
-	var neighbors := PackedInt32Array()
-	neighbors.resize(6)
-	for i in 6:
-		neighbors[i] = (bits ^ (1 << i)) & 0x3F
-	return neighbors
-
-
 func _mock_chat(prompt: String) -> String:
 	if not _scripted.is_empty():
 		return _scripted.pop_front()
@@ -475,128 +286,3 @@ static func cosine(a: PackedFloat32Array, b: PackedFloat32Array) -> float:
 	for i in mini(a.size(), b.size()):
 		dot += a[i] * b[i]
 	return dot
-
-
-# ── MNN ENGINE EXTENSIONS: TOKENIZER, SAMPLING, PERF & CONTEXT ──────────────
-var _can_cancel := false
-var _can_tokenize := false
-var _can_perf := false
-
-var _sampling_params := {
-	"temperature": 0.7,
-	"top_p": 0.9,
-	"repetition_penalty": 1.15
-}
-
-var _mock_history_count := 0
-var _mock_vocab: Dictionary = {}
-var _mock_inv_vocab: Dictionary = {}
-var _last_perf: Dictionary = {
-	"prompt_len": 0,
-	"gen_seq_len": 0,
-	"all_seq_len": 0,
-	"prefill_ms": 0.0,
-	"decode_ms": 0.0,
-	"tps": 0.0,
-	"status": 0
-}
-
-
-## Encodes a prompt string into model token IDs.
-func tokenize(text: String) -> PackedInt32Array:
-	if available() and _can_tokenize:
-		var arr: Array = _android.call("tokenize", text)
-		var out := PackedInt32Array()
-		out.resize(arr.size())
-		for i in arr.size():
-			out[i] = int(arr[i])
-		return out
-	var out := PackedInt32Array()
-	var words := text.split(" ", false)
-	for w in words:
-		var lower := w.to_lower().strip_edges()
-		if not _mock_vocab.has(lower):
-			var new_id := 1000 + int(_mock_vocab.size())
-			_mock_vocab[lower] = new_id
-			_mock_inv_vocab[new_id] = lower
-		out.append(_mock_vocab[lower])
-	return out
-
-
-## Decodes a single token ID back into text.
-func detokenize(token_id: int) -> String:
-	if available() and _android.has_method("detokenize"):
-		return String(_android.call("detokenize", token_id))
-	if _mock_inv_vocab.has(token_id):
-		return String(_mock_inv_vocab[token_id]) + " "
-	return "[tok_" + str(token_id) + "] "
-
-
-## Retrieves native C++ execution telemetry (prefill, decode latency, TPS, tokens).
-func get_perf() -> Dictionary:
-	if available() and _can_perf:
-		var raw_json: String = String(_android.call("get_perf"))
-		var parsed = JSON.parse_string(raw_json)
-		if parsed is Dictionary:
-			var d: Dictionary = parsed
-			var p_us: float = float(d.get("prefill_us", 0))
-			var d_us: float = float(d.get("decode_us", 0))
-			var gen_len: int = int(d.get("gen_seq_len", 0))
-			var tps: float = 0.0
-			if d_us > 0.0 and gen_len > 0:
-				tps = (float(gen_len) * 1000000.0) / d_us
-			return {
-				"prompt_len": int(d.get("prompt_len", 0)),
-				"gen_seq_len": gen_len,
-				"all_seq_len": int(d.get("all_seq_len", 0)),
-				"prefill_ms": p_us / 1000.0,
-				"decode_ms": d_us / 1000.0,
-				"tps": snappedf(tps, 0.1),
-				"status": int(d.get("status", 0))
-			}
-	return _last_perf.duplicate()
-
-
-## Dynamically sets runtime sampling parameters (Temperature, Top-P, Repetition Penalty).
-func set_sampling(temperature: float, top_p: float = 0.9, repetition_penalty: float = 1.15) -> bool:
-	_sampling_params["temperature"] = clampf(temperature, 0.05, 2.0)
-	_sampling_params["top_p"] = clampf(top_p, 0.1, 1.0)
-	_sampling_params["repetition_penalty"] = clampf(repetition_penalty, 1.0, 2.0)
-	if available() and _android.has_method("set_sampling"):
-		return bool(_android.call("set_sampling", _sampling_params["temperature"], _sampling_params["top_p"], _sampling_params["repetition_penalty"]))
-	return true
-
-
-func get_sampling() -> Dictionary:
-	return _sampling_params.duplicate()
-
-
-## Current context history token count.
-func get_history_count() -> int:
-	if available() and _android.has_method("get_history_count"):
-		return int(_android.call("get_history_count"))
-	return _mock_history_count
-
-
-## Trims sliding-window context history to prevent memory explosion on mobile devices.
-func trim_history(begin: int, end: int) -> bool:
-	if available() and _android.has_method("trim_history"):
-		return bool(_android.call("trim_history", begin, end))
-	var removed := maxi(0, end - begin)
-	_mock_history_count = maxi(0, _mock_history_count - removed)
-	return true
-
-
-## Formats prompt using model's native ChatML template.
-func apply_template(prompt: String) -> String:
-	if available() and _android.has_method("apply_template"):
-		return String(_android.call("apply_template", prompt))
-	return "<|im_start|>user\n" + prompt.strip_edges() + "<|im_end|>\n<|im_start|>assistant\n"
-
-
-func chat_loaded() -> bool:
-	return chat_ready()
-
-
-func embedding_name() -> String:
-	return "mnn" if available() else "mock_hash"
