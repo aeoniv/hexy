@@ -1183,82 +1183,63 @@
     }
   
     /* =========================================================================
-       I-Ching Geometric Deep Learning & Q6-GNN Studio
+       8. Creature State & 6-Strut Tensegrity Ball 3D Studio
        ========================================================================= */
-    .gdl-container {
-      width: 960px;
-      min-height: 560px;
-      max-height: 84vh;
+    .creature-container {
+      width: 1040px;
+      min-height: 620px;
+      max-height: 88vh;
       background: rgba(10, 15, 29, 0.97);
       border: 1px solid rgba(56, 189, 248, 0.4);
       border-radius: 12px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      box-shadow: 0 14px 44px rgba(0, 0, 0, 0.75), 0 0 28px rgba(56, 189, 248, 0.2);
+      box-shadow: 0 14px 44px rgba(0, 0, 0, 0.75), 0 0 28px rgba(56, 189, 248, 0.15);
       animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .gdl-subnav {
+    .creature-subnav {
       display: flex;
       background: rgba(4, 7, 18, 0.75);
       border-bottom: 1px solid var(--card-border);
-      padding: 7px 12px;
-      gap: 6px;
+      padding: 8px 16px;
+      gap: 12px;
       align-items: center;
       flex-wrap: wrap;
     }
-    .gdl-tab-btn {
-      padding: 5px 12px;
-      border-radius: 6px;
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--text-muted);
-      font-size: 0.74rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .gdl-tab-btn:hover {
-      color: #fff;
-      background: rgba(255, 255, 255, 0.06);
-    }
-    .gdl-tab-btn.active {
-      color: #38bdf8;
-      background: rgba(56, 189, 248, 0.15);
-      border-color: rgba(56, 189, 248, 0.45);
-      box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
-    }
-    .gdl-body {
+    .creature-body {
       flex: 1;
-      padding: 12px 14px;
+      padding: 14px 16px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
     }
-    .gdl-card {
+    .creature-split {
+      display: grid;
+      grid-template-columns: 1.22fr 0.98fr;
+      gap: 14px;
+    }
+    .creature-card {
       background: rgba(15, 23, 42, 0.75);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 8px;
       padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
-    .gdl-card-title {
+    .creature-card-title {
       font-size: 0.85rem;
       font-weight: 700;
       color: #e2e8f0;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 10px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
       padding-bottom: 6px;
     }
-    .gdl-split {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-    .gdl-chip {
+    .creature-chip {
       display: inline-block;
       padding: 2px 7px;
       border-radius: 4px;
@@ -1266,35 +1247,56 @@
       font-family: 'JetBrains Mono', monospace;
       font-weight: 600;
     }
-    .gdl-chip-cyan { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); }
-    .gdl-chip-amber { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.35); }
-    .gdl-chip-purple { background: rgba(192, 132, 252, 0.15); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.35); }
-    .gdl-chip-green { background: rgba(74, 222, 128, 0.15); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.35); }
-    .gdl-chip-rose { background: rgba(251, 113, 133, 0.15); color: #fb7185; border: 1px solid rgba(251, 113, 133, 0.35); }
+    .creature-chip-cyan { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .creature-chip-amber { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
+    .creature-chip-green { background: rgba(74, 222, 128, 0.15); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3); }
+    .creature-chip-rose { background: rgba(251, 113, 133, 0.15); color: #fb7185; border: 1px solid rgba(251, 113, 133, 0.3); }
+    .creature-chip-purple { background: rgba(192, 132, 252, 0.15); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.3); }
 
-    .line-toggle-btn {
-      padding: 6px 10px;
-      border-radius: 6px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      background: rgba(255, 255, 255, 0.04);
-      color: #94a3b8;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem;
-      cursor: pointer;
+    .strut-row {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
       transition: all 0.2s;
     }
-    .line-toggle-btn.yang {
-      background: rgba(56, 189, 248, 0.2);
-      border-color: rgba(56, 189, 248, 0.55);
-      color: #38bdf8;
-      box-shadow: 0 0 8px rgba(56, 189, 248, 0.2);
+    .strut-row:hover {
+      background: rgba(56, 189, 248, 0.06);
+      border-color: rgba(56, 189, 248, 0.25);
     }
-    .line-bar-glyph {
-      font-weight: 900;
-      letter-spacing: 1px;
+    .strut-row.active-changing {
+      border-color: #fbbf24;
+      background: rgba(251, 191, 36, 0.08);
+      box-shadow: 0 0 10px rgba(251, 191, 36, 0.15);
+    }
+    .strut-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+    .strut-badge-yang { background: #fbbf24; color: #0f172a; }
+    .strut-badge-yin { background: #64748b; color: #f8fafc; }
+
+    .vitality-bar-bg {
+      flex: 1;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 0 10px;
+    }
+    .vitality-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 </style>
 </head>
@@ -1353,7 +1355,7 @@
           <button class="tab-btn engine-tab" id="tab4" onclick="switchTab(4)">5. KV-Cache Allocator</button>
           <button class="tab-btn engine-tab" id="tab5" onclick="switchTab(5)">6. Sampler & Logits Pipeline</button>
           <button class="tab-btn engine-tab" id="tab6" onclick="switchTab(6)" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.14); box-shadow: 0 0 10px rgba(251, 191, 36, 0.2);">7. 🎓 Educational Lab & Math Sandbox</button>
-          <button class="tab-btn engine-tab" id="tab7" onclick="switchTab(7)" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.45); background: rgba(56, 189, 248, 0.14); box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);">8. 🌀 I-Ching GDL & Q₆-GNN Engine</button>
+          <button class="tab-btn engine-tab" id="tab7" onclick="switchTab(7)" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.45); background: rgba(56, 189, 248, 0.14); box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);">8. 🪐 Creature Tensegrity 3D & Telemetry</button>
 
         </div>
 
@@ -2708,8 +2710,8 @@
         initEduLab();
       }
       else if (idx === 7) {
-        mount.innerHTML = renderGdlEngineHtml();
-        initGdlEngine();
+        mount.innerHTML = renderCreatureTensegrityHtml();
+        initCreatureTensegrity();
       }
 
       closePopover();
@@ -3504,199 +3506,7 @@
               </div>
             </div>
 
-            <!-- Module 6: Live Dual-Channel Mind Stream Simulator -->
-            <div id="gdlView6" class="gdl-card" style="display: none; flex-direction: column; gap: 10px;">
-              <div class="gdl-card-title">
-                <span>🧠 Live Dual-Channel Mind Stream: Reasoning (<think>) vs. Spoken Mouth</span>
-                <span class="gdl-chip gdl-chip-cyan">Signal Demuxing: chat_thought ⟷ chat_token</span>
-              </div>
-              <div style="font-size: 0.74rem; color: #94a3b8; line-height: 1.4;">
-                Qwen3 reasons out loud inside <code>&lt;think&gt;...&lt;/think&gt;</code> blocks. The upgraded C++ and GDScript seam automatically demuxes the stream in real time: internal topological graph deliberation travels through <b>chat_thought</b> for the HUD, while only clean spoken responses reach <b>chat_token</b> and the TTS mouth.
-              </div>
-              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
-                <label style="font-size: 0.72rem; color: #38bdf8; font-weight: 700;">PROMPT SCENARIO:</label>
-                <select id="mindScenarioSelect" onchange="loadMindScenario()" style="background: #0f172a; border: 1px solid #38bdf8; color: #f8fafc; font-size: 0.72rem; padding: 4px 8px; border-radius: 4px;">
-                  <option value="noise">1. Sudden Loud Noise (Perception ➔ Hex 52 Stillness Grounding)</option>
-                  <option value="counsel">2. User Seeking Direction (Deliberation ➔ Hex 24 Return)</option>
-                  <option value="loop">3. Rapid Repetitive Query (Hodge Circulation ➔ Hex 40 Release)</option>
-                  <option value="spatial">4. Spatial Awareness & Kinematics Query (Hex 1 Creative Flow)</option>
-                </select>
-                <label style="font-size: 0.72rem; color: #c084fc; font-weight: 700; margin-left: 6px;">MODEL:</label>
-                <select id="mindModelSelect" style="background: #0f172a; border: 1px solid #c084fc; color: #f8fafc; font-size: 0.72rem; padding: 4px 8px; border-radius: 4px;">
-                  <option value="0.6b">qwen3-0.6b-mnn (Phone · 18 TPS · ~400MB)</option>
-                  <option value="1.7b">qwen3-1.7b-mnn (Tablet · 12 TPS · ~1.1GB)</option>
-                  <option value="3b">qwen2.5-3b-mnn (PC · 8 TPS · ~1.9GB)</option>
-                </select>
-                <button onclick="runMindStreamDemo()" id="btnRunMindStream" style="background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; border: 1px solid #38bdf8; padding: 5px 14px; border-radius: 6px; font-size: 0.74rem; font-weight: 700; cursor: pointer;">▶ Run Dual-Stream Turn</button>
-                <button onclick="cancelMindStreamDemo()" id="btnCancelMindStream" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.4); padding: 5px 10px; border-radius: 6px; font-size: 0.74rem; cursor: pointer;">⏹ Cancel</button>
-              </div>
-
-              <!-- Dual Channel Split View -->
-              <div class="gdl-split">
-                <!-- Channel 1: Inner Monologue -->
-                <div style="background: rgba(4, 7, 18, 0.85); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding-bottom: 4px;">
-                    <span style="font-size: 0.74rem; font-weight: 700; color: #38bdf8;">🧠 Channel 1: chat_thought (Inner Mind)</span>
-                    <span id="thoughtStatusBadge" class="gdl-chip gdl-chip-cyan">READY</span>
-                  </div>
-                  <div style="font-size: 0.68rem; color: #64748b;">Internal topological deliberation & Q₆ graph path traversal. NEVER spoken to TTS.</div>
-                  <div id="thoughtStreamBox" style="background: #020617; border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 8px; height: 180px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: #38bdf8; line-height: 1.45; white-space: pre-wrap;">Select a scenario and click "▶ Run Dual-Stream Turn" to observe the live reasoning trace.</div>
-                  <div id="thoughtGraphPath" style="font-size: 0.68rem; color: #cbd5e1; background: rgba(15,23,42,0.8); padding: 5px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace;">Traversed Path: [Pending]</div>
-                </div>
-
-                <!-- Channel 2: Spoken Mouth Output -->
-                <div style="background: rgba(4, 7, 18, 0.85); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(251, 191, 36, 0.2); padding-bottom: 4px;">
-                    <span style="font-size: 0.74rem; font-weight: 700; color: #fbbf24;">👄 Channel 2: chat_token (Avatar Mouth)</span>
-                    <span id="tokenStatusBadge" class="gdl-chip gdl-chip-amber">READY</span>
-                  </div>
-                  <div style="font-size: 0.68rem; color: #64748b;">Clean spoken reply streamed token-by-token directly to TTS & avatar speech bubble.</div>
-                  <div id="tokenStreamBox" style="background: #020617; border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 8px; height: 180px; overflow-y: auto; font-family: 'Outfit', sans-serif; font-size: 0.78rem; color: #f8fafc; line-height: 1.5; white-space: pre-wrap;">Spoken output will appear here with zero <think> tags.</div>
-                  <div id="streamMetrics" style="font-size: 0.68rem; color: #94a3b8; display: flex; justify-content: space-between; padding: 4px 2px;">
-                    <span>TTFT: <b id="valTtft">0.00s</b></span>
-                    <span>Thoughts: <b id="valThoughtCount">0 tok</b></span>
-                    <span>Speech: <b id="valSpeechCount">0 tok</b></span>
-                    <span>Integrity: <b style="color: #4ade80;">100% (No Bleed)</b></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-                          <!-- Module 7: Where I-Ching Thrives & Architecture Plan -->
-              <div id="gdlView7" class="gdl-card" style="display: none; flex-direction: column; gap: 12px;">
-                <div class="gdl-card-title">
-                  <span>🏆 Architecture Plan: Where I-Ching GDL Thrives vs. Raw LLMs</span>
-                  <span style="font-size: 0.72rem; color: #38bdf8; font-family: 'JetBrains Mono';">Tier 1 & Tier 2 Shipped · Tier 3 Active Research</span>
-                </div>
-
-                <!-- Implementation Status Badges (3 Tiers) -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
-                  <div style="background: rgba(74, 222, 128, 0.08); border: 1px solid rgba(74, 222, 128, 0.35); border-radius: 6px; padding: 8px 10px;">
-                    <div style="font-size: 0.68rem; font-weight: 700; color: #4ade80; display: flex; align-items: center; justify-content: space-between;">
-                      <span>TIER 1: SHIPPED & ACTIVE</span>
-                      <span style="background: rgba(74, 222, 128, 0.2); padding: 1px 5px; border-radius: 4px; font-size: 0.6rem;">84/84 PASS</span>
-                    </div>
-                    <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 3px; line-height: 1.35;">
-                      • C++ FWHT Spectral Kernel (384 adds, 1.2 µs)<br>
-                      • JNI nativeSetHexPrior & Kotlin Bridge<br>
-                      • Godot Seam & Real-time &lt;think&gt; Demuxer<br>
-                      • Qwen3.5-0.8B Lane (chat35) & /no_think Fence
-                    </div>
-                  </div>
-
-                  <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 6px; padding: 8px 10px;">
-                    <div style="font-size: 0.68rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; justify-content: space-between;">
-                      <span>TIER 2: SHIPPED & ACTIVE</span>
-                      <span style="background: rgba(56, 189, 248, 0.2); padding: 1px 5px; border-radius: 4px; font-size: 0.6rem;">DEPLOYED</span>
-                    </div>
-                    <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 3px; line-height: 1.35;">
-                      • Cellular Sheaf Laplacian over Δ₂(Q₆)<br>
-                      • SO(2) Trigram Pairing Restriction Maps (1-4, 2-5, 3-6)<br>
-                      • Sheaf Dirichlet Energy (Cognitive Dissonance)<br>
-                      • Harmonic Diffusion without Oversmoothing
-                    </div>
-                  </div>
-
-                  <div style="background: rgba(192, 132, 252, 0.08); border: 1px solid rgba(192, 132, 252, 0.35); border-radius: 6px; padding: 8px 10px;">
-                    <div style="font-size: 0.68rem; font-weight: 700; color: #c084fc; display: flex; align-items: center; justify-content: space-between;">
-                      <span>TIER 3: IN ACTIVE RESEARCH</span>
-                      <span style="background: rgba(192, 132, 252, 0.2); padding: 1px 5px; border-radius: 4px; font-size: 0.6rem;">THEORY</span>
-                    </div>
-                    <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 3px; line-height: 1.35;">
-                      • Discrete Hodge 1-Form Decomposition on Q₆<br>
-                      • Harmonic Cycle Loop Breaker (ker Δ₁)<br>
-                      • Curvature-Free Lie Geodesic Transport<br>
-                      • Multi-Avatar Swarm Sheaf Sync (Mesh/VMC)
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Mathematical Theorem & Cognitive Hierarchy Banner -->
-                <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 10px;">
-                  <div style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 6px; padding: 8px 10px;">
-                    <div style="font-size: 0.68rem; font-weight: 700; color: #f87171; margin-bottom: 3px;">
-                      ⚡ The Lie Group RoPE Collision Theorem
-                    </div>
-                    <div style="font-size: 0.64rem; color: #cbd5e1; line-height: 1.35;">
-                      In modern LLMs (Qwen2.5 / Qwen3 / Qwen3.5), RoPE rotation <b>R_{Θ, t}</b> does <b>not commute</b> with Lie group generators <b>exp(Ω)</b>:
-                      <code style="display: block; background: rgba(0,0,0,0.5); padding: 3px 6px; border-radius: 4px; margin: 4px 0; color: #fca5a5; font-family: 'JetBrains Mono'; font-size: 0.62rem;">
-                        [ Ω, log R_{Θ, t} ] ≠ 0  ⟹  R_{Θ, t} exp(Ω) K ≠ exp(Ω) R_{Θ, t} K
-                      </code>
-                      Directly rotating KV cache tensors shatters relative token phase alignment, causing perplexity collapse. <b>Resolution:</b> I-Ching topological conditioning remains strictly in the <b>Logit Sampler Bias</b> and <b>Discrete Prompt Tokens</b>.
-                    </div>
-                  </div>
-
-                  <div style="background: rgba(14, 165, 233, 0.06); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: 6px; padding: 8px 10px;">
-                    <div style="font-size: 0.68rem; font-weight: 700; color: #38bdf8; margin-bottom: 3px;">
-                      🧠 Dual-Speed Cognitive Hierarchy
-                    </div>
-                    <div style="font-size: 0.64rem; color: #cbd5e1; line-height: 1.35;">
-                      <b>System 1 (Fast Reflex):</b> I-Ching Q₆ GDL running at 60 FPS (1.2 µs latency, 0 W, zero battery) providing a Lyapunov-stable homeostatic anchor grounded in 6 bodily needs.<br>
-                      <b>System 2 (Slow Deliberation):</b> Alibaba MNN Qwen3/3.5 executing on background thread (2-3s turn) providing deep semantic conversation and &lt;think&gt; reasoning.
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Comparative Value Matrix -->
-                <div style="background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); padding: 10px; overflow-x: auto;">
-                  <table style="width: 100%; border-collapse: collapse; font-size: 0.72rem; text-align: left;">
-                    <thead>
-                      <tr style="border-bottom: 1px solid rgba(255,255,255,0.12); color: #cbd5e1;">
-                        <th style="padding: 6px 8px;">Capability Dimension</th>
-                        <th style="padding: 6px 8px; color: #f87171;">Native MNN Alone (Raw LLM)</th>
-                        <th style="padding: 6px 8px; color: #38bdf8;">With I-Ching GDL Coprocessor</th>
-                        <th style="padding: 6px 8px; color: #4ade80;">Where It Thrives</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                        <td style="padding: 6px 8px; font-weight: 700; color: #e2e8f0;">1. State Memory & Continuity</td>
-                        <td style="padding: 6px 8px; color: #94a3b8;">Ephemeral / Leaky (pruning context loses character grounding)</td>
-                        <td style="padding: 6px 8px; color: #38bdf8; font-family: 'JetBrains Mono';">O(1) 6-bit Topological Anchor (h ∈ 𝔽₂⁶) + heat curve</td>
-                        <td style="padding: 6px 8px; color: #4ade80;">Infinite-turn persona consistency with zero memory growth</td>
-                      </tr>
-                      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                        <td style="padding: 6px 8px; font-weight: 700; color: #e2e8f0;">2. Persona Oversmoothing</td>
-                        <td style="padding: 6px 8px; color: #94a3b8;">Collapses into bland corporate assistant ("I'd be happy to help!")</td>
-                        <td style="padding: 6px 8px; color: #38bdf8;">Cellular Sheaf Holonomy: ker(ℒ_ℱ) = {0} prevents Dirichlet decay</td>
-                        <td style="padding: 6px 8px; color: #4ade80;">Sharp, distinct archetypes that never homogenize</td>
-                      </tr>
-                      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                        <td style="padding: 6px 8px; font-weight: 700; color: #e2e8f0;">3. Dialogue Loop Breaking</td>
-                        <td style="padding: 6px 8px; color: #94a3b8;">Blunt scalar penalty (1.15x) suppresses words & breaks grammar</td>
-                        <td style="padding: 6px 8px; color: #38bdf8;">Discrete Hodge 1-form circulation (H¹) + Pangtong jump (~x)</td>
-                        <td style="padding: 6px 8px; color: #4ade80;">Instantly detects and escapes loops with clean phrasing</td>
-                      </tr>
-                      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                        <td style="padding: 6px 8px; font-weight: 700; color: #e2e8f0;">4. Mobile Latency & Battery</td>
-                        <td style="padding: 6px 8px; color: #94a3b8;">Conditioning via prompt eats 30+ tokens (2s on mobile, heats battery)</td>
-                        <td style="padding: 6px 8px; color: #38bdf8; font-family: 'JetBrains Mono';">384 butterfly additions, 0 mults, 1.2 µs on ARM Cortex-A78</td>
-                        <td style="padding: 6px 8px; color: #4ade80;">10,000x faster state transitions with 0% battery consumption</td>
-                      </tr>
-                      <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                        <td style="padding: 6px 8px; font-weight: 700; color: #e2e8f0;">5. Explainability & Auditing</td>
-                        <td style="padding: 6px 8px; color: #94a3b8;">Black box neural weights; impossible to audit mood changes</td>
-                        <td style="padding: 6px 8px; color: #38bdf8;">Explicit 6D Coxeter coordinates, Yao line transitions, nuclear core</td>
-                        <td style="padding: 6px 8px; color: #4ade80;">100% deterministic visual inspector and reproducible telemetry</td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 6px 8px; font-weight: 700; color: #e2e8f0;">6. Alignment & Tone Style</td>
-                        <td style="padding: 6px 8px; color: #94a3b8;">Preachy / patronizing safety refusals ("As an AI model...")</td>
-                        <td style="padding: 6px 8px; color: #38bdf8;">Ancient situational archetypes (Stillness, Danger, Release, Joy)</td>
-                        <td style="padding: 6px 8px; color: #4ade80;">Calm, objective situational framing without preachy scolding</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <!-- Model Matrix Footnote -->
-                <div style="font-size: 0.68rem; color: #64748b; text-align: right;">
-                  Engine Architecture: <b>Alibaba MNN 3.6.1</b> · Native C++ JNI Singleton · Godot 4.7.1 Headless Verified (84/84 PASS) · Zero Heap Allocations on Hot Path
-                </div>
-              </div>
-            </div>
-
-          </div>
+                      </div>
         </div>
       `;
     }
@@ -4173,14 +3983,66 @@
   
 
     // =========================================================================
-    // I-Ching Geometric Deep Learning (GDL) & Q6-GNN Engine Interactive Lab
+    // 8. 🪐 Creature State & 6-Strut Tensegrity Ball 3D Engine
+    // Real-time pure 3D projection of scripts/creature/ball_geometry.gd
     // =========================================================================
 
-    const GDL_NAMES = {"1": {"zh": "乾", "pinyin": "qián", "en": "The Creative", "pt": "O Criador"}, "2": {"zh": "坤", "pinyin": "kūn", "en": "The Receptive", "pt": "O Receptivo"}, "3": {"zh": "屯", "pinyin": "zhūn", "en": "Sprouting", "pt": "Brotar"}, "4": {"zh": "蒙", "pinyin": "méng", "en": "Youthful Folly", "pt": "Inexperiência"}, "5": {"zh": "需", "pinyin": "xū", "en": "Waiting", "pt": "Espera"}, "6": {"zh": "訟", "pinyin": "sòng", "en": "Conflict", "pt": "Conflito"}, "7": {"zh": "師", "pinyin": "shī", "en": "The Army", "pt": "O Exército"}, "8": {"zh": "比", "pinyin": "bǐ", "en": "Holding Together", "pt": "União"}, "9": {"zh": "小畜", "pinyin": "xiǎo chù", "en": "Small Taming", "pt": "Pequena Contenção"}, "10": {"zh": "履", "pinyin": "lǚ", "en": "Treading", "pt": "Caminhar"}, "11": {"zh": "泰", "pinyin": "tài", "en": "Peace", "pt": "Paz"}, "12": {"zh": "否", "pinyin": "pǐ", "en": "Standstill", "pt": "Estagnação"}, "13": {"zh": "同人", "pinyin": "tóng rén", "en": "Fellowship", "pt": "Companhia"}, "14": {"zh": "大有", "pinyin": "dà yǒu", "en": "Great Possession", "pt": "Grande Posse"}, "15": {"zh": "謙", "pinyin": "qiān", "en": "Modesty", "pt": "Modéstia"}, "16": {"zh": "豫", "pinyin": "yù", "en": "Enthusiasm", "pt": "Entusiasmo"}, "17": {"zh": "隨", "pinyin": "suí", "en": "Following", "pt": "Seguir"}, "18": {"zh": "蠱", "pinyin": "gǔ", "en": "Repairing", "pt": "Reparo"}, "19": {"zh": "臨", "pinyin": "lín", "en": "Approach", "pt": "Aproximação"}, "20": {"zh": "觀", "pinyin": "guān", "en": "Contemplation", "pt": "Contemplação"}, "21": {"zh": "噬嗑", "pinyin": "shì kè", "en": "Biting Through", "pt": "Atravessar"}, "22": {"zh": "賁", "pinyin": "bì", "en": "Grace", "pt": "Graça"}, "23": {"zh": "剝", "pinyin": "bō", "en": "Splitting Apart", "pt": "Desgaste"}, "24": {"zh": "復", "pinyin": "fù", "en": "Return", "pt": "Retorno"}, "25": {"zh": "無妄", "pinyin": "wú wàng", "en": "Innocence", "pt": "Inocência"}, "26": {"zh": "大畜", "pinyin": "dà chù", "en": "Great Taming", "pt": "Grande Contenção"}, "27": {"zh": "頤", "pinyin": "yí", "en": "Nourishment", "pt": "Nutrição"}, "28": {"zh": "大過", "pinyin": "dà guò", "en": "Great Excess", "pt": "Grande Excesso"}, "29": {"zh": "坎", "pinyin": "kǎn", "en": "The Deep", "pt": "O Profundo"}, "30": {"zh": "離", "pinyin": "lí", "en": "The Clinging Fire", "pt": "O Fogo"}, "31": {"zh": "咸", "pinyin": "xián", "en": "Influence", "pt": "Atração"}, "32": {"zh": "恆", "pinyin": "héng", "en": "Duration", "pt": "Duração"}, "33": {"zh": "遯", "pinyin": "dùn", "en": "Retreat", "pt": "Recuo"}, "34": {"zh": "大壯", "pinyin": "dà zhuàng", "en": "Great Power", "pt": "Grande Vigor"}, "35": {"zh": "晉", "pinyin": "jìn", "en": "Progress", "pt": "Progresso"}, "36": {"zh": "明夷", "pinyin": "míng yí", "en": "Hidden Light", "pt": "Luz Velada"}, "37": {"zh": "家人", "pinyin": "jiā rén", "en": "The Family", "pt": "A Família"}, "38": {"zh": "睽", "pinyin": "kuí", "en": "Opposition", "pt": "Divergência"}, "39": {"zh": "蹇", "pinyin": "jiǎn", "en": "Obstruction", "pt": "Obstáculo"}, "40": {"zh": "解", "pinyin": "xiè", "en": "Deliverance", "pt": "Alívio"}, "41": {"zh": "損", "pinyin": "sǔn", "en": "Decrease", "pt": "Diminuição"}, "42": {"zh": "益", "pinyin": "yì", "en": "Increase", "pt": "Aumento"}, "43": {"zh": "夬", "pinyin": "guài", "en": "Breakthrough", "pt": "Rompimento"}, "44": {"zh": "姤", "pinyin": "gòu", "en": "Coming to Meet", "pt": "Encontro"}, "45": {"zh": "萃", "pinyin": "cuì", "en": "Gathering Together", "pt": "Reunião"}, "46": {"zh": "升", "pinyin": "shēng", "en": "Pushing Upward", "pt": "Ascensão"}, "47": {"zh": "困", "pinyin": "kùn", "en": "Confinement", "pt": "Aperto"}, "48": {"zh": "井", "pinyin": "jǐng", "en": "The Well", "pt": "O Poço"}, "49": {"zh": "革", "pinyin": "gé", "en": "Revolution", "pt": "Mudança"}, "50": {"zh": "鼎", "pinyin": "dǐng", "en": "The Cauldron", "pt": "O Caldeirão"}, "51": {"zh": "震", "pinyin": "zhèn", "en": "The Arousing", "pt": "O Trovão"}, "52": {"zh": "艮", "pinyin": "gèn", "en": "Keeping Still", "pt": "Quietude"}, "53": {"zh": "漸", "pinyin": "jiàn", "en": "Gradual Progress", "pt": "Progresso Gradual"}, "54": {"zh": "歸妹", "pinyin": "guī mèi", "en": "The Marrying Maiden", "pt": "A Noiva"}, "55": {"zh": "豐", "pinyin": "fēng", "en": "Abundance", "pt": "Abundância"}, "56": {"zh": "旅", "pinyin": "lǚ", "en": "The Wanderer", "pt": "O Viajante"}, "57": {"zh": "巽", "pinyin": "xùn", "en": "The Gentle Wind", "pt": "O Vento Suave"}, "58": {"zh": "兌", "pinyin": "duì", "en": "The Joyous", "pt": "A Alegria"}, "59": {"zh": "渙", "pinyin": "huàn", "en": "Dispersion", "pt": "Dispersão"}, "60": {"zh": "節", "pinyin": "jié", "en": "Limitation", "pt": "Limite"}, "61": {"zh": "中孚", "pinyin": "zhōng fú", "en": "Inner Truth", "pt": "Verdade Interior"}, "62": {"zh": "小過", "pinyin": "xiǎo guò", "en": "Small Excess", "pt": "Pequeno Excesso"}, "63": {"zh": "既濟", "pinyin": "jì jì", "en": "After Completion", "pt": "Após a Conclusão"}, "64": {"zh": "未濟", "pinyin": "wèi jì", "en": "Before Completion", "pt": "Antes da Conclusão"}};
+    // BallGeometry Constants (exactly matching ball_geometry.gd)
+    const BALL_PHI = 1.618033988749895;
+    const BALL_U = 45.0;            // Pivot offset from hub centre (mm)
+    const BALL_H = BALL_PHI * BALL_U; // Strut half-length at rest (72.81 mm)
+    const BALL_CORD = 2.0 * BALL_U; // Rest cord length = 90.0 mm
 
-    const GDL_TRIGRAM_ORDER = [0b111, 0b001, 0b010, 0b100, 0b000, 0b110, 0b101, 0b011];
+    // [pivot axis, strut direction] per strut from ball_geometry.gd
+    const BALL_STRUTS = [
+      [[0, 1, 0], [0, 0, 1]],   // Strut 1: Body (motion, pose)
+      [[0, -1, 0], [0, 0, 1]],  // Strut 2: Food (items, capture)
+      [[0, 0, 1], [1, 0, 0]],   // Strut 3: Breath (voice, rave)
+      [[0, 0, -1], [1, 0, 0]],  // Strut 4: Rest (rhythm, sleep)
+      [[1, 0, 0], [0, 1, 0]],   // Strut 5: Focus (MNN Qwen mind)
+      [[-1, 0, 0], [0, 1, 0]],  // Strut 6: Connection (radar, peers)
+    ];
 
-    const GDL_KING_WEN = [
+    // 24 Cords connecting the 12 tips (regular icosahedron tensegrity)
+    let BALL_CORDS_CACHE = [];
+
+    // Creature State
+    let creatureBits = 0b110101;     // Hexagram bits (Line 1..6)
+    let creatureExt = 15.0;          // Extension delta (mm)
+    let creatureFold = 0.0;         // Fold factor (0 open, 1 collapsed)
+    let creatureAutoRotate = true;   // 3D continuous rotation
+    let creatureRotX = -0.38;
+    let creatureRotY = 0.65;
+    let creatureIsDragging = false;
+    let creatureLastMouseX = 0;
+    let creatureLastMouseY = 0;
+    let creatureAnimFrame = null;
+
+    // The 6 bodily needs fullness (0.0 to 1.0)
+    let creatureNeeds = [0.85, 0.62, 0.78, 0.45, 0.92, 0.70];
+    const NEED_CONFIG = [
+      { name: "body",       label: "1. Body",       sense: "Ground & Motion",   script: "scripts/clock.gd",            color: "#38bdf8", yangColor: "#38bdf8" },
+      { name: "food",       label: "2. Food",       sense: "Items & Discovery", script: "scripts/lens/find_tenant.gd", color: "#fbbf24", yangColor: "#fbbf24" },
+      { name: "breath",     label: "3. Breath",     sense: "Voice & Rhythm",    script: "scripts/voice/voice_sense.gd",color: "#22c55e", yangColor: "#4ade80" },
+      { name: "rest",       label: "4. Rest",       sense: "Circadian Sync",    script: "scripts/net/chirp_sync.gd",   color: "#a855f7", yangColor: "#c084fc" },
+      { name: "focus",      label: "5. Focus",      sense: "MNN Mind Context",  script: "scripts/brain/mnn_runtime.gd",color: "#ec4899", yangColor: "#f472b6" },
+      { name: "connection", label: "6. Connection", sense: "Radar Mesh Peers",  script: "scripts/social/radar.gd",     color: "#06b6d4", yangColor: "#22d3ee" }
+    ];
+
+    // Standard I-Ching Trigram order from hexagram.gd
+    const TRIGRAM_ORDER = [0b111, 0b001, 0b010, 0b100, 0b000, 0b110, 0b101, 0b011];
+    const TRIGRAM_NAMES = {
+      0b111: { zh: "乾", name: "Heaven / Sky", glyph: "☰" },
+      0b001: { zh: "震", name: "Thunder",      glyph: "☳" },
+      0b010: { zh: "坎", name: "Water",        glyph: "☵" },
+      0b100: { zh: "艮", name: "Mountain",     glyph: "☶" },
+      0b000: { zh: "坤", name: "Earth",        glyph: "☷" },
+      0b110: { zh: "巽", name: "Wind",         glyph: "☴" },
+      0b101: { zh: "離", name: "Fire",         glyph: "☲" },
+      0b011: { zh: "兌", name: "Lake",         glyph: "☱" }
+    };
+
+    const KING_WEN_MATRIX = [
       [1, 34, 5, 26, 11, 9, 14, 43],
       [25, 51, 3, 27, 24, 42, 21, 17],
       [6, 40, 29, 4, 7, 59, 64, 47],
@@ -4191,1241 +4053,575 @@
       [10, 54, 60, 41, 19, 61, 38, 58]
     ];
 
-    const GDL_TRIGRAMS = {
-      0b111: { zh: "乾", py: "qián", en: "Heaven", nature: "The Creative", symbol: "☰" },
-      0b001: { zh: "震", py: "zhèn", en: "Thunder", nature: "The Arousing", symbol: "☳" },
-      0b010: { zh: "坎", py: "kǎn", en: "Water", nature: "The Abysmal", symbol: "☵" },
-      0b100: { zh: "艮", py: "gèn", en: "Mountain", nature: "Keeping Still", symbol: "☶" },
-      0b000: { zh: "坤", py: "kūn", en: "Earth", nature: "The Receptive", symbol: "☷" },
-      0b110: { zh: "巽", py: "xùn", en: "Wind", nature: "The Gentle", symbol: "☴" },
-      0b101: { zh: "離", py: "lí", en: "Fire", nature: "The Clinging", symbol: "☲" },
-      0b011: { zh: "兌", py: "duì", en: "Lake", nature: "The Joyous", symbol: "☱" }
+    const HEX_DICTIONARY = {
+      1: { zh: "乾", py: "qián", name: "The Creative", meaning: "Pure yang, active force, creative flow" },
+      2: { zh: "坤", py: "kūn", name: "The Receptive", meaning: "Pure yin, devoted grounding, nourishment" },
+      11: { zh: "泰", py: "tài", name: "Peace", meaning: "Heaven and Earth unite, harmony and balance" },
+      12: { zh: "否", py: "pǐ", name: "Standstill", meaning: "Heaven moves upward, earth sits below; stillness" },
+      24: { zh: "復", py: "fù", name: "Return", meaning: "The light returns, awakening at the winter solstice" },
+      29: { zh: "坎", py: "kǎn", name: "The Abysmal Water", meaning: "Flowing through danger without loss of nature" },
+      30: { zh: "離", py: "lí", name: "The Clinging Fire", meaning: "Clarity, perception, awareness illuminating" },
+      53: { zh: "漸", py: "jiàn", name: "Development", meaning: "Gradual progress, steady rooted adaptation" },
+      63: { zh: "既濟", py: "jì jì", name: "After Completion", meaning: "Every line in its rightful place; maintaining order" },
+      64: { zh: "未濟", py: "wèi jì", name: "Before Completion", meaning: "Perpetual renewal, transition, the continuous path" }
     };
 
-    const GDL_LINE_NAMES = ["body", "food", "breath", "rest", "focus", "connection"];
-    const GDL_LINE_ZH = ["身", "食", "息", "休", "專", "伴"];
-    const GDL_LINE_PT = ["corpo", "comida", "respiração", "descanso", "atenção", "companhia"];
+    function computeBallCords() {
+      if (BALL_CORDS_CACHE.length > 0) return BALL_CORDS_CACHE;
+      const rest = computeBallTips(0b111111, 0.0, 0.0);
+      const cords = [];
+      for (let a = 0; a < 12; a++) {
+        for (let b = a + 1; b < 12; b++) {
+          if (Math.floor((Math.floor(a / 2)) / 2) === Math.floor((Math.floor(b / 2)) / 2)) {
+            continue;
+          }
+          const dx = rest[a][0] - rest[b][0];
+          const dy = rest[a][1] - rest[b][1];
+          const dz = rest[a][2] - rest[b][2];
+          const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+          if (Math.abs(dist - BALL_CORD) < 1.0) {
+            cords.push([a, b]);
+          }
+        }
+      }
+      BALL_CORDS_CACHE = cords;
+      return cords;
+    }
 
-    let gdlActiveBits = 0b011000; // Default to Hexagram 24 Return (0b011000: Zhen below, Kun above)
-    let gdlActiveTab = 0;
-    let gdlNoiseSigma = 0.35;
-    let gdlSpectralCutoff = 6;
-    let gdlDiffusionStep = 3;
-    let gdlSimCurl = 0.88;
+    function rotateAxis(v, axis, angle) {
+      const cosA = Math.cos(angle);
+      const sinA = Math.sin(angle);
+      const dot = axis[0]*v[0] + axis[1]*v[1] + axis[2]*v[2];
+      const cx = axis[1]*v[2] - axis[2]*v[1];
+      const cy = axis[2]*v[0] - axis[0]*v[2];
+      const cz = axis[0]*v[1] - axis[1]*v[0];
+      return [
+        v[0]*cosA + cx*sinA + axis[0]*dot*(1 - cosA),
+        v[1]*cosA + cy*sinA + axis[1]*dot*(1 - cosA),
+        v[2]*cosA + cz*sinA + axis[2]*dot*(1 - cosA)
+      ];
+    }
 
-    function getGdlHexNumber(bits) {
+    function computeBallTips(bits, ext, fold) {
+      const tips = [];
+      for (let i = 0; i < 6; i++) {
+        const p = BALL_STRUTS[i][0];
+        const d = BALL_STRUTS[i][1];
+        const centre = [p[0]*BALL_U, p[1]*BALL_U, p[2]*BALL_U];
+        const dir = rotateAxis(d, p, fold * Math.PI * 0.5);
+        const yang = ((bits >> i) & 1) === 1;
+        const half = BALL_H + (yang ? ext : -ext) * 0.5;
+
+        tips[2 * i] = [
+          centre[0] + dir[0] * half,
+          centre[1] + dir[1] * half,
+          centre[2] + dir[2] * half
+        ];
+        tips[2 * i + 1] = [
+          centre[0] - dir[0] * half,
+          centre[1] - dir[1] * half,
+          centre[2] - dir[2] * half
+        ];
+      }
+      return tips;
+    }
+
+    function project3D(pt, rotX, rotY, cx, cy, scale) {
+      const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+      const x1 = pt[0] * cosY - pt[2] * sinY;
+      const z1 = pt[0] * sinY + pt[2] * cosY;
+
+      const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+      const y2 = pt[1] * cosX - z1 * sinX;
+      const z2 = pt[1] * sinX + z1 * cosX;
+
+      const cameraDist = 320.0;
+      const factor = cameraDist / (cameraDist + z2);
+
+      return {
+        x: cx + x1 * scale * factor,
+        y: cy - y2 * scale * factor,
+        z: z2,
+        factor: factor
+      };
+    }
+
+    function lookupKingWen(bits) {
       const lower = bits & 7;
       const upper = (bits >> 3) & 7;
-      const row = GDL_TRIGRAM_ORDER.indexOf(lower);
-      const col = GDL_TRIGRAM_ORDER.indexOf(upper);
-      if (row === -1 || col === -1) return 1;
-      return GDL_KING_WEN[row][col];
+      const r = TRIGRAM_ORDER.indexOf(lower);
+      const c = TRIGRAM_ORDER.indexOf(upper);
+      if (r === -1 || c === -1) return 1;
+      return KING_WEN_MATRIX[r][c];
     }
 
-    
-  // ── GDL Studio Global State Variables ──
-  // (gdlActiveBits, gdlActiveTab, etc. hoisted above)
-  var gdlWenNumber = 24;
-  var gdlLines = [1,0,0,1,1,0];
-function renderGdlEngineHtml() {
+    function getChangingLine(needs) {
+      let nearestDist = 999;
+      let winningLine = 0;
+      for (let i = 0; i < 6; i++) {
+        const dist = Math.abs(needs[i] - 0.5);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          winningLine = i;
+        }
+      }
+      return winningLine;
+    }
+
+    function renderCreatureTensegrityHtml() {
       return `
-        <div class="gdl-container">
-          <!-- Sub-Navigation -->
-          <div class="gdl-subnav">
-            <span style="font-size: 0.74rem; font-weight: 700; color: #38bdf8; margin-right: 4px;">GDL MODULES:</span>
-            <button class="gdl-tab-btn active" id="gdlTab0" onclick="switchGdlTab(0)">1. 🗺️ 4-Pillar GDL Pipeline</button>
-            <button class="gdl-tab-btn" id="gdlTab1" onclick="switchGdlTab(1)">2. 🎲 Q₆ Hypercube Manifold</button>
-            <button class="gdl-tab-btn" id="gdlTab2" onclick="switchGdlTab(2)">3. ⚡ Spectral FWHT Denoising</button>
-            <button class="gdl-tab-btn" id="gdlTab3" onclick="switchGdlTab(3)">4. 🌿 Cellular Sheaves vs Blur</button>
-            <button class="gdl-tab-btn" id="gdlTab4" onclick="switchGdlTab(4)">5. 🌀 Hodge Loop Breaker & KV</button>
-            <button class="gdl-tab-btn" id="gdlTab5" onclick="switchGdlTab(5)">6. 💻 Native C++ MNN Code</button>
-            <button class="gdl-tab-btn" id="gdlTab6" onclick="switchGdlTab(6)">7. 🧠 Mind vs Mouth (&lt;think&gt; Stream)</button>
-            <button class="gdl-tab-btn" id="gdlTab7" onclick="switchGdlTab(7)">8. 🏆 Where I-Ching Thrives (Plan)</button>
+        <div class="creature-container">
+          <!-- Sub-Navigation / Toolbar -->
+          <div class="creature-subnav">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
+              🪐 Creature Tensegrity Ball 3D
+            </span>
+            <span class="creature-chip creature-chip-cyan" id="creatureModelBadge">Godot 4.7.1 · scripts/creature/ball_geometry.gd</span>
+            <span class="creature-chip creature-chip-amber" id="hexBadge">Hex 53 · 漸 Development</span>
+            <span class="creature-chip creature-chip-green" id="vitalityBadge">Vitality: 73% (Stable)</span>
+
+            <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
+              <button class="btn" style="padding: 4px 10px; font-size: 0.72rem;" onclick="toggleBallAutoRotate()" id="btnAutoRot">⏸ Pause Spin</button>
+              <button class="btn" style="padding: 4px 10px; font-size: 0.72rem;" onclick="resetBallCamera()">↺ Reset View</button>
+              <button class="btn" style="padding: 4px 10px; font-size: 0.72rem; border-color: #fbbf24; color: #fbbf24;" onclick="simulateNeedPulse()">⚡ Pulse Random Need</button>
+            </div>
           </div>
 
-          <!-- Body Container -->
-          <div class="gdl-body">
+          <!-- Body Content -->
+          <div class="creature-body">
+            <div class="creature-split">
 
-            <!-- Module 0: Pipeline Overview -->
-            <div id="gdlView0" class="gdl-card" style="display: flex; flex-direction: column; gap: 10px;">
-              <div class="gdl-card-title">
-                <span>🗺️ Geometric Deep Learning (GDL) Coprocessor Pipeline on Alibaba MNN</span>
-                <span class="gdl-chip gdl-chip-cyan">ARM64 NEON · &lt; 1.5 µs Latency · O(1) Memory</span>
-              </div>
-              <div class="gdl-split">
-                <!-- SVG Architecture Flow -->
-                <div style="background: rgba(0,0,0,0.45); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); padding: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                  <svg id="gdlPipelineSvg" width="440" height="380" viewBox="0 0 440 380">
-                    <defs>
-                      <linearGradient id="gdlGradCyan" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#0284c7"/>
-                        <stop offset="100%" stop-color="#38bdf8"/>
-                      </linearGradient>
-                      <linearGradient id="gdlGradPurple" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#7e22ce"/>
-                        <stop offset="100%" stop-color="#c084fc"/>
-                      </linearGradient>
-                      <linearGradient id="gdlGradAmber" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#b45309"/>
-                        <stop offset="100%" stop-color="#fbbf24"/>
-                      </linearGradient>
-                      <linearGradient id="gdlGradGreen" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#15803d"/>
-                        <stop offset="100%" stop-color="#4ade80"/>
-                      </linearGradient>
-                      <filter id="gdlGlow" x="-20%" y="-20%" width="140%" height="140%">
-                        <feGaussianBlur stdDeviation="3" result="blur" />
-                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                      </filter>
-                    </defs>
-
-                    <!-- Stage 1: Multimodal Telemetry -->
-                    <g onclick="inspectGdlStage('telemetry')" style="cursor: pointer;">
-                      <rect x="20" y="20" width="180" height="50" rx="8" fill="rgba(15,23,42,0.9)" stroke="#38bdf8" stroke-width="1.5" />
-                      <text x="110" y="42" fill="#f8fafc" font-size="11" font-weight="700" text-anchor="middle">1. Multimodal Telemetry</text>
-                      <text x="110" y="58" fill="#94a3b8" font-size="9" text-anchor="middle">IMU / Needs (0..2) ⊕ Vision/Speech (3..5)</text>
-                    </g>
-
-                    <!-- Arrow 1 -> 2 -->
-                    <path d="M 110 70 L 110 95" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#arrow)" />
-
-                    <!-- Stage 2: Cartesian Factorization -->
-                    <g onclick="inspectGdlStage('cartesian')" style="cursor: pointer;">
-                      <rect x="20" y="95" width="180" height="52" rx="8" fill="rgba(15,23,42,0.9)" stroke="#818cf8" stroke-width="1.5" />
-                      <text x="110" y="117" fill="#f8fafc" font-size="11" font-weight="700" text-anchor="middle">2. Q₃ □ Q₃ Factorization</text>
-                      <text x="110" y="133" fill="#94a3b8" font-size="9" text-anchor="middle">Inner Body (Q₃) ⊠ Outer World (Q₃) = Q₆</text>
-                    </g>
-
-                    <!-- Arrow 2 -> 3 -->
-                    <path d="M 110 147 L 110 172" stroke="#818cf8" stroke-width="1.5" marker-end="url(#arrow)" />
-
-                    <!-- Stage 3: Spectral FWHT Denoising -->
-                    <g onclick="inspectGdlStage('fwht')" style="cursor: pointer;">
-                      <rect x="20" y="172" width="180" height="52" rx="8" fill="rgba(15,23,42,0.9)" stroke="#c084fc" stroke-width="1.5" />
-                      <text x="110" y="194" fill="#f8fafc" font-size="11" font-weight="700" text-anchor="middle">3. Spectral FWHT Kernel</text>
-                      <text x="110" y="210" fill="#c084fc" font-size="9" font-family="'JetBrains Mono'" text-anchor="middle">384 Butterfly Adds (0 Mults) · 1.2µs</text>
-                    </g>
-
-                    <!-- Arrow 3 -> 4 -->
-                    <path d="M 110 224 L 110 249" stroke="#c084fc" stroke-width="1.5" marker-end="url(#arrow)" />
-
-                    <!-- Stage 4: Cellular Sheaf Laplacian -->
-                    <g onclick="inspectGdlStage('sheaf')" style="cursor: pointer;">
-                      <rect x="20" y="249" width="180" height="52" rx="8" fill="rgba(15,23,42,0.9)" stroke="#4ade80" stroke-width="1.5" />
-                      <text x="110" y="271" fill="#f8fafc" font-size="11" font-weight="700" text-anchor="middle">4. Cellular Sheaf ℒ_ℱ</text>
-                      <text x="110" y="287" fill="#94a3b8" font-size="9" text-anchor="middle">Line Restriction Maps (Anti-Oversmooth)</text>
-                    </g>
-
-                    <!-- Arrow 4 -> 5 -->
-                    <path d="M 200 275 L 240 275" stroke="#4ade80" stroke-width="1.5" marker-end="url(#arrow)" />
-
-                    <!-- Stage 5: Discrete Hodge De-Looper -->
-                    <g onclick="inspectGdlStage('hodge')" style="cursor: pointer;">
-                      <rect x="240" y="249" width="180" height="52" rx="8" fill="rgba(15,23,42,0.9)" stroke="#fbbf24" stroke-width="1.5" />
-                      <text x="330" y="271" fill="#f8fafc" font-size="11" font-weight="700" text-anchor="middle">5. Discrete Hodge Filter</text>
-                      <text x="330" y="287" fill="#fbbf24" font-size="9" font-family="'JetBrains Mono'" text-anchor="middle">Nullifies Token Loop Curl (ker d₁)</text>
-                    </g>
-
-                    <!-- Arrow 5 -> 6 (Upward) -->
-                    <path d="M 330 249 L 330 224" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow)" />
-
-                    <!-- Stage 6: MNN Engine Logit Biasing & Parallel Transport -->
-                    <g onclick="inspectGdlStage('mnn_hook')" style="cursor: pointer;">
-                      <rect x="240" y="172" width="180" height="52" rx="8" fill="rgba(15,23,42,0.9)" stroke="#38bdf8" stroke-width="1.5" />
-                      <text x="330" y="194" fill="#f8fafc" font-size="11" font-weight="700" text-anchor="middle">6. MNN C++ Logit Bias</text>
-                      <text x="330" y="210" fill="#38bdf8" font-size="9" text-anchor="middle">Logits' = Logits + β·Uh | KV Parallel Tr.</text>
-                    </g>
-
-                    <!-- Arrow 6 -> 7 (Upward) -->
-                    <path d="M 330 172 L 330 147" stroke="#38bdf8" stroke-width="1.5" marker-end="url(#arrow)" />
-
-                    <!-- Stage 7: Hexy 3D Tensegrity Ball & Behavior -->
-                    <g onclick="inspectGdlStage('tensegrity')" style="cursor: pointer;">
-                      <rect x="240" y="95" width="180" height="52" rx="8" fill="rgba(15,23,42,0.9)" stroke="#fb7185" stroke-width="1.5" />
-                      <text x="330" y="117" fill="#f8fafc" font-size="11" font-weight="700" text-anchor="middle">7. 3D Tensegrity Ball Cl(3,0)</text>
-                      <text x="330" y="133" fill="#fb7185" font-size="9" text-anchor="middle">6-Strut Body = The Hexagram State</text>
-                    </g>
-
-                    <!-- Feedback Loop 7 -> 1 -->
-                    <path d="M 330 95 L 330 45 L 200 45" stroke="#fb7185" stroke-dasharray="4,4" stroke-width="1.5" fill="none" marker-end="url(#arrow)" />
-                    <text x="265" y="38" fill="#94a3b8" font-size="8" text-anchor="middle">Continuous Somatic Feedback</text>
-                  </svg>
+              <!-- Left Panel: Interactive 3D Canvas -->
+              <div class="creature-card" style="padding: 0; position: relative; overflow: hidden; height: 500px; display: flex; flex-direction: column;">
+                <div style="position: absolute; top: 10px; left: 14px; z-index: 10; display: flex; flex-direction: column; gap: 4px; pointer-events: none;">
+                  <span style="font-size: 0.85rem; font-weight: 700; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">
+                    The 6-Strut Vector Equilibrium Shell
+                  </span>
+                  <span style="font-size: 0.7rem; color: #94a3b8; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">
+                    24 Tension Cords (2U = 90mm) · 12 Tips · Golden Ratio H = Φ·U (72.81mm)
+                  </span>
                 </div>
 
-                <!-- Inspector Panel -->
-                <div id="gdlStageInspector" style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 0.76rem;">
-                  <div style="font-weight: 700; color: #38bdf8; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 4px;">
-                    Stage Inspector (Click any pipeline node)
-                  </div>
-                  <div id="gdlStageDesc" style="color: #cbd5e1; line-height: 1.45;">
-                    Select any pipeline node on the left to inspect its exact mathematical formulation, group equivariance properties, tensor shapes, and native C++ execution code inside MNN.
-                  </div>
-                  <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #94a3b8;">
-                    <div><span style="color: #38bdf8;">Group Symmetry:</span> <span id="gdlStageGroup">B₆ ≅ (ℤ₂)⁶ ⋊ S₆ (46,080 symmetries)</span></div>
-                    <div><span style="color: #c084fc;">C++ Kernel:</span> <span id="gdlStageKernel">include/q6_spectral.hpp</span></div>
-                    <div><span style="color: #4ade80;">Complexity:</span> <span id="gdlStageComplexity">O(N log N) additions, 0 multiplications</span></div>
-                    <div><span style="color: #fbbf24;">Latency:</span> <span id="gdlStageLatency">&lt; 1.5 µs on ARM Cortex-A78</span></div>
-                  </div>
+                <div style="position: absolute; bottom: 10px; left: 14px; z-index: 10; font-size: 0.68rem; color: #64748b; pointer-events: none;">
+                  🖱 Click & Drag to Orbit · Scroll to Adjust Fold · Hover Struts for Telemetry
                 </div>
-              </div>
-            </div>
 
-            <!-- Module 1: Q6 Hypercube Manifold & State Explorer -->
-            <div id="gdlView1" class="gdl-card" style="display: none; flex-direction: column; gap: 10px;">
-              <div class="gdl-card-title">
-                <span>🎲 Q₆ Boolean Hypercube (64 States) & Hexagram State Manifold</span>
-                <span class="gdl-chip gdl-chip-amber">Hamming Graph · 6-Regular · Cayley Graph</span>
-              </div>
-              <div class="gdl-split">
-                <!-- Coxeter Plane 2D Projection SVG -->
-                <div style="background: rgba(0,0,0,0.5); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); padding: 8px; display: flex; flex-direction: column; align-items: center;">
-                  <svg id="q6HypercubeSvg" width="400" height="340" viewBox="-160 -140 320 280">
-                    <g id="q6EdgesGroup" stroke="rgba(255,255,255,0.08)" stroke-width="0.8"></g>
-                    <g id="q6ActiveEdgesGroup" stroke="#fbbf24" stroke-width="2" stroke-dasharray="3,3"></g>
-                    <g id="q6NodesGroup"></g>
-                    <!-- Active Node Ripple -->
-                    <circle id="q6ActiveGlow" cx="0" cy="0" r="10" fill="none" stroke="#38bdf8" stroke-width="2" filter="url(#gdlGlow)" style="transition: all 0.3s;" />
-                    <circle id="q6ActiveDot" cx="0" cy="0" r="5" fill="#38bdf8" style="transition: all 0.3s;" />
-                  </svg>
-                  <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 4px;">
-                    Coxeter Plane Projection of Q₆ (Concentric Hamming Rings 0..6). Amber links = 6 valid 1-flip transitions.
+                <div style="position: absolute; top: 10px; right: 14px; z-index: 10; display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
+                  <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 6px 10px; display: flex; flex-direction: column; gap: 4px; font-size: 0.7rem;">
+                    <div style="color: #94a3b8; display: flex; justify-content: space-between; gap: 10px;">
+                      <span>Extension (&plusmn;mm):</span>
+                      <span id="lblExtVal" style="color: #38bdf8; font-family: monospace;">15.0 mm</span>
+                    </div>
+                    <input type="range" id="sliderExt" min="0" max="30" step="1" value="15" oninput="updateBallParameters()" style="width: 110px;">
+
+                    <div style="color: #94a3b8; display: flex; justify-content: space-between; gap: 10px; margin-top: 4px;">
+                      <span>Fold (0 open, 1 flat):</span>
+                      <span id="lblFoldVal" style="color: #fbbf24; font-family: monospace;">0.00</span>
+                    </div>
+                    <input type="range" id="sliderFold" min="0" max="1" step="0.02" value="0" oninput="updateBallParameters()" style="width: 110px;">
                   </div>
                 </div>
 
-                <!-- Interactive Hexagram State HUD & Line Toggles -->
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                  <div style="background: rgba(15,23,42,0.85); border: 1px solid rgba(56,189,248,0.3); border-radius: 8px; padding: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                      <div>
-                        <span style="font-size: 1.1rem; font-weight: 800; color: #38bdf8;" id="gdlHudTitle">24 · 復 fù · Return</span>
-                        <span style="font-size: 0.72rem; color: #94a3b8; margin-left: 6px;" id="gdlHudBits">Bits: 0b011000</span>
+                <canvas id="creature3dCanvas" width="560" height="498" style="width: 100%; height: 100%; background: radial-gradient(circle at center, #0f172a 0%, #020617 100%); cursor: grab;"></canvas>
+              </div>
+
+              <!-- Right Panel: Struts, Needs Telemetry & I-Ching State -->
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+
+                <!-- Hexagram & Trigram Card -->
+                <div class="creature-card">
+                  <div class="creature-card-title">
+                    <span>Hexagram Reading (Creature Self-Model)</span>
+                    <span id="trigramPairBadge" class="creature-chip creature-chip-purple">Upper ☴ Wind / Lower ☶ Mountain</span>
+                  </div>
+                  <div style="display: flex; gap: 14px; align-items: center;">
+                    <div style="font-size: 2.8rem; font-weight: 900; color: #fbbf24; line-height: 1;" id="hexChineseChar">漸</div>
+                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                      <div style="font-size: 0.95rem; font-weight: 700; color: #fff;" id="hexFullTitle">#53 漸 Development (jiàn)</div>
+                      <div style="font-size: 0.72rem; color: #94a3b8; line-height: 1.35;" id="hexDescription">
+                        Gradual development; a tree on a mountain grows steadily and withstands storms.
                       </div>
-                      <span class="gdl-chip gdl-chip-purple" id="gdlHudWen">King Wen #24</span>
-                    </div>
-                    <div style="font-size: 0.72rem; color: #e2e8f0; margin-top: 6px; line-height: 1.4; font-style: italic; background: rgba(0,0,0,0.3); padding: 6px 8px; border-radius: 4px;" id="gdlHudSentence">
-                      "food is the line that moved — it has been quiet since morning · a little would be welcome"
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; font-size: 0.7rem;">
-                      <div style="background: rgba(255,255,255,0.03); padding: 5px 8px; border-radius: 4px;">
-                        <span style="color: #94a3b8;">Lower (Inner/Body):</span> <strong style="color: #4ade80;" id="gdlHudLower">☳ 震 zhèn (Thunder)</strong>
-                      </div>
-                      <div style="background: rgba(255,255,255,0.03); padding: 5px 8px; border-radius: 4px;">
-                        <span style="color: #94a3b8;">Upper (Outer/Head):</span> <strong style="color: #c084fc;" id="gdlHudUpper">☷ 坤 kūn (Earth)</strong>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- 6 Line Switches -->
-                  <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <span style="font-size: 0.72rem; font-weight: 700; color: #cbd5e1;">HEXAGRAM LINES (Bottom-to-Top · Click to Flip):</span>
-                    <!-- Line 6 (Top) down to Line 1 (Bottom) -->
-                    <div class="line-toggle-btn" id="lineBtn5" onclick="toggleGdlLine(5)">
-                      <span>Line 6 (Top): Connection (伴 / Companhia)</span>
-                      <span class="line-bar-glyph" id="lineGlyph5">-- --</span>
-                    </div>
-                    <div class="line-toggle-btn" id="lineBtn4" onclick="toggleGdlLine(4)">
-                      <span>Line 5: Focus (專 / Atenção)</span>
-                      <span class="line-bar-glyph" id="lineGlyph4">-- --</span>
-                    </div>
-                    <div class="line-toggle-btn" id="lineBtn3" onclick="toggleGdlLine(3)">
-                      <span>Line 4: Rest (休 / Descanso)</span>
-                      <span class="line-bar-glyph" id="lineGlyph3">-- --</span>
-                    </div>
-                    <div class="line-toggle-btn" id="lineBtn2" onclick="toggleGdlLine(2)">
-                      <span>Line 3: Breath (息 / Respiração)</span>
-                      <span class="line-bar-glyph" id="lineGlyph2">-- --</span>
-                    </div>
-                    <div class="line-toggle-btn" id="lineBtn1" onclick="toggleGdlLine(1)">
-                      <span>Line 2: Food (食 / Comida)</span>
-                      <span class="line-bar-glyph" id="lineGlyph1">-- --</span>
-                    </div>
-                    <div class="line-toggle-btn yang" id="lineBtn0" onclick="toggleGdlLine(0)">
-                      <span>Line 1 (Base): Body (身 / Corpo)</span>
-                      <span class="line-bar-glyph" id="lineGlyph0">─────</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Module 2: Spectral Fast Walsh-Hadamard Transform Sandbox -->
-            <div id="gdlView2" class="gdl-card" style="display: none; flex-direction: column; gap: 10px;">
-              <div class="gdl-card-title">
-                <span>⚡ Spectral Graph Convolution via Fast Walsh-Hadamard Transform (FWHT)</span>
-                <span class="gdl-chip gdl-chip-purple">λ_k = 2k (k ∈ 0..6) · Zero Multiplications · Native C++</span>
-              </div>
-              <div class="gdl-split">
-                <!-- Controls and Explanation -->
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                  <div style="font-size: 0.74rem; color: #cbd5e1; line-height: 1.45;">
-                    Because Q₆ is Cayley on (ℤ₂)⁶, its Graph Laplacian eigenvectors are analytically the <strong>Walsh-Hadamard matrix H₆</strong>. A spectral convolution:
-                    <div style="font-family: 'JetBrains Mono'; background: rgba(0,0,0,0.4); padding: 6px; border-radius: 4px; margin: 6px 0; color: #38bdf8;">
-                      y = (1/64) · H₆ · [ ĝ_θ(Λ) ⊙ (H₆ · x) ]
-                    </div>
-                    operates with <strong>384 butterfly additions and 0 floating-point multiplications</strong>, filtering semantic embedding jitter in &lt;1.5µs.
-                  </div>
-
-                  <div style="background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-                    <div style="display: flex; justify-content: space-between; font-size: 0.72rem;">
-                      <span>Semantic Embedding Noise (σ):</span>
-                      <strong id="fwhtNoiseVal" style="color: #fb7185;">0.35</strong>
-                    </div>
-                    <input type="range" id="fwhtNoiseSlider" min="0" max="1" step="0.05" value="0.35" oninput="updateFwhtSim()" style="accent-color: #fb7185;">
-
-                    <div style="display: flex; justify-content: space-between; font-size: 0.72rem; margin-top: 4px;">
-                      <span>Spectral Cutoff Frequency (λ_max):</span>
-                      <strong id="fwhtCutoffVal" style="color: #c084fc;">6 (Harmonic 3)</strong>
-                    </div>
-                    <input type="range" id="fwhtCutoffSlider" min="0" max="12" step="2" value="6" oninput="updateFwhtSim()" style="accent-color: #c084fc;">
-
-                    <div style="display: flex; gap: 8px; margin-top: 6px;">
-                      <button class="action-btn" onclick="runFwhtStep()" style="flex: 1; padding: 6px; font-size: 0.72rem;">▶ Step FWHT Denoising</button>
-                      <button class="action-btn" onclick="resetFwhtSim()" style="padding: 6px 12px; font-size: 0.72rem;">↺ Reset</button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Canvas Visualizer -->
-                <div style="background: rgba(0,0,0,0.5); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); padding: 10px; display: flex; flex-direction: column;">
-                  <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; margin-bottom: 6px; display: flex; justify-content: space-between;">
-                    <span>64-Node State Distribution α ∈ Δ⁶³</span>
-                    <span id="fwhtStatusPill" class="gdl-chip gdl-chip-green">Attractor Locked</span>
-                  </div>
-                  <canvas id="fwhtCanvas" width="400" height="240" style="width: 100%; height: 240px;"></canvas>
-                  <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 6px; display: flex; justify-content: space-between;">
-                    <span>Raw GTE-768 Projected (Cyan)</span>
-                    <span>FWHT Denoised Topo Prior (Amber)</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Module 3: Cellular Sheaf Laplacian vs Naive Oversmoothing -->
-            <div id="gdlView3" class="gdl-card" style="display: none; flex-direction: column; gap: 10px;">
-              <div class="gdl-card-title">
-                <span>🌿 Cellular Sheaf Laplacian (ℒ_ℱ) vs. Naive GNN Oversmoothing Collapse</span>
-                <span class="gdl-chip gdl-chip-green">Anisotropic Restriction Maps · ker(ℒ_ℱ) Harmonic Sections</span>
-              </div>
-              <div class="gdl-split">
-                <!-- Explanatory math & controls -->
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                  <div style="font-size: 0.74rem; color: #cbd5e1; line-height: 1.45;">
-                    Standard GCN diffusion on 6-regular graphs causes <strong>exponential oversmoothing</strong>: all 64 node representations collapse to their global mean vector within 4 layers.
-                    <div style="background: rgba(0,0,0,0.4); padding: 8px; border-radius: 4px; margin: 6px 0; font-family: 'JetBrains Mono'; font-size: 0.68rem; color: #4ade80;">
-                      (ℒ_ℱ h)_v = ∑_{e=(v,u)} ℱ_{v⊴e}^T ( ℱ_{v⊴e} h_v - ℱ_{u⊴e} h_u )
-                    </div>
-                    By assigning each of the 6 changing line edges an anisotropic restriction map ℱ_{v⊴e_k} (e.g., SE(3) kinematic rotations for Line 1, metabolic scaling for Line 2), diffusion converges to <strong>distinct harmonic attractors</strong> with provably zero collapse.
-                  </div>
-
-                  <div style="background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-                    <div style="display: flex; justify-content: space-between; font-size: 0.72rem;">
-                      <span>Diffusion Depth (GNN Layers / Iterations):</span>
-                      <strong id="sheafStepVal" style="color: #4ade80;">Step 3</strong>
-                    </div>
-                    <input type="range" id="sheafSlider" min="1" max="10" step="1" value="3" oninput="updateSheafSim()" style="accent-color: #4ade80;">
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; font-size: 0.7rem; font-family: 'JetBrains Mono';">
-                      <div style="background: rgba(251,113,133,0.1); border: 1px solid rgba(251,113,133,0.3); padding: 6px; border-radius: 4px;">
-                        <span style="color: #fb7185;">Standard GCN Var:</span><br>
-                        <strong id="naiveVarVal" style="font-size: 0.85rem; color: #fff;">0.04 (Collapse)</strong>
-                      </div>
-                      <div style="background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.3); padding: 6px; border-radius: 4px;">
-                        <span style="color: #4ade80;">Cellular Sheaf Var:</span><br>
-                        <strong id="sheafVarVal" style="font-size: 0.85rem; color: #fff;">0.89 (Stable)</strong>
+                      <div style="font-size: 0.68rem; color: #38bdf8; margin-top: 2px;" id="hexChangingNotice">
+                        Moving Line: <b>Line 4 (Rest)</b> &rarr; Mutates to <b>#33 遯 Retreat</b>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <!-- Simulation Canvas -->
-                <div style="background: rgba(0,0,0,0.5); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); padding: 10px; display: flex; flex-direction: column;">
-                  <div style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; margin-bottom: 6px;">
-                    Feature Space Dispersion (Standard GCN vs Cellular Sheaf)
+                <!-- The 6 Struts & Bodily Needs Status -->
+                <div class="creature-card" style="flex: 1;">
+                  <div class="creature-card-title">
+                    <span>The 6 Struts (Lines 1..6) & Need Fullness</span>
+                    <span style="font-size: 0.68rem; color: #64748b;">Floor = 20% (The coach does not guilt)</span>
                   </div>
-                  <canvas id="sheafCanvas" width="400" height="240" style="width: 100%; height: 240px;"></canvas>
-                  <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 6px; display: flex; justify-content: space-between;">
-                    <span style="color: #fb7185;">● Standard GCN (Collapsing)</span>
-                    <span style="color: #4ade80;">● Sheaf Diffusion (Harmonic)</span>
+
+                  <div style="display: flex; flex-direction: column; gap: 6px;" id="strutRowsContainer">
+                    <!-- Strut rows dynamically rendered -->
                   </div>
                 </div>
+
+                <!-- Engine Law & Parity Card -->
+                <div class="creature-card">
+                  <div class="creature-card-title">
+                    <span>Constitutional Architectural Law</span>
+                    <span class="creature-chip creature-chip-green">Parity Locked</span>
+                  </div>
+                  <div style="font-size: 0.7rem; color: #cbd5e1; line-height: 1.4;">
+                    <b>1. Vector Equilibrium Rest Condition:</b> Every tip is exactly 2U (90mm) from its 4 cord neighbors. The cords never break.<br>
+                    <b>2. Floor Under Vitality:</b> A creature that a bad week can end is a creature you delete. Vitality is floored at 20%.<br>
+                    <b>3. Deterministic Replay:</b> <code>replay(events, now)</code> rebuilds the whole reading identically without referencing live state.
+                  </div>
+                </div>
+
               </div>
+
             </div>
-
-            <!-- Module 4: Discrete Hodge De-Looper & Parallel Transport -->
-            <div id="gdlView4" class="gdl-card" style="display: none; flex-direction: column; gap: 10px;">
-              <div class="gdl-card-title">
-                <span>🌀 Discrete Exterior Calculus (DEC) Hodge De-Looper & Lie KV-Cache Parallel Transport</span>
-                <span class="gdl-chip gdl-chip-amber">J = grad(ϕ) + curl(ψ) + h · O(1) KV-Cache Rotation</span>
-              </div>
-              <div class="gdl-split">
-                <!-- Controls and Hodge loop simulation -->
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                  <div style="font-size: 0.74rem; color: #cbd5e1; line-height: 1.45;">
-                    Small on-device LLMs (0.5B-1.5B) frequently get trapped in repetitive dialogue loops. Under <strong>Discrete Hodge Theory on Q₆</strong>, any edge attention flow decomposes as:
-                    <div style="font-family: 'JetBrains Mono'; background: rgba(0,0,0,0.4); padding: 6px; border-radius: 4px; margin: 4px 0; color: #fbbf24; font-size: 0.7rem;">
-                      J = d₀ ϕ (Gradient) + d₁* ψ (Vortex/Curl) + h (Harmonic)
-                    </div>
-                    Repetitive token hallucination manifests as a spike in the co-exact curl component ||d₁* ψ||. Projecting the flow onto ker(d₁) nullifies the curl and terminates the loop in 1 step!
-                  </div>
-
-                  <div style="background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                      <span style="font-size: 0.74rem;">Curl Loop Metric ||d₁* ψ||:</span>
-                      <span id="hodgeCurlBadge" class="gdl-chip gdl-chip-rose">CURL: 0.88 (LOOP TRAPPED)</span>
-                    </div>
-
-                    <div style="display: flex; gap: 8px; margin-top: 4px;">
-                      <button class="action-btn" onclick="simHodgeLoop()" style="flex: 1; padding: 6px; font-size: 0.72rem; border-color: rgba(251,113,133,0.4); color: #fb7185;">⚠️ Provoke Dialogue Loop</button>
-                      <button class="action-btn" onclick="applyHodgeProjection()" style="flex: 1; padding: 6px; font-size: 0.72rem; border-color: rgba(56,189,248,0.4); color: #38bdf8;">✨ Apply Hodge Projection</button>
-                    </div>
-
-                    <div style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px; font-size: 0.7rem;">
-                      <strong style="color: #38bdf8;">Lie Group KV Parallel Transport:</strong>
-                      <div style="color: #94a3b8; margin-top: 2px;">
-                        K_new = exp(Ω_k) · K_old. When transitioning states, the KV-cache is parallel-transported along line k in O(d) without context re-encoding.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Hodge Loop Graph Animation -->
-                <div style="background: rgba(0,0,0,0.5); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); padding: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                  <svg id="hodgeGraphSvg" width="380" height="240" viewBox="0 0 380 240">
-                    <!-- 4 Hexagram Cycle: 24 -> 2 -> 23 -> 27 -> 24 -->
-                    <defs>
-                      <marker id="hodgeArrowRed" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                        <path d="M0,0 L0,6 L6,3 z" fill="#fb7185" />
-                      </marker>
-                      <marker id="hodgeArrowBlue" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                        <path d="M0,0 L0,6 L6,3 z" fill="#38bdf8" />
-                      </marker>
-                    </defs>
-
-                    <!-- Cycle Edges -->
-                    <path id="hodgeEdge0" d="M 120 70 L 260 70" stroke="#fb7185" stroke-width="3" marker-end="url(#hodgeArrowRed)" />
-                    <path id="hodgeEdge1" d="M 260 70 L 260 170" stroke="#fb7185" stroke-width="3" marker-end="url(#hodgeArrowRed)" />
-                    <path id="hodgeEdge2" d="M 260 170 L 120 170" stroke="#fb7185" stroke-width="3" marker-end="url(#hodgeArrowRed)" />
-                    <path id="hodgeEdge3" d="M 120 170 L 120 70" stroke="#fb7185" stroke-width="3" marker-end="url(#hodgeArrowRed)" />
-
-                    <!-- Exit Geodesic Edge (Gradient flow) -->
-                    <path id="hodgeExitEdge" d="M 260 170 L 330 170" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4,4" marker-end="url(#hodgeArrowBlue)" opacity="0.3" />
-
-                    <!-- Nodes -->
-                    <circle cx="120" cy="70" r="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2" />
-                    <text x="120" y="74" fill="#fff" font-size="10" font-weight="700" text-anchor="middle">#24 復</text>
-
-                    <circle cx="260" cy="70" r="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2" />
-                    <text x="260" y="74" fill="#fff" font-size="10" font-weight="700" text-anchor="middle">#2 坤</text>
-
-                    <circle cx="260" cy="170" r="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2" />
-                    <text x="260" y="174" fill="#fff" font-size="10" font-weight="700" text-anchor="middle">#23 剝</text>
-
-                    <circle cx="120" cy="170" r="18" fill="#1e293b" stroke="#38bdf8" stroke-width="2" />
-                    <text x="120" y="174" fill="#fff" font-size="10" font-weight="700" text-anchor="middle">#27 頤</text>
-
-                    <circle cx="330" cy="170" r="18" fill="#0f172a" stroke="#4ade80" stroke-width="1.5" />
-                    <text x="330" y="174" fill="#4ade80" font-size="9" font-weight="700" text-anchor="middle">#52 艮</text>
-
-                    <text id="hodgeStatusText" x="190" y="125" fill="#fb7185" font-size="11" font-weight="700" text-anchor="middle">Loop Vortex Active</text>
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <!-- Module 5: Native C++ Implementation Code -->
-            <div id="gdlView5" class="gdl-card" style="display: none; flex-direction: column; gap: 8px;">
-              <div class="gdl-card-title">
-                <span>💻 Native C++ MNN Implementation Blueprint (android_plugin/ixmnn)</span>
-                <span class="gdl-chip gdl-chip-cyan">Header-Only FWHT Kernel · JNI Sampling Hook</span>
-              </div>
-              <div style="background: #090d16; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: #cbd5e1; overflow-x: auto; max-height: 380px; line-height: 1.45;">
-<span style="color: #64748b;">// =========================================================================</span>
-<span style="color: #64748b;">// android_plugin/ixmnn/src/main/cpp/include/q6_spectral.hpp</span>
-<span style="color: #64748b;">// Fast Walsh-Hadamard Transform (FWHT) Spectral Denoising Kernel for Q6</span>
-<span style="color: #64748b;">// 64 states, 384 butterfly additions, 0 multiplications. Latency: 1.2 µs</span>
-<span style="color: #64748b;">// =========================================================================</span>
-<span style="color: #c084fc;">#pragma once</span>
-<span style="color: #c084fc;">#include</span> <span style="color: #38bdf8;">&lt;array&gt;</span>
-<span style="color: #c084fc;">#include</span> <span style="color: #38bdf8;">&lt;cmath&gt;</span>
-
-<span style="color: #f59e0b;">namespace</span> <span style="color: #38bdf8;">ix64::gdl</span> {
-
-<span style="color: #f59e0b;">inline void</span> <span style="color: #60a5fa;">fwht_inplace</span>(<span style="color: #f59e0b;">float</span>* a, <span style="color: #f59e0b;">int</span> n = 64) {
-    <span style="color: #f59e0b;">for</span> (<span style="color: #f59e0b;">int</span> h = 1; h &lt; n; h &lt;&lt;= 1) {
-        <span style="color: #f59e0b;">for</span> (<span style="color: #f59e0b;">int</span> i = 0; i &lt; n; i += (h &lt;&lt; 1)) {
-            <span style="color: #f59e0b;">for</span> (<span style="color: #f59e0b;">int</span> j = i; j &lt; i + h; ++j) {
-                <span style="color: #f59e0b;">float</span> x = a[j];
-                <span style="color: #f59e0b;">float</span> y = a[j + h];
-                a[j] = x + y;
-                a[j + h] = x - y;
-            }
-        }
-    }
-}
-
-<span style="color: #64748b;">// Spectral Filter using Hypercube Laplacian Eigenvalues λ_k = 2k</span>
-<span style="color: #f59e0b;">inline void</span> <span style="color: #60a5fa;">q6_spectral_filter</span>(<span style="color: #f59e0b;">float</span>* prob_64, <span style="color: #f59e0b;">int</span> max_hamming_cutoff = 3) {
-    <span style="color: #60a5fa;">fwht_inplace</span>(prob_64, 64);
-    
-    <span style="color: #f59e0b;">for</span> (<span style="color: #f59e0b;">int</span> i = 0; i &lt; 64; ++i) {
-        <span style="color: #f59e0b;">int</span> hamming = __builtin_popcount(i);
-        <span style="color: #f59e0b;">float</span> weight = (hamming &lt;= max_hamming_cutoff) ? 1.0f : 0.0f;
-        prob_64[i] *= (weight / 64.0f);
-    }
-    
-    <span style="color: #60a5fa;">fwht_inplace</span>(prob_64, 64);
-}
-
-<span style="color: #64748b;">// =========================================================================</span>
-<span style="color: #64748b;">// JNI Hook in ixmnn_jni.cpp: Logit Biasing Before Sampling</span>
-<span style="color: #64748b;">// =========================================================================</span>
-<span style="color: #f59e0b;">void</span> <span style="color: #60a5fa;">apply_q6_logit_bias</span>(<span style="color: #f59e0b;">float</span>* logits, <span style="color: #f59e0b;">int</span> vocab_size, <span style="color: #f59e0b;">const float</span>* gdl_prior_64, <span style="color: #f59e0b;">float</span> beta) {
-    <span style="color: #64748b;">// Injected right before MNN::Sampler::sampleTopP()</span>
-    <span style="color: #64748b;">// Projects 64-node topological attractors to constrain generation without prompt bloat</span>
-}
-
-} <span style="color: #64748b;">// namespace ix64::gdl</span>
-              </div>
-            </div>
-
-            <!-- Module 6: Live Dual-Channel Mind Stream Simulator -->
-            <div id="gdlView6" class="gdl-card" style="display: none; flex-direction: column; gap: 10px;">
-              <div class="gdl-card-title">
-                <span>🧠 Live Dual-Channel Mind Stream: Reasoning (<think>) vs. Spoken Mouth</span>
-                <span class="gdl-chip gdl-chip-cyan">Signal Demuxing: chat_thought ⟷ chat_token</span>
-              </div>
-              <div style="font-size: 0.74rem; color: #94a3b8; line-height: 1.4;">
-                Qwen3 reasons out loud inside <code>&lt;think&gt;...&lt;/think&gt;</code> blocks. The upgraded C++ and GDScript seam automatically demuxes the stream in real time: internal topological graph deliberation travels through <b>chat_thought</b> for the HUD, while only clean spoken responses reach <b>chat_token</b> and the TTS mouth.
-              </div>
-              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
-                <label style="font-size: 0.72rem; color: #38bdf8; font-weight: 700;">PROMPT SCENARIO:</label>
-                <select id="mindScenarioSelect" onchange="loadMindScenario()" style="background: #0f172a; border: 1px solid #38bdf8; color: #f8fafc; font-size: 0.72rem; padding: 4px 8px; border-radius: 4px;">
-                  <option value="noise">1. Sudden Loud Noise (Perception ➔ Hex 52 Stillness Grounding)</option>
-                  <option value="counsel">2. User Seeking Direction (Deliberation ➔ Hex 24 Return)</option>
-                  <option value="loop">3. Rapid Repetitive Query (Hodge Circulation ➔ Hex 40 Release)</option>
-                  <option value="spatial">4. Spatial Awareness & Kinematics Query (Hex 1 Creative Flow)</option>
-                </select>
-                <label style="font-size: 0.72rem; color: #c084fc; font-weight: 700; margin-left: 6px;">MODEL:</label>
-                <select id="mindModelSelect" style="background: #0f172a; border: 1px solid #c084fc; color: #f8fafc; font-size: 0.72rem; padding: 4px 8px; border-radius: 4px;">
-                  <option value="0.6b">qwen3-0.6b-mnn (Phone · 18 TPS · ~400MB)</option>
-                  <option value="1.7b">qwen3-1.7b-mnn (Tablet · 12 TPS · ~1.1GB)</option>
-                  <option value="3b">qwen2.5-3b-mnn (PC · 8 TPS · ~1.9GB)</option>
-                </select>
-                <button onclick="runMindStreamDemo()" id="btnRunMindStream" style="background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; border: 1px solid #38bdf8; padding: 5px 14px; border-radius: 6px; font-size: 0.74rem; font-weight: 700; cursor: pointer;">▶ Run Dual-Stream Turn</button>
-                <button onclick="cancelMindStreamDemo()" id="btnCancelMindStream" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.4); padding: 5px 10px; border-radius: 6px; font-size: 0.74rem; cursor: pointer;">⏹ Cancel</button>
-              </div>
-
-              <!-- Dual Channel Split View -->
-              <div class="gdl-split">
-                <!-- Channel 1: Inner Monologue -->
-                <div style="background: rgba(4, 7, 18, 0.85); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding-bottom: 4px;">
-                    <span style="font-size: 0.74rem; font-weight: 700; color: #38bdf8;">🧠 Channel 1: chat_thought (Inner Mind)</span>
-                    <span id="thoughtStatusBadge" class="gdl-chip gdl-chip-cyan">READY</span>
-                  </div>
-                  <div style="font-size: 0.68rem; color: #64748b;">Internal topological deliberation & Q₆ graph path traversal. NEVER spoken to TTS.</div>
-                  <div id="thoughtStreamBox" style="background: #020617; border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 8px; height: 180px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: #38bdf8; line-height: 1.45; white-space: pre-wrap;">Select a scenario and click "▶ Run Dual-Stream Turn" to observe the live reasoning trace.</div>
-                  <div id="thoughtGraphPath" style="font-size: 0.68rem; color: #cbd5e1; background: rgba(15,23,42,0.8); padding: 5px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace;">Traversed Path: [Pending]</div>
-                </div>
-
-                <!-- Channel 2: Spoken Mouth Output -->
-                <div style="background: rgba(4, 7, 18, 0.85); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(251, 191, 36, 0.2); padding-bottom: 4px;">
-                    <span style="font-size: 0.74rem; font-weight: 700; color: #fbbf24;">👄 Channel 2: chat_token (Avatar Mouth)</span>
-                    <span id="tokenStatusBadge" class="gdl-chip gdl-chip-amber">READY</span>
-                  </div>
-                  <div style="font-size: 0.68rem; color: #64748b;">Clean spoken reply streamed token-by-token directly to TTS & avatar speech bubble.</div>
-                  <div id="tokenStreamBox" style="background: #020617; border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 8px; height: 180px; overflow-y: auto; font-family: 'Outfit', sans-serif; font-size: 0.78rem; color: #f8fafc; line-height: 1.5; white-space: pre-wrap;">Spoken output will appear here with zero <think> tags.</div>
-                  <div id="streamMetrics" style="font-size: 0.68rem; color: #94a3b8; display: flex; justify-content: space-between; padding: 4px 2px;">
-                    <span>TTFT: <b id="valTtft">0.00s</b></span>
-                    <span>Thoughts: <b id="valThoughtCount">0 tok</b></span>
-                    <span>Speech: <b id="valSpeechCount">0 tok</b></span>
-                    <span>Integrity: <b style="color: #4ade80;">100% (No Bleed)</b></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Module 7: Where I-Ching Thrives & Architecture Plan -->
-            <div id="gdlView7" class="gdl-card" style="display: none; flex-direction: column; gap: 10px;">
-              <div class="gdl-card-title">
-                <span>🏆 Where the I-Ching GDL Engine Thrives over Native MNN</span>
-                <span class="gdl-chip gdl-chip-green">Tier-1 Shipped · All 66 Smoke Tests PASS</span>
-              </div>
-
-              <!-- Implementation Status Badges -->
-              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
-                <div style="background: rgba(74, 222, 128, 0.08); border: 1px solid rgba(74, 222, 128, 0.35); border-radius: 6px; padding: 8px 10px;">
-                  <div style="font-size: 0.68rem; font-weight: 700; color: #4ade80;">TIER 1: SHIPPED & ACTIVE</div>
-                  <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 3px;">• C++ FWHT Spectral Hot Path (1.2 µs)<br>• JNI nativeSetHexPrior & Kotlin Hook<br>• Godot Mind Seam & &lt;think&gt; Demuxer<br>• 66/66 Smoke Tests Verified</div>
-                </div>
-                <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 6px; padding: 8px 10px;">
-                  <div style="font-size: 0.68rem; font-weight: 700; color: #38bdf8;">TIER 2: IN ACTIVE FLIGHT</div>
-                  <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 3px;">• Topological Logit Prior Biasing<br>• Cellular Sheaf Holonomy Regularizer<br>• Discrete Hodge Loop Breaker (H¹)<br>• Qwen3 Soft-Switch Dynamic Tuning</div>
-                </div>
-                <div style="background: rgba(192, 132, 252, 0.08); border: 1px solid rgba(192, 132, 252, 0.35); border-radius: 6px; padding: 8px 10px;">
-                  <div style="font-size: 0.68rem; font-weight: 700; color: #c084fc;">TIER 3: PLANNED EXPANSION</div>
-                  <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 3px;">• CoT Graph Walk Constraint on Q₆<br>• Zero-RoPE Key Bias Injection<br>• Multi-Avatar Sheaf Synchronization<br>• Low-Rank Discrete Autoencoder</div>
-                </div>
-              </div>
-
-              <!-- Comparative Value Matrix -->
-              <div style="background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); padding: 10px; overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.72rem; text-align: left;">
-                  <thead>
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.12); color: #cbd5e1;">
-                      <th style="padding: 6px 8px;">Capability Dimension</th>
-                      <th style="padding: 6px 8px; color: #f87171;">Native MNN Alone (Raw LLM)</th>
-                      <th style="padding: 6px 8px; color: #38bdf8;">With I-Ching GDL Coprocessor</th>
-                      <th style="padding: 6px 8px; color: #4ade80;">Where It Thrives</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                      <td style="padding: 6px 8px; font-weight: 700; color: #e2e8f0;">1. State Memory & Continuity</td>
-                      <td style="padding: 6px 8px; color: #94a3b8;">Ephemeral / Leaky (pruning context loses character grounding)</td>
-                      <td style="padding: 6px 8px; color: #38bdf8; font-family: 'JetBrains Mono';">O(1) 6-bit Topological Anchor (h ∈ 𝔽₂⁶) + heat curve</td>
-                      <td style="padding: 6px 8px; color: #4ade80;">Infinite-turn persona consistency with zero memory growth</td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                      <td style="padding: 6px 8px; font-weight: 700; color: #e2e8f0;">2. Persona Oversmoothing</td>
-                      <td style="padding: 6px 8px; color: #94a3b8;">Collapses into bland corporate assistant ("I'd be happy to help!")</td>
-                      <td style="padding: 6px 8px; color: #38bdf8;">Cellular Sheaf Holonomy: ker(ℒ_ℱ) = {0} prevents Dirichlet decay</td>
-                      <td style="padding: 6px 8px; color: #4ade80;">Sharp, distinct archetypes that never homogenize</td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                      <td style="padding: 6px 8px; font-weight: 700; color: #e2e8f0;">3. Dialogue Loop Breaking</td>
-                      <td style="padding: 6px 8px; color: #94a3b8;">Blunt scalar penalty (1.15x) suppresses words & breaks grammar</td>
-                      <td style="padding: 6px 8px; color: #38bdf8;">Discrete Hodge 1-form circulation (H¹) + Pangtong jump (~x)</td>
-                      <td style="padding: 6px 8px; color: #4ade80;">Instantly detects and escapes loops with clean phrasing</td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                      <td style="padding: 6px 8px; font-weight: 700; color: #e2e8f0;">4. Mobile Latency & Battery</td>
-                      <td style="padding: 6px 8px; color: #94a3b8;">Conditioning via prompt eats 30+ tokens (2s on mobile, heats battery)</td>
-                      <td style="padding: 6px 8px; color: #38bdf8; font-family: 'JetBrains Mono';">384 butterfly additions, 0 mults, 1.2 µs on ARM Cortex-A78</td>
-                      <td style="padding: 6px 8px; color: #4ade80;">10,000x faster state transitions with 0% battery consumption</td>
-                    </tr>
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                      <td style="padding: 6px 8px; font-weight: 700; color: #e2e8f0;">5. Explainability & Auditing</td>
-                      <td style="padding: 6px 8px; color: #94a3b8;">Black box neural weights; impossible to audit mood changes</td>
-                      <td style="padding: 6px 8px; color: #38bdf8;">Explicit 6D Coxeter coordinates, Yao line transitions, nuclear core</td>
-                      <td style="padding: 6px 8px; color: #4ade80;">100% deterministic visual inspector and reproducible telemetry</td>
-                    </tr>
-                    <tr>
-                      <td style="padding: 6px 8px; font-weight: 700; color: #e2e8f0;">6. Alignment & Tone Style</td>
-                      <td style="padding: 6px 8px; color: #94a3b8;">Preachy / patronizing safety refusals ("As an AI model...")</td>
-                      <td style="padding: 6px 8px; color: #38bdf8;">Ancient situational archetypes (Stillness, Danger, Release, Joy)</td>
-                      <td style="padding: 6px 8px; color: #4ade80;">Calm, objective situational framing without preachy scolding</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <!-- Model Matrix Footnote -->
-              <div style="font-size: 0.68rem; color: #64748b; text-align: right;">
-                Engine Architecture: <b>Alibaba MNN 3.6.1</b> · Native C++ JNI Singleton · Godot 4.7.1 Headless Verified · Zero Heap Allocations on Hot Path
-              </div>
-            </div>
-
           </div>
         </div>
       `;
     }
 
-    
-  // ── Module 6: Live Dual-Channel Mind Stream Simulator Logic ──
-  var mindStreamActive = false;
-  var mindStreamTimer = null;
+    function initCreatureTensegrity() {
+      computeBallCords();
+      setupCanvasEvents();
+      renderStrutRows();
+      updateCreatureTelemetry();
 
-  var MIND_SCENARIOS = {
-    noise: {
-      thoughts: [
-        "<think>",
-        "Auditory sensor spike detected (RMS > 0.82).\n",
-        "Assessing environmental disruption...\n",
-        "Current Topological State: Hexagram 52 (艮 / Mountain / Keeping Still).\n",
-        "Input vector projects to lower trigram Mountain [0, 0, 1].\n",
-        "Evaluating adjacent Hamming-1 options: [56, 4, 18, 23, 27, 39].\n",
-        "Selected transition: Flip line 1 -> Hexagram 22 (Grace / Mountain over Fire).\n",
-        "Nuclear attractor: Hexagram 40 (Release / Thunder over Water).\n",
-        "Posture recommendation: Grounded stance, calm head turn, non-combative awareness.",
-        "</think>"
-      ],
-      speech: [
-        "I ", "heard ", "a ", "sharp ", "crack ", "near ", "the ", "hallway. ",
-        "Staying ", "centered ", "and ", "observing ", "carefully."
-      ],
-      path: "[Hex 52 Keeping Still] ➔ Flip Line 1 ➔ [Hex 22 Grace] ➔ Core [Hex 40 Release]"
-    },
-    counsel: {
-      thoughts: [
-        "<think>",
-        "User query: 'Should I rush this project or wait for clarity?'\n",
-        "Semantic mapping: impatience vs. strategic retreat.\n",
-        "Active State: Hexagram 24 (复 / Return / Turning Point).\n",
-        "Upper Trigram Earth (receptive), Lower Trigram Thunder (nascent movement).\n",
-        "Huguaci Nuclear projection: Hexagram 2 (Pure Earth).\n",
-        "Guidance rule: Do not force progress during the turning point; nurture the first yang line.",
-        "</think>"
-      ],
-      speech: [
-        "When ", "the ", "turning ", "point ", "arrives, ", "movement ", "happens ", "naturally. ",
-        "There ", "is ", "no ", "need ", "to ", "rush; ", "let ", "the ", "first ", "steps ", "settle ", "first."
-      ],
-      path: "[Hex 24 Return] ➔ Huguaci Core ➔ [Hex 2 Pure Earth] ➔ Steady Receptivity"
-    },
-    loop: {
-      thoughts: [
-        "<think>",
-        "Circulation anomaly detected: token transition graph circulation ||γ||² = 0.94.\n",
-        "WARNING: Infinite conversational loop detected in standard greedy decoding.\n",
-        "Executing Discrete Helmholtz-Hodge decomposition...\n",
-        "Harmonic component H¹ exceeds threshold (0.75).\n",
-        "Triggering Pangtong Antipodal Involution: bits = ~0b010101 = 0b101010.\n",
-        "Jumped across Q₆ hypercube: Hexagram 63 (After Completion) ➔ Hexagram 64 (Before Completion).\n",
-        "Cycle broken cleanly.",
-        "</think>"
-      ],
-      speech: [
-        "Let ", "us ", "step ", "back ", "from ", "the ", "circle. ",
-        "Looking ", "at ", "this ", "from ", "the ", "unfolding ", "future ", "reveals ", "a ", "different ", "path."
-      ],
-      path: "[Hex 63 After Completion] ➔ Pangtong NOT (~x) ➔ [Hex 64 Before Completion]"
-    },
-    spatial: {
-      thoughts: [
-        "<think>",
-        "Camera frame received from ixmirror: user approaching avatar right quadrant.\n",
-        "Spatial coordinate: [dx: 0.85m, dy: 0.12m, dz: 1.40m].\n",
-        "Active State: Hexagram 1 (乾 / The Creative / Pure Yang).\n",
-        "Kinematic solver: neck yaw +18°, eye gaze pitch -4°, torso balance 0.92.\n",
-        "Tone invariant: Confident, active, engaging.",
-        "</think>"
-      ],
-      speech: [
-        "Welcome ", "back. ", "I ", "see ", "you ", "over ", "here—", "ready ", "when ", "you ", "are."
-      ],
-      path: "[Hex 1 Creative] ➔ Kinematic Rig ➔ [Neck Yaw +18°] ➔ Focused Attention"
+      if (creatureAnimFrame) cancelAnimationFrame(creatureAnimFrame);
+      function loop() {
+        if (creatureAutoRotate && !creatureIsDragging) {
+          creatureRotY += 0.006;
+        }
+        drawCreature3d();
+        creatureAnimFrame = requestAnimationFrame(loop);
+      }
+      loop();
     }
-  };
 
-  function loadMindScenario() {
-    var sel = document.getElementById('mindScenarioSelect');
-    var sc = MIND_SCENARIOS[sel.value] || MIND_SCENARIOS.noise;
-    var pathEl = document.getElementById('thoughtGraphPath');
-    if (pathEl) pathEl.innerText = "Target Path: " + sc.path;
-  }
+    function setupCanvasEvents() {
+      const canvas = document.getElementById('creature3dCanvas');
+      if (!canvas) return;
 
-  function runMindStreamDemo() {
-    if (mindStreamActive) return;
-    mindStreamActive = true;
+      canvas.onmousedown = (e) => {
+        creatureIsDragging = true;
+        creatureLastMouseX = e.clientX;
+        creatureLastMouseY = e.clientY;
+        canvas.style.cursor = 'grabbing';
+      };
 
-    var sel = document.getElementById('mindScenarioSelect');
-    var sc = MIND_SCENARIOS[sel.value] || MIND_SCENARIOS.noise;
+      window.onmouseup = () => {
+        if (creatureIsDragging) {
+          creatureIsDragging = false;
+          if (canvas) canvas.style.cursor = 'grab';
+        }
+      };
 
-    var thoughtBox = document.getElementById('thoughtStreamBox');
-    var tokenBox = document.getElementById('tokenStreamBox');
-    var pathEl = document.getElementById('thoughtGraphPath');
-    var ttftEl = document.getElementById('valTtft');
-    var thCountEl = document.getElementById('valThoughtCount');
-    var spCountEl = document.getElementById('valSpeechCount');
-    var thBadge = document.getElementById('thoughtStatusBadge');
-    var tokBadge = document.getElementById('tokenStatusBadge');
+      window.onmousemove = (e) => {
+        if (!creatureIsDragging) return;
+        const dx = e.clientX - creatureLastMouseX;
+        const dy = e.clientY - creatureLastMouseY;
+        creatureRotY += dx * 0.008;
+        creatureRotX += dy * 0.008;
+        creatureLastMouseX = e.clientX;
+        creatureLastMouseY = e.clientY;
+      };
 
-    thoughtBox.innerText = "";
-    tokenBox.innerText = "";
-    if (pathEl) pathEl.innerText = "Active Traversal: " + sc.path;
-    if (ttftEl) ttftEl.innerText = "0.08s";
-    if (thBadge) { thBadge.innerText = "STREAMING..."; thBadge.className = "gdl-chip gdl-chip-cyan"; }
-    if (tokBadge) { tokBadge.innerText = "BUFFERING..."; tokBadge.className = "gdl-chip gdl-chip-amber"; }
+      canvas.onwheel = (e) => {
+        e.preventDefault();
+        creatureFold = Math.max(0.0, Math.min(1.0, creatureFold + e.deltaY * 0.001));
+        const sliderFold = document.getElementById('sliderFold');
+        if (sliderFold) sliderFold.value = creatureFold.toString();
+        const lblFold = document.getElementById('lblFoldVal');
+        if (lblFold) lblFold.textContent = creatureFold.toFixed(2);
+      };
+    }
 
-    var tIdx = 0;
-    var sIdx = 0;
-    var totalThoughts = sc.thoughts.length;
-    var totalSpeech = sc.speech.length;
+    function toggleBallAutoRotate() {
+      creatureAutoRotate = !creatureAutoRotate;
+      const btn = document.getElementById('btnAutoRot');
+      if (btn) {
+        btn.textContent = creatureAutoRotate ? "⏸ Pause Spin" : "▶ Resume Spin";
+      }
+    }
 
-    // Step 1: Stream reasoning thoughts (chat_thought)
-    function streamThoughts() {
-      if (!mindStreamActive) return;
-      if (tIdx < totalThoughts) {
-        thoughtBox.innerText += sc.thoughts[tIdx] + " ";
-        thoughtBox.scrollTop = thoughtBox.scrollHeight;
-        tIdx++;
-        if (thCountEl) thCountEl.innerText = (tIdx * 4) + " tok";
-        mindStreamTimer = setTimeout(streamThoughts, 70);
+    function resetBallCamera() {
+      creatureRotX = -0.38;
+      creatureRotY = 0.65;
+      creatureFold = 0.0;
+      creatureExt = 15.0;
+      const sliderFold = document.getElementById('sliderFold');
+      if (sliderFold) sliderFold.value = "0";
+      const sliderExt = document.getElementById('sliderExt');
+      if (sliderExt) sliderExt.value = "15";
+      updateBallParameters();
+    }
+
+    function updateBallParameters() {
+      const sliderExt = document.getElementById('sliderExt');
+      if (sliderExt) creatureExt = parseFloat(sliderExt.value);
+      const lblExt = document.getElementById('lblExtVal');
+      if (lblExt) lblExt.textContent = `${creatureExt.toFixed(1)} mm`;
+
+      const sliderFold = document.getElementById('sliderFold');
+      if (sliderFold) creatureFold = parseFloat(sliderFold.value);
+      const lblFold = document.getElementById('lblFoldVal');
+      if (lblFold) lblFold.textContent = creatureFold.toFixed(2);
+    }
+
+    function toggleStrutYang(lineIdx) {
+      creatureBits ^= (1 << lineIdx);
+      const isYang = ((creatureBits >> lineIdx) & 1) === 1;
+      creatureNeeds[lineIdx] = isYang ? 0.82 : 0.28;
+      renderStrutRows();
+      updateCreatureTelemetry();
+    }
+
+    function setNeedSlider(lineIdx, val) {
+      creatureNeeds[lineIdx] = Math.max(0.2, Math.min(1.0, parseFloat(val)));
+      if (creatureNeeds[lineIdx] >= 0.5) {
+        creatureBits |= (1 << lineIdx);
       } else {
-        if (thBadge) { thBadge.innerText = "COMPLETED"; thBadge.className = "gdl-chip gdl-chip-green"; }
-        if (tokBadge) { tokBadge.innerText = "SPEAKING..."; tokBadge.className = "gdl-chip gdl-chip-amber"; }
-        mindStreamTimer = setTimeout(streamSpeech, 120);
+        creatureBits &= ~(1 << lineIdx);
+      }
+      renderStrutRows();
+      updateCreatureTelemetry();
+    }
+
+    function simulateNeedPulse() {
+      const idx = Math.floor(Math.random() * 6);
+      creatureNeeds[idx] = Math.min(1.0, creatureNeeds[idx] + 0.35);
+      if (creatureNeeds[idx] >= 0.5) {
+        creatureBits |= (1 << idx);
+      }
+      renderStrutRows();
+      updateCreatureTelemetry();
+    }
+
+    function renderStrutRows() {
+      const container = document.getElementById('strutRowsContainer');
+      if (!container) return;
+
+      const changingLine = getChangingLine(creatureNeeds);
+
+      let html = "";
+      for (let i = 5; i >= 0; i--) {
+        const cfg = NEED_CONFIG[i];
+        const isYang = ((creatureBits >> i) & 1) === 1;
+        const fullness = creatureNeeds[i];
+        const isChanging = (i === changingLine);
+
+        const badgeClass = isYang ? "strut-badge-yang" : "strut-badge-yin";
+        const glyph = isYang ? "&#9473;&#9473;&#9473;" : "&#9473; &#9473;";
+        const activeClass = isChanging ? "active-changing" : "";
+
+        html += `
+          <div class="strut-row ${activeClass}">
+            <div style="display: flex; align-items: center; gap: 8px; width: 135px;">
+              <span class="strut-badge ${badgeClass}" title="${isYang ? 'Yang (Extended)' : 'Yin (Retracted)'}">${i + 1}</span>
+              <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 0.74rem; font-weight: 700; color: #fff;">${cfg.label}</span>
+                <span style="font-size: 0.65rem; color: #94a3b8;">${cfg.sense}</span>
+              </div>
+            </div>
+
+            <button onclick="toggleStrutYang(${i})" style="background: none; border: none; font-family: monospace; font-size: 0.95rem; font-weight: 900; color: ${isYang ? '#fbbf24' : '#64748b'}; cursor: pointer;" title="Click to flip Yang/Yin">
+              ${glyph}
+            </button>
+
+            <div class="vitality-bar-bg" title="Fullness: ${(fullness * 100).toFixed(0)}%">
+              <div class="vitality-bar-fill" style="width: ${(fullness * 100).toFixed(0)}%; background: ${cfg.color};"></div>
+            </div>
+
+            <input type="range" min="0.2" max="1.0" step="0.05" value="${fullness}" oninput="setNeedSlider(${i}, this.value)" style="width: 70px;">
+
+            <span style="font-size: 0.7rem; font-family: monospace; width: 35px; text-align: right; color: ${isChanging ? '#fbbf24' : '#94a3b8'}; font-weight: ${isChanging ? '700' : '400'};">
+              ${(fullness * 100).toFixed(0)}%
+            </span>
+          </div>
+        `;
+      }
+      container.innerHTML = html;
+    }
+
+    function updateCreatureTelemetry() {
+      const wen = lookupKingWen(creatureBits);
+      const hex = HEX_DICTIONARY[wen] || { zh: "卦", py: "", name: `Hexagram #${wen}`, meaning: "Balance of forces in continuous motion." };
+
+      const hexChar = document.getElementById('hexChineseChar');
+      if (hexChar) hexChar.textContent = hex.zh;
+
+      const hexTitle = document.getElementById('hexFullTitle');
+      if (hexTitle) hexTitle.textContent = `#${wen} ${hex.zh} ${hex.name} (${hex.py})`;
+
+      const hexDesc = document.getElementById('hexDescription');
+      if (hexDesc) hexDesc.textContent = hex.meaning;
+
+      const hexBadge = document.getElementById('hexBadge');
+      if (hexBadge) hexBadge.textContent = `Hex ${wen} · ${hex.zh} ${hex.name}`;
+
+      const lowerTrigram = creatureBits & 7;
+      const upperTrigram = (creatureBits >> 3) & 7;
+      const tLow = TRIGRAM_NAMES[lowerTrigram] || { glyph: "", name: "Trigram" };
+      const tUp = TRIGRAM_NAMES[upperTrigram] || { glyph: "", name: "Trigram" };
+
+      const trigramBadge = document.getElementById('trigramPairBadge');
+      if (trigramBadge) {
+        trigramBadge.textContent = `Upper ${tUp.glyph} ${tUp.name} / Lower ${tLow.glyph} ${tLow.name}`;
+      }
+
+      const avg = creatureNeeds.reduce((a, b) => a + b, 0) / 6.0;
+      const vitBadge = document.getElementById('vitalityBadge');
+      if (vitBadge) {
+        vitBadge.textContent = `Vitality: ${(avg * 100).toFixed(0)}% (${avg > 0.65 ? 'Thriving' : avg > 0.4 ? 'Steady' : 'Quiet'})`;
+      }
+
+      const changingIdx = getChangingLine(creatureNeeds);
+      const mutatedBits = creatureBits ^ (1 << changingIdx);
+      const mutatedWen = lookupKingWen(mutatedBits);
+      const mutatedHex = HEX_DICTIONARY[mutatedWen] || { zh: "卦", name: `Hexagram #${mutatedWen}` };
+
+      const changeNotice = document.getElementById('hexChangingNotice');
+      if (changeNotice) {
+        changeNotice.innerHTML = `Moving Line: <b>Line ${changingIdx + 1} (${NEED_CONFIG[changingIdx].label})</b> &rarr; Mutates to <b>#${mutatedWen} ${mutatedHex.zh} ${mutatedHex.name}</b>`;
       }
     }
 
-    // Step 2: Stream spoken tokens (chat_token)
-    function streamSpeech() {
-      if (!mindStreamActive) return;
-      if (sIdx < totalSpeech) {
-        tokenBox.innerText += sc.speech[sIdx];
-        tokenBox.scrollTop = tokenBox.scrollHeight;
-        sIdx++;
-        if (spCountEl) spCountEl.innerText = sIdx + " tok";
-        mindStreamTimer = setTimeout(streamSpeech, 95);
-      } else {
-        if (tokBadge) { tokBadge.innerText = "COMPLETED (chat_done)"; tokBadge.className = "gdl-chip gdl-chip-green"; }
-        mindStreamActive = false;
-      }
-    }
-
-    streamThoughts();
-  }
-
-  function cancelMindStreamDemo() {
-    mindStreamActive = false;
-    if (mindStreamTimer) clearTimeout(mindStreamTimer);
-    var thBadge = document.getElementById('thoughtStatusBadge');
-    var tokBadge = document.getElementById('tokenStatusBadge');
-    if (thBadge) { thBadge.innerText = "CANCELLED"; thBadge.className = "gdl-chip gdl-chip-rose"; }
-    if (tokBadge) { tokBadge.innerText = "CANCELLED"; tokBadge.className = "gdl-chip gdl-chip-rose"; }
-  }
-
-
-    function switchGdlTab(idx) {
-      gdlActiveTab = idx;
-      for (let i = 0; i < 8; i++) {
-        const btn = document.getElementById(`gdlTab${i}`);
-        const view = document.getElementById(`gdlView${i}`);
-        if (btn) {
-          if (i === idx) btn.classList.add('active');
-          else btn.classList.remove('active');
-        }
-        if (view) {
-          if (i === idx) view.style.display = 'flex';
-          else view.style.display = 'none';
-        }
-      }
-      if (idx === 1) renderQ6HypercubeSvg();
-      if (idx === 2) updateFwhtSim();
-      if (idx === 3) updateSheafSim();
-    }
-
-    function initGdlEngine() {
-      switchGdlTab(0);
-      renderQ6HypercubeSvg();
-      updateGdlHud();
-      updateFwhtSim();
-      updateSheafSim();
-    }
-
-    const GDL_STAGE_DATA = {
-      telemetry: {
-        title: "1. Multimodal Telemetry Grounding",
-        desc: "Binds real-time device sensors to the 6 lines: IMU, MediaPipe pose, and metabolic decay drive Lines 0-2 (Lower Trigram); camera FIND, speech, and peer presence drive Lines 3-5 (Upper Trigram).",
-        group: "SE(3) × ℝ⁶ Local State Manifold",
-        kernel: "scripts/organs/creature_organ.gd",
-        complexity: "O(1) Sensor Polling",
-        latency: "< 0.2 ms"
-      },
-      cartesian: {
-        title: "2. Cartesian Product Factorization (Q₃ □ Q₃)",
-        desc: "Factorizes the 6-hypercube into Lower Trigram (Inner Body) and Upper Trigram (Outer World). Equivalent to K₈ complete pairing graph, anchoring self-state before external reasoning.",
-        group: "Q₃ □ Q₃ ≅ Q₆ (Cartesian Graph Product)",
-        kernel: "packages/core/src/trigram-graph.ts",
-        complexity: "8 × 8 Matrix Indexing",
-        latency: "< 0.05 µs"
-      },
-      fwht: {
-        title: "3. Spectral Hypercube Denoising (FWHT)",
-        desc: "Analytic Graph Fourier Transform via Walsh-Hadamard functions. Filters noisy MNN GTE-768 text embeddings into crisp hypercube attractors with zero matrix multiplications.",
-        group: "Walsh-Hadamard H₆ Eigenbasis",
-        kernel: "include/q6_spectral.hpp",
-        complexity: "384 Butterfly Adds (0 Mults)",
-        latency: "1.2 µs (ARM NEON)"
-      },
-      sheaf: {
-        title: "4. Cellular Sheaf Laplacian (ℒ_ℱ)",
-        desc: "Replaces naive scalar GNN diffusion with line-specific restriction maps ℱ_{v⊴e_k}. Prevents oversmoothing feature collapse, preserving distinct harmonic agent modes.",
-        group: "Cellular Sheaf Cohomology H⁰(ℱ)",
-        kernel: "android_plugin/ixmnn/src/main/cpp/sheaf.hpp",
-        complexity: "Sparse Graph GEMM (Degree 6)",
-        latency: "< 12 µs"
-      },
-      hodge: {
-        title: "5. Discrete Hodge Decomposition De-Looper",
-        desc: "Decomposes dialogue attention flow into Exact (gradient), Co-exact (curl), and Harmonic components. Nullifies the curl component to break repetitive hallucination loops.",
-        group: "Discrete Exterior Calculus (DEC) Δ₁",
-        kernel: "include/hodge_dec.hpp",
-        complexity: "1-Form Hodge Projection",
-        latency: "< 0.8 µs"
-      },
-      mnn_hook: {
-        title: "6. MNN C++ Logit Bias & KV Parallel Transport",
-        desc: "Direct logit biasing in ixmnn_jni.cpp: logits' = logits + β · U h. Binds KV-cache through Lie group rotations exp(Ω_k), updating memory across turns in O(1) without recomputation.",
-        group: "SO(d) Lie Group Parallel Transport",
-        kernel: "ixmnn_jni.cpp (around sampleTopP)",
-        complexity: "O(V) Vector Add + In-place Rotation",
-        latency: "< 25 µs"
-      },
-      tensegrity: {
-        title: "7. 3D Tensegrity Ball Body Cl(3,0)",
-        desc: "Hexy's 6-strut tensegrity ball is the physical hexagram: strut i represents line i+1 (yang stands out thick, yin draws back). Rendered in 3 draw calls via MultiMeshes.",
-        group: "Clifford Geometric Algebra Cl(3,0)",
-        kernel: "scripts/creature/ball_geometry.gd",
-        complexity: "3 Draw Calls (MultiMesh SubViewport)",
-        latency: "0.15 ms / frame"
-      }
-    };
-
-    function inspectGdlStage(stageKey) {
-      const data = GDL_STAGE_DATA[stageKey];
-      if (!data) return;
-      document.getElementById('gdlStageInspector').innerHTML = `
-        <div style="font-weight: 700; color: #38bdf8; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 4px;">
-          ${data.title}
-        </div>
-        <div style="color: #cbd5e1; line-height: 1.45; font-size: 0.74rem;">
-          ${data.desc}
-        </div>
-        <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #94a3b8;">
-          <div><span style="color: #38bdf8;">Group Symmetry:</span> <span>${data.group}</span></div>
-          <div><span style="color: #c084fc;">C++ Kernel:</span> <span>${data.kernel}</span></div>
-          <div><span style="color: #4ade80;">Complexity:</span> <span>${data.complexity}</span></div>
-          <div><span style="color: #fbbf24;">Latency:</span> <span>${data.latency}</span></div>
-        </div>
-      `;
-    }
-
-    function toggleGdlLine(lineIdx) {
-      gdlActiveBits ^= (1 << lineIdx);
-      updateGdlHud();
-      renderQ6HypercubeSvg();
-      updateFwhtSim();
-    }
-
-    function updateGdlHud() {
-      const wen = getGdlHexNumber(gdlActiveBits);
-      const hexInfo = GDL_NAMES[wen] || { zh: "復", pinyin: "fù", en: "Return", pt: "Retorno" };
-      
-      const titleElem = document.getElementById('gdlHudTitle');
-      if (titleElem) titleElem.textContent = `${wen} · ${hexInfo.zh} ${hexInfo.pinyin} · ${hexInfo.en}`;
-      
-      const bitsElem = document.getElementById('gdlHudBits');
-      if (bitsElem) {
-        let bitStr = "";
-        for (let i = 5; i >= 0; i--) bitStr += ((gdlActiveBits >> i) & 1);
-        bitsElem.textContent = `Bits: 0b${bitStr}`;
-      }
-
-      const wenElem = document.getElementById('gdlHudWen');
-      if (wenElem) wenElem.textContent = `King Wen #${wen}`;
-
-      const lowerVal = gdlActiveBits & 7;
-      const upperVal = (gdlActiveBits >> 3) & 7;
-      const tLower = GDL_TRIGRAMS[lowerVal];
-      const tUpper = GDL_TRIGRAMS[upperVal];
-
-      const lowerElem = document.getElementById('gdlHudLower');
-      if (lowerElem) lowerElem.textContent = `${tLower.symbol} ${tLower.zh} ${tLower.py} (${tLower.en})`;
-
-      const upperElem = document.getElementById('gdlHudUpper');
-      if (upperElem) upperElem.textContent = `${tUpper.symbol} ${tUpper.zh} ${tUpper.py} (${tUpper.en})`;
-
-      // Update Line buttons
-      for (let i = 0; i < 8; i++) {
-        const btn = document.getElementById(`lineBtn${i}`);
-        const glyph = document.getElementById(`lineGlyph${i}`);
-        const isYang = ((gdlActiveBits >> i) & 1) === 1;
-        if (btn && glyph) {
-          if (isYang) {
-            btn.classList.add('yang');
-            glyph.textContent = "─────";
-          } else {
-            btn.classList.remove('yang');
-            glyph.textContent = "-- --";
-          }
-        }
-      }
-
-      // Composed Sentence from reading_words.gd logic
-      const sentenceElem = document.getElementById('gdlHudSentence');
-      if (sentenceElem) {
-        const movingLine = 1; // Body
-        const needName = GDL_LINE_NAMES[movingLine - 1];
-        sentenceElem.textContent = `"${needName} is the line that moved — it has been quiet since morning · a little would be welcome"`;
-      }
-    }
-
-    function renderQ6HypercubeSvg() {
-      const nodesGroup = document.getElementById('q6NodesGroup');
-      const edgesGroup = document.getElementById('q6EdgesGroup');
-      const activeEdgesGroup = document.getElementById('q6ActiveEdgesGroup');
-      if (!nodesGroup || !edgesGroup || !activeEdgesGroup) return;
-
-      // Generate Coxeter 2D projection of 64 vertices
-      const coords = [];
-      for (let i = 0; i < 64; i++) {
-        let x = 0, y = 0;
-        for (let k = 0; k < 6; k++) {
-          const bit = (i >> k) & 1;
-          const val = bit ? 1 : -1;
-          const angle = (2 * Math.PI * k) / 6.0;
-          x += val * Math.cos(angle) * 22;
-          y += val * Math.sin(angle) * 22;
-        }
-        coords.push({ x, y });
-      }
-
-      // Draw Edges if empty
-      if (edgesGroup.children.length === 0) {
-        let edgeHtml = "";
-        for (let i = 0; i < 64; i++) {
-          for (let k = 0; k < 6; k++) {
-            const j = i ^ (1 << k);
-            if (i < j) {
-              edgeHtml += `<line x1="${coords[i].x}" y1="${coords[i].y}" x2="${coords[j].x}" y2="${coords[j].y}" />`;
-            }
-          }
-        }
-        edgesGroup.innerHTML = edgeHtml;
-      }
-
-      // Draw Nodes if empty
-      if (nodesGroup.children.length === 0) {
-        let nodeHtml = "";
-        for (let i = 0; i < 64; i++) {
-          nodeHtml += `<circle id="q6node_${i}" cx="${coords[i].x}" cy="${coords[i].y}" r="3.2" fill="rgba(148,163,184,0.35)" style="cursor: pointer;" onclick="selectQ6Node(${i})" />`;
-        }
-        nodesGroup.innerHTML = nodeHtml;
-      }
-
-      // Highlight active node & its 6 Hamming-1 neighbors
-      const activeCoord = coords[gdlActiveBits];
-      const glow = document.getElementById('q6ActiveGlow');
-      const dot = document.getElementById('q6ActiveDot');
-      if (glow && dot && activeCoord) {
-        glow.setAttribute('cx', activeCoord.x);
-        glow.setAttribute('cy', activeCoord.y);
-        dot.setAttribute('cx', activeCoord.x);
-        dot.setAttribute('cy', activeCoord.y);
-      }
-
-      // Render the 6 incident Hamming-1 edges in amber
-      let activeEdgesHtml = "";
-      for (let k = 0; k < 6; k++) {
-        const neighbor = gdlActiveBits ^ (1 << k);
-        activeEdgesHtml += `<line x1="${activeCoord.x}" y1="${activeCoord.y}" x2="${coords[neighbor].x}" y2="${coords[neighbor].y}" />`;
-        const nodeElem = document.getElementById(`q6node_${neighbor}`);
-        if (nodeElem) nodeElem.setAttribute('fill', '#fbbf24');
-      }
-      activeEdgesGroup.innerHTML = activeEdgesHtml;
-    }
-
-    function selectQ6Node(idx) {
-      gdlActiveBits = idx;
-      updateGdlHud();
-      renderQ6HypercubeSvg();
-      updateFwhtSim();
-    }
-
-    // FWHT Simulation
-    function updateFwhtSim() {
-      const noiseSlider = document.getElementById('fwhtNoiseSlider');
-      const cutoffSlider = document.getElementById('fwhtCutoffSlider');
-      if (noiseSlider) gdlNoiseSigma = parseFloat(noiseSlider.value);
-      if (cutoffSlider) gdlSpectralCutoff = parseInt(cutoffSlider.value);
-
-      const noiseVal = document.getElementById('fwhtNoiseVal');
-      if (noiseVal) noiseVal.textContent = gdlNoiseSigma.toFixed(2);
-
-      const cutoffVal = document.getElementById('fwhtCutoffVal');
-      if (cutoffVal) cutoffVal.textContent = `${gdlSpectralCutoff} (Harmonic ${Math.floor(gdlSpectralCutoff / 2)})`;
-
-      drawFwhtCanvas();
-    }
-
-    function runFwhtStep() {
-      const pill = document.getElementById('fwhtStatusPill');
-      if (pill) {
-        pill.textContent = "Denoising Active (< 1.2 µs)";
-        pill.className = "gdl-chip gdl-chip-cyan";
-        setTimeout(() => {
-          pill.textContent = "Attractor Locked";
-          pill.className = "gdl-chip gdl-chip-green";
-        }, 400);
-      }
-      drawFwhtCanvas(true);
-    }
-
-    function resetFwhtSim() {
-      const noiseSlider = document.getElementById('fwhtNoiseSlider');
-      const cutoffSlider = document.getElementById('fwhtCutoffSlider');
-      if (noiseSlider) noiseSlider.value = "0.35";
-      if (cutoffSlider) cutoffSlider.value = "6";
-      updateFwhtSim();
-    }
-
-    function drawFwhtCanvas(isFiltered = false) {
-      const canvas = document.getElementById('fwhtCanvas');
+    function drawCreature3d() {
+      const canvas = document.getElementById('creature3dCanvas');
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       const w = canvas.width;
       const h = canvas.height;
-      const barW = (w - 20) / 64.0;
+      const cx = w * 0.5;
+      const cy = h * 0.5;
+      const scale = 1.32;
 
-      // Draw bars for 64 nodes
-      for (let i = 0; i < 64; i++) {
-        const x = 10 + i * barW;
-        const isTarget = (i === gdlActiveBits);
-        
-        let rawVal = isTarget ? 0.9 : 0.04;
-        rawVal += (Math.sin(i * 3.7) * 0.5 + 0.5) * gdlNoiseSigma * 0.6;
-        
-        let filteredVal = isTarget ? 0.92 : 0.01;
-        if (Math.abs(i - gdlActiveBits) === 1) filteredVal = 0.15;
+      ctx.clearRect(0, 0, w, h);
 
-        // Raw Bar (Cyan)
-        const barH1 = Math.min(rawVal * (h - 40), h - 30);
-        ctx.fillStyle = isTarget ? 'rgba(56, 189, 248, 0.9)' : 'rgba(56, 189, 248, 0.25)';
-        ctx.fillRect(x, h - 25 - barH1, barW - 1, barH1);
+      const tips3D = computeBallTips(creatureBits, creatureExt, creatureFold);
+      const tips2D = tips3D.map(pt => project3D(pt, creatureRotX, creatureRotY, cx, cy, scale));
 
-        // Filtered Bar (Amber)
-        if (isFiltered || gdlSpectralCutoff <= 6) {
-          const barH2 = Math.min(filteredVal * (h - 40), h - 30);
-          ctx.fillStyle = isTarget ? 'rgba(251, 191, 36, 0.95)' : 'rgba(251, 191, 36, 0.15)';
-          ctx.fillRect(x + 1, h - 25 - barH2, barW - 3, barH2);
-        }
-      }
-
-      // Baseline
-      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-      ctx.lineWidth = 1;
+      const hubProjected = project3D([0, 0, 0], creatureRotX, creatureRotY, cx, cy, scale);
+      const hubR = Math.max(6, 18 * hubProjected.factor);
+      const hubGrad = ctx.createRadialGradient(hubProjected.x, hubProjected.y, 2, hubProjected.x, hubProjected.y, hubR * 2.5);
+      hubGrad.addColorStop(0, 'rgba(56, 189, 248, 0.85)');
+      hubGrad.addColorStop(0.4, 'rgba(56, 189, 248, 0.25)');
+      hubGrad.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+      ctx.fillStyle = hubGrad;
       ctx.beginPath();
-      ctx.moveTo(10, h - 25);
-      ctx.lineTo(w - 10, h - 25);
-      ctx.stroke();
-    }
-
-    // Sheaf Simulation
-    function updateSheafSim() {
-      const slider = document.getElementById('sheafSlider');
-      if (slider) gdlDiffusionStep = parseInt(slider.value);
-      
-      const stepVal = document.getElementById('sheafStepVal');
-      if (stepVal) stepVal.textContent = `Step ${gdlDiffusionStep}`;
-
-      const naiveVar = Math.max(0.01, 1.0 / Math.pow(1.9, gdlDiffusionStep));
-      const sheafVar = Math.max(0.78, 0.95 - 0.015 * gdlDiffusionStep);
-
-      const naiveElem = document.getElementById('naiveVarVal');
-      if (naiveElem) naiveElem.textContent = `${naiveVar.toFixed(2)} (Collapse)`;
-
-      const sheafElem = document.getElementById('sheafVarVal');
-      if (sheafElem) sheafElem.textContent = `${sheafVar.toFixed(2)} (Stable)`;
-
-      drawSheafCanvas(naiveVar, sheafVar);
-    }
-
-    function drawSheafCanvas(naiveVar, sheafVar) {
-      const canvas = document.getElementById('sheafCanvas');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const cx1 = canvas.width * 0.28;
-      const cx2 = canvas.width * 0.72;
-      const cy = canvas.height * 0.5;
-
-      // Draw Naive cluster (Left)
-      ctx.fillStyle = 'rgba(251,113,133,0.15)';
-      ctx.beginPath();
-      ctx.arc(cx1, cy, 50 * naiveVar + 12, 0, Math.PI * 2);
+      ctx.arc(hubProjected.x, hubProjected.y, hubR * 2.5, 0, Math.PI * 2);
       ctx.fill();
 
-      // Draw Sheaf cluster (Right)
-      ctx.fillStyle = 'rgba(74,222,128,0.15)';
-      ctx.beginPath();
-      ctx.arc(cx2, cy, 65, 0, Math.PI * 2);
-      ctx.fill();
+      const elements = [];
 
-      // Draw individual points
-      for (let i = 0; i < 24; i++) {
-        const angle = (i / 24.0) * Math.PI * 2;
-        
-        // Naive point (contracts to center)
-        const r1 = (35 * naiveVar + 4) * (0.6 + 0.4 * Math.sin(i * 1.5));
-        const px1 = cx1 + Math.cos(angle) * r1;
-        const py1 = cy + Math.sin(angle) * r1;
-        ctx.fillStyle = '#fb7185';
-        ctx.beginPath();
-        ctx.arc(px1, py1, 3, 0, Math.PI * 2);
-        ctx.fill();
+      const cords = computeBallCords();
+      cords.forEach(([a, b]) => {
+        const p1 = tips2D[a];
+        const p2 = tips2D[b];
+        const avgZ = (p1.z + p2.z) * 0.5;
 
-        // Sheaf point (maintains distinct harmonic angles)
-        const r2 = 55 * (0.8 + 0.2 * Math.sin(i * 2.3));
-        const px2 = cx2 + Math.cos(angle) * r2;
-        const py2 = cy + Math.sin(angle) * r2;
-        ctx.fillStyle = '#4ade80';
-        ctx.beginPath();
-        ctx.arc(px2, py2, 3, 0, Math.PI * 2);
-        ctx.fill();
+        const dx = tips3D[a][0] - tips3D[b][0];
+        const dy = tips3D[a][1] - tips3D[b][1];
+        const dz = tips3D[a][2] - tips3D[b][2];
+        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        const strain = (dist - BALL_CORD) / BALL_CORD;
+
+        elements.push({
+          type: 'cord',
+          z: avgZ,
+          p1, p2, strain
+        });
+      });
+
+      for (let i = 0; i < 6; i++) {
+        const p1 = tips2D[2 * i];
+        const p2 = tips2D[2 * i + 1];
+        const avgZ = (p1.z + p2.z) * 0.5;
+        const isYang = ((creatureBits >> i) & 1) === 1;
+
+        elements.push({
+          type: 'strut',
+          z: avgZ,
+          p1, p2,
+          strutIdx: i,
+          isYang: isYang,
+          color: NEED_CONFIG[i].color
+        });
       }
 
-      // Labels
-      ctx.fillStyle = '#fb7185';
-      ctx.font = '10px JetBrains Mono';
-      ctx.textAlign = 'center';
-      ctx.fillText(`Naive GCN: Var=${naiveVar.toFixed(2)}`, cx1, canvas.height - 15);
+      elements.sort((e1, e2) => e2.z - e1.z);
 
-      ctx.fillStyle = '#4ade80';
-      ctx.fillText(`Sheaf: Var=${sheafVar.toFixed(2)}`, cx2, canvas.height - 15);
-    }
+      elements.forEach(el => {
+        if (el.type === 'cord') {
+          const alpha = Math.max(0.2, Math.min(0.9, 0.55 + el.strain * 1.5));
+          ctx.beginPath();
+          ctx.moveTo(el.p1.x, el.p1.y);
+          ctx.lineTo(el.p2.x, el.p2.y);
+          ctx.strokeStyle = el.strain > 0.05
+            ? `rgba(56, 189, 248, ${alpha})`
+            : `rgba(34, 211, 238, ${alpha * 0.7})`;
+          ctx.lineWidth = Math.max(1.0, 1.8 * el.p1.factor);
+          ctx.stroke();
+        } else if (el.type === 'strut') {
+          const p1 = el.p1;
+          const p2 = el.p2;
+          const strutW = Math.max(3.5, 6.5 * p1.factor);
 
-    // Hodge Simulation
-    function simHodgeLoop() {
-      const badge = document.getElementById('hodgeCurlBadge');
-      const text = document.getElementById('hodgeStatusText');
-      if (badge) {
-        badge.className = "gdl-chip gdl-chip-rose";
-        badge.textContent = "CURL: 0.88 (LOOP TRAPPED)";
-      }
-      if (text) {
-        text.textContent = "Loop Vortex Active";
-        text.setAttribute('fill', '#fb7185');
-      }
-      for (let i = 0; i < 4; i++) {
-        const edge = document.getElementById(`hodgeEdge${i}`);
-        if (edge) {
-          edge.setAttribute('stroke', '#fb7185');
-          edge.setAttribute('marker-end', 'url(#hodgeArrowRed)');
+          if (el.isYang) {
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = el.color;
+            ctx.lineWidth = strutW;
+            ctx.shadowColor = el.color;
+            ctx.shadowBlur = 8;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+          } else {
+            const mx = (p1.x + p2.x) * 0.5;
+            const my = (p1.y + p2.y) * 0.5;
+            const vx = (p2.x - p1.x);
+            const vy = (p2.y - p1.y);
+            const len = Math.sqrt(vx*vx + vy*vy);
+            const ux = vx / len;
+            const uy = vy / len;
+            const gap = Math.min(14, len * 0.16);
+
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(mx - ux * gap, my - uy * gap);
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = strutW;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(mx + ux * gap, my + uy * gap);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = strutW;
+            ctx.stroke();
+          }
+
+          [p1, p2].forEach((tip, tIdx) => {
+            const r = Math.max(2.5, 4.5 * tip.factor);
+            ctx.beginPath();
+            ctx.arc(tip.x, tip.y, r, 0, Math.PI * 2);
+            ctx.fillStyle = el.isYang ? '#fbbf24' : '#94a3b8';
+            ctx.fill();
+          });
+
+          const midX = (p1.x + p2.x) * 0.5;
+          const midY = (p1.y + p2.y) * 0.5;
+          ctx.font = `bold ${Math.max(9, Math.floor(11 * p1.factor))}px 'JetBrains Mono', monospace`;
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText((el.strutIdx + 1).toString(), midX, midY - 8);
         }
-      }
-      const exitEdge = document.getElementById('hodgeExitEdge');
-      if (exitEdge) exitEdge.setAttribute('opacity', '0.2');
-    }
-
-    function applyHodgeProjection() {
-      const badge = document.getElementById('hodgeCurlBadge');
-      const text = document.getElementById('hodgeStatusText');
-      if (badge) {
-        badge.className = "gdl-chip gdl-chip-cyan";
-        badge.textContent = "CURL: 0.00 (LOOP BROKEN)";
-      }
-      if (text) {
-        text.textContent = "Hodge Projection: Gradient Resumed";
-        text.setAttribute('fill', '#38bdf8');
-      }
-      for (let i = 0; i < 4; i++) {
-        const edge = document.getElementById(`hodgeEdge${i}`);
-        if (edge) {
-          edge.setAttribute('stroke', '#38bdf8');
-          edge.setAttribute('marker-end', 'url(#hodgeArrowBlue)');
-        }
-      }
-      const exitEdge = document.getElementById('hodgeExitEdge');
-      if (exitEdge) {
-        exitEdge.setAttribute('opacity', '1.0');
-        exitEdge.setAttribute('stroke-width', '3');
-      }
+      });
     }
 
 </script>
