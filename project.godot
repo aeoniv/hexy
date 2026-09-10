@@ -1,21 +1,14 @@
 ; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; but it can also be edited by hand.
+
 config_version=5
 
 [application]
 
-config/name="ix64-hexy"
-; THE BUILD ID, AND IT IS ON THE GLASS. v8 step 4 puts a `build` row on the
-; panel `[ inside ]` opens, and the ruling above that panel is that a person can
-; read every fact the app is standing on without asking anybody. There was no
-; build id in this repo at all before that row existed; this is it, and
-; `oracle_wiring.build_id()` prints exactly this string and never invents one.
-; BUMP IT WHEN A BUILD IS CUT — an id that never changes is a row that lies the
-; second time somebody reads it.
-config/version="v8.4"
+config/name="hexy-mnn-iching"
+config/version="1.0"
 run/main_scene="res://scenes/main.tscn"
-; Without this every Android export logs `ERROR: No project icon specified` and
-; exits 255 — a red build for a missing picture. A flat-top hexagon in Hexy's
-; own palette: body #5CC9A6, edge #388C73.
 config/icon="res://icon.png"
 config/features=PackedStringArray("4.7", "Mobile")
 
@@ -29,21 +22,6 @@ window/stretch/aspect="expand"
 
 [input_devices]
 
-; ── THE SENSORS, SWITCHED ON (chirp24) ──────────────────────────────────────
-;
-; THIS SECTION DID NOT EXIST, AND THAT WAS A FIELD DEFECT. Godot registers no
-; Android sensor listener unless the project asks for one, and these default to
-; OFF — so `Input.get_gravity()` returned the zero vector on two perfectly good
-; handsets, every HexCam sidecar came back with `orientation: {}`, and the one
-; piece of camera pose a phone knows for free never reached a solver.
-;
-; `ambient.sample(Input.get_accelerometer().length(), ...)` in main.gd was
-; starving on the same missing switch, silently, since Phase 15: the creature's
-; carried-ness evidence has been a constant zero on every build so far.
-;
-; NONE OF THE THREE IS A PROTECTED SENSOR on any Android API level, so this adds
-; nothing to the manifest and nothing to the four consent switches. The
-; gyroscope is on for the placement guide's tilt (see `RigPlan`).
 sensors/enable_accelerometer=true
 sensors/enable_gravity=true
 sensors/enable_gyroscope=true
@@ -57,4 +35,4 @@ textures/vram_compression/import_etc2_astc=true
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/ixmesh/plugin.cfg", "res://addons/ixmnn/plugin.cfg", "res://addons/ixloc/plugin.cfg", "res://addons/ixbody/plugin.cfg", "res://addons/ixvoice/plugin.cfg", "res://addons/ixcap/plugin.cfg", "res://addons/ixlens/plugin.cfg")
+enabled=PackedStringArray("res://addons/ixmnn/plugin.cfg")
