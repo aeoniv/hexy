@@ -1,74 +1,108 @@
-class_name SensorOracle
+﻿class_name SensorOracle
 extends Node
 
-## Hexy Autonomous Sensor Fusion & Coherence Engine
-## Tier 1: Afferent Sensor Fusion (Kalman/EMA filter for Gravity, Accel, Gyro, Mag)
-## Tier 2: Ba-Gua Topological Manifold (Spherical Voronoi Gravity -> Lower Trigram, Heading -> Upper Trigram)
-## Tier 3: Temporal Coherence & Hysteresis (Schmitt Trigger + Hamming Distance d=1 walk)
-## Tier 4: Tensegrity Equilibrium Coupling & Autonomous MNN Thought Trigger
+## Autonomous Cybernetic Sensor Fusion & Dynamic Line Strain Engine
+## Integrates multi-modal afferent telemetry from hardware:
+## - 3D Inclinometer / Accelerometer (Tilt strain on lower lines)
+## - Tri-Axis Gyroscope (Kinetic perturbation & whirlpool flux)
+## - 3D Geomagnetic Magnetometer (Azimuth heading & polar strain)
+## - Ambient Light Sensor (Solar illuminance & twilight flare)
+## - Infrared Proximity Sensor (Occultation / Palm eclipse hover)
+## - Battery State & Diurnal Chronos (Vitality metabolism & solar hour)
+## - Kinetic Jerk (Coin divination reservoir)
+##
+## Cybernetic Principle:
+## Manual intent (dialing or casting) establishes the sovereign equilibrium anchor.
+## Physical stillness preserves the chosen hexagram indefinitely (no static angle traps).
+## Sustained physical gestures accumulate line strain, mutating one line at a time (d=1 Hamming).
 
 signal shake_started()
-signal shake_progress(normalized_energy: float)
-signal shake_cast_completed(wen_index: int, moving_line: int, hex_bits: int)
+signal shake_progress(progress: float)
+signal shake_cast_completed(wen: int, moving_line: int, bits: int)
 signal autonomous_mutation_stepped(new_bits: int, moving_line: int, reason: String)
 signal autonomous_thought_requested(prompt: String)
-signal sensor_telemetry_updated(gravity: Vector3, heading: float, energy: float, lower_tri: int, upper_tri: int)
+signal sensor_telemetry_updated(grav: Vector3, heading: float, jerk: float, lower: int, upper: int)
 
 @export var enabled: bool = false
-@export var shake_threshold: float = 13.0 # m/s^2 linear jerk threshold
-@export var energy_to_cast: float = 24.0   # Accumulated energy for intentional shake cast
-@export var settle_duration: float = 0.35  # Settle time for shake cast
+@export var shake_threshold: float = 18.0
+@export var energy_to_cast: float = 85.0
+@export var settle_duration: float = 0.55
 
-# Afferent Filtered State (Tier 1)
+# Sovereign Homeostatic Anchor
+var current_hex_bits: int = 0b111111 # Manifested Hexagram bits (0..63)
+var anchor_hex_bits: int = 0b111111
+var anchor_grav: Vector3 = Vector3(0.0, -9.8, 0.0)
+var anchor_heading: float = 0.0
+var anchor_lux: float = 250.0
+
+# Filtered Afferent Sensor Telemetry
 var filtered_grav: Vector3 = Vector3(0.0, -9.8, 0.0)
-var filtered_mag: Vector3 = Vector3(0.0, 0.0, -1.0)
 var filtered_gyro: Vector3 = Vector3.ZERO
+var filtered_mag: Vector3 = Vector3.ZERO
 var filtered_jerk: float = 0.0
 var current_heading_deg: float = 0.0
+var current_lux: float = 250.0
+var current_proximity: float = 5.0 # cm (>= 5.0 is clear, < 3.0 is covered/eclipse)
+var current_battery: float = 100.0 # percentage
+var solar_hour: float = 12.0
 
-# Hysteresis & State Coherence (Tier 3)
-var current_hex_bits: int = 0b111111 # Hexagram 1 (The Creative)
-var candidate_hex_bits: int = 0b111111
-var candidate_dwell_time: float = 0.0
-const DWELL_THRESHOLD: float = 0.55 # Must dwell in sector for 0.55s
-const MUTATION_COOLDOWN: float = 1.0 # Min cooldown between autonomous line steps
+# Dynamic Kinetic Excitation & Line Strain Field
+var kinetic_excitation: float = 0.0 # 0.0 (stillness) to 1.0 (mutation threshold)
+var line_strains: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 var last_mutation_time: float = 0.0
+const MUTATION_COOLDOWN: float = 3.5 # Minimum seconds between autonomous line mutations
 var step_mutation_count: int = 0
 
-# Shake Divination State
+# Coin Toss Divination State
 var shake_energy: float = 0.0
 var last_shake_time: float = 0.0
 var is_shaking: bool = false
 var last_haptic_time: float = 0.0
 
-# Trigram metadata: 0=Earth (坤), 1=Thunder (震), 2=Water (坎), 3=Lake (兌), 4=Mountain (艮), 5=Fire (離), 6=Wind (巽), 7=Heaven (乾)
+# Trigram metadata
 const TRIGRAM_NAMES: Array[String] = ["坤 Earth", "震 Thunder", "坎 Water", "兌 Lake", "艮 Mountain", "離 Fire", "巽 Wind", "乾 Heaven"]
-const TRIGRAM_SYMBOLS: Array[String] = ["☷", "☳", "☵", "☱", "☶", "☲", "☴", "☰"]
+
+func _ready() -> void:
+	anchor_grav = Vector3(0.0, -9.8, 0.0)
+	filtered_grav = anchor_grav
+	var time_dict = Time.get_time_dict_from_system()
+	solar_hour = float(time_dict.get("hour", 12)) + float(time_dict.get("minute", 0)) / 60.0
 
 func set_enabled(val: bool) -> void:
 	enabled = val
 	if not enabled:
 		shake_energy = 0.0
 		is_shaking = false
-		candidate_dwell_time = 0.0
+		kinetic_excitation = 0.0
+		for i in range(6):
+			line_strains[i] = 0.0
+
+func inject_manual_state(bits: int, _moving_line: int = -1) -> void:
+	## Ingests manual user intention as sovereign equilibrium anchor
+	current_hex_bits = bits
+	anchor_hex_bits = bits
+	anchor_grav = filtered_grav
+	anchor_heading = current_heading_deg
+	anchor_lux = current_lux
+	kinetic_excitation = 0.0
+	for i in range(6):
+		line_strains[i] = 0.0
+	last_mutation_time = Time.get_ticks_msec() * 0.001 + 2.5 # Grace cooldown after user interaction
 
 func _process(delta: float) -> void:
-	if not enabled:
-		return
-		
 	var now: float = Time.get_ticks_msec() * 0.001
 	
-	# --- TIER 1: AFFERENT SENSOR FUSION & FILTERING ---
+	# --- TIER 1: MULTI-MODAL AFFERENT SENSOR ACQUISITION ---
 	var raw_acc: Vector3 = Input.get_accelerometer()
 	var raw_grav: Vector3 = Input.get_gravity()
 	var raw_gyro: Vector3 = Input.get_gyroscope()
 	var raw_mag: Vector3 = Input.get_magnetometer()
 	
-	# Exponential Moving Average (alpha=0.15 for smooth gravity, alpha=0.35 for dynamic response)
+	# Gravity filtering
 	if raw_grav.length_squared() > 1.0:
 		filtered_grav = filtered_grav.lerp(raw_grav, delta * 8.0)
-	else:
-		filtered_grav = filtered_grav.lerp(Vector3(0.0, -9.8, 0.0), delta * 2.0)
+	elif raw_acc.length_squared() > 1.0:
+		filtered_grav = filtered_grav.lerp(raw_acc, delta * 2.0)
 		
 	filtered_gyro = filtered_gyro.lerp(raw_gyro, delta * 12.0)
 	if raw_mag.length_squared() > 1.0:
@@ -78,14 +112,21 @@ func _process(delta: float) -> void:
 	var jerk: float = linear_vec.length()
 	filtered_jerk = lerp(filtered_jerk, jerk, delta * 10.0)
 	
-	# Compute Azimuth Heading (Compass)
+	# Azimuth Heading
 	if filtered_mag.length_squared() > 0.01:
 		var heading_rad: float = atan2(-filtered_mag.x, -filtered_mag.y)
 		current_heading_deg = posmod(rad_to_deg(heading_rad), 360.0)
 		
-	# --- INTENTIONAL SHAKE DETECTION (Coins divination) ---
+	# Hardware Light, Proximity & Battery from Android Plugin (with graceful fallbacks)
+	_sample_hardware_extensions()
+	
+	# Local Solar Time
+	var time_dict = Time.get_time_dict_from_system()
+	solar_hour = float(time_dict.get("hour", 12)) + float(time_dict.get("minute", 0)) / 60.0
+
+	# --- TIER 2: COIN TOSS DIVINATION (Vigorous intentional shaking) ---
 	if jerk > shake_threshold:
-		shake_energy = min(shake_energy + jerk * delta * 10.0, 100.0)
+		shake_energy = min(shake_energy + jerk * delta * 12.0, 100.0)
 		last_shake_time = now
 		if not is_shaking:
 			is_shaking = true
@@ -106,104 +147,109 @@ func _process(delta: float) -> void:
 		return
 	else:
 		shake_energy = max(0.0, shake_energy - delta * 25.0)
-		
-	# --- TIER 2: BA-GUA TOPOLOGICAL MANIFOLD CLASSIFICATION ---
-	var lower_tri: int = _classify_lower_trigram_from_gravity(filtered_grav)
-	var upper_tri: int = _classify_upper_trigram_from_heading(current_heading_deg)
-	var raw_hex_bits: int = (upper_tri << 3) | (lower_tri & 0x07)
+
+	if not enabled:
+		return
+
+	# --- TIER 3: DYNAMIC PERTURBATION & RELATIVE FLUX ---
+	var delta_grav: Vector3 = filtered_grav - anchor_grav
+	var tilt_pitch: float = abs(delta_grav.y) + abs(delta_grav.z)
+	var tilt_roll: float = abs(delta_grav.x)
+	var gyro_speed: float = filtered_gyro.length()
+	var d_heading: float = abs(angle_difference(deg_to_rad(current_heading_deg), deg_to_rad(anchor_heading)))
+	var is_eclipse: bool = (current_proximity >= 0.0 and current_proximity < 3.5)
+	var delta_lux: float = abs(current_lux - anchor_lux)
 	
-	sensor_telemetry_updated.emit(filtered_grav, current_heading_deg, filtered_jerk, lower_tri, upper_tri)
+	# Overall physical movement flux
+	var kinetic_flux: float = (
+		tilt_pitch * 0.15 +
+		tilt_roll * 0.18 +
+		gyro_speed * 0.25 +
+		d_heading * 0.35 +
+		jerk * 0.08 +
+		(1.2 if is_eclipse else 0.0)
+	)
 	
-	# --- TIER 3: TEMPORAL COHERENCE & HYSTERESIS ---
-	if raw_hex_bits == candidate_hex_bits:
-		candidate_dwell_time += delta
+	# Homeostatic excitation / cooling:
+	if kinetic_flux > 0.35:
+		kinetic_excitation = min(1.0, kinetic_excitation + kinetic_flux * delta * 0.35)
 	else:
-		candidate_hex_bits = raw_hex_bits
-		candidate_dwell_time = 0.0
+		kinetic_excitation = max(0.0, kinetic_excitation - delta * 0.5)
 		
-	# Check if candidate has dwelled steadily beyond threshold and cooldown elapsed
-	if candidate_dwell_time >= DWELL_THRESHOLD and (now - last_mutation_time >= MUTATION_COOLDOWN):
-		if current_hex_bits != candidate_hex_bits:
-			# HAMMING DISTANCE d=1 CONSTRAINT:
-			# Mutate exactly one line at a time towards candidate
-			var diff_mask: int = current_hex_bits ^ candidate_hex_bits
-			var line_to_flip: int = -1
-			for b in range(6):
-				if ((diff_mask >> b) & 1) == 1:
-					line_to_flip = b
-					break
-					
-			if line_to_flip >= 0:
-				current_hex_bits ^= (1 << line_to_flip)
-				last_mutation_time = now
-				candidate_dwell_time = 0.0 # reset dwell for next line step
-				step_mutation_count += 1
-				
-				var is_now_yang: bool = ((current_hex_bits >> line_to_flip) & 1) == 1
-				var reason: String = "Posture: %s | Azimuth: %s ➔ Line %d %s" % [
-					TRIGRAM_NAMES[lower_tri],
-					TRIGRAM_NAMES[upper_tri],
-					line_to_flip + 1,
-					"Igniting into Yang" if is_now_yang else "Yielding into Yin"
-				]
-				
-				Input.vibrate_handheld(15) # Gentle tactile line mutation feedback
-				autonomous_mutation_stepped.emit(current_hex_bits, line_to_flip, reason)
-				
-				# If settled after multiple steps, request spontaneous MNN thought
-				if step_mutation_count >= 3:
-					step_mutation_count = 0
-					var prompt: String = "In one evocative sentence, reflect as the I-Ching on mutating into Hexagram binary 0b%06s through physical stillness and balance." % String.num_int64(current_hex_bits, 2).pad_zeros(6)
-					autonomous_thought_requested.emit(prompt)
+	# Distribute strain across the 6 lines:
+	line_strains[0] = lerp(line_strains[0], clamp(jerk / 8.0, 0.0, 1.0), delta * 3.0)
+	line_strains[1] = lerp(line_strains[1], clamp(tilt_pitch / 4.0, 0.0, 1.0), delta * 4.0)
+	line_strains[2] = lerp(line_strains[2], clamp(tilt_roll / 3.5, 0.0, 1.0), delta * 4.0)
+	line_strains[3] = lerp(line_strains[3], 1.0 if is_eclipse else 0.0, delta * 5.0)
+	line_strains[4] = lerp(line_strains[4], clamp(delta_lux / 250.0, 0.0, 1.0), delta * 3.0)
+	line_strains[5] = lerp(line_strains[5], clamp(d_heading / 0.8, 0.0, 1.0), delta * 3.0)
+	
+	var lower_tri: int = current_hex_bits & 0x07
+	var upper_tri: int = (current_hex_bits >> 3) & 0x07
+	sensor_telemetry_updated.emit(filtered_grav, current_heading_deg, filtered_jerk, lower_tri, upper_tri)
 
-func _classify_lower_trigram_from_gravity(g: Vector3) -> int:
-	# Spherical Voronoi Posture Classification
-	# g: (gx, gy, gz) in m/s^2. Earth gravity is ~ 9.8.
-	# Phone flat on back (screen up): gz ~ +9.8 -> 000 Earth (坤)
-	if g.z > 6.5:
-		return 0 # 坤 Earth
-	# Phone upright portrait: gy ~ -9.8 -> 111 Heaven (乾)
-	if g.y < -6.5:
-		return 7 # 乾 Heaven
-	# Phone face down: gz ~ -6.5 -> 100 Mountain (艮)
-	if g.z < -5.5:
-		return 4 # 艮 Mountain
-	# Phone upside down: gy ~ +6.5 -> 011 Lake (兌)
-	if g.y > 5.5:
-		return 3 # 兌 Lake
-	# Phone tilted left (landscape left): gx ~ -5.0 -> 001 Thunder (震)
-	if g.x < -4.0:
-		return 1 # 震 Thunder
-	# Phone tilted right: gx ~ +5.0 -> 110 Wind (巽)
-	if g.x > 4.0:
-		return 6 # 巽 Wind
-	# Pitched forward (leaning away): -> 010 Water (坎)
-	if g.z < -2.0 and g.y < -2.0:
-		return 2 # 坎 Water
-	# Pitched back (leaning toward user): -> 101 Fire (離)
-	if g.z > 2.0 and g.y < -2.0:
-		return 5 # 離 Fire
-		
-	return 7 # Default Heaven if upright tilt
+	# --- TIER 4: HAMMING d=1 MUTATION ON HIGH STRAIN ---
+	if kinetic_excitation >= 0.92 and (now - last_mutation_time >= MUTATION_COOLDOWN):
+		var max_strain: float = -1.0
+		var line_to_flip: int = -1
+		for i in range(6):
+			if line_strains[i] > max_strain:
+				max_strain = line_strains[i]
+				line_to_flip = i
+				
+		if line_to_flip >= 0 and max_strain > 0.35:
+			current_hex_bits ^= (1 << line_to_flip)
+			anchor_hex_bits = current_hex_bits
+			anchor_grav = filtered_grav
+			anchor_heading = current_heading_deg
+			anchor_lux = current_lux
+			kinetic_excitation = 0.0
+			for i in range(6):
+				line_strains[i] = 0.0
+			last_mutation_time = now
+			step_mutation_count += 1
+			
+			var is_yang: bool = ((current_hex_bits >> line_to_flip) & 1) == 1
+			var strain_reasons: Array[String] = [
+				"Kinetic Impact / Jerk",
+				"Pitch Tilt / Gravitational Incline",
+				"Roll Tilt / Lateral Horizon",
+				"Occultation / Palm Eclipse",
+				"Celestial Lux Flux",
+				"Geomagnetic Azimuth Turning"
+			]
+			var reason: String = "Physical Strain: %s ➔ Line %d %s" % [
+				strain_reasons[line_to_flip],
+				line_to_flip + 1,
+				"Ignited into Yang ⚊" if is_yang else "Yielded into Yin ⚋"
+			]
+			
+			Input.vibrate_handheld(20)
+			autonomous_mutation_stepped.emit(current_hex_bits, line_to_flip, reason)
+			
+			if step_mutation_count >= 3:
+				step_mutation_count = 0
+				var prompt: String = "In one evocative sentence, reflect as the I-Ching on mutating into Hexagram binary 0b%06s through physical stillness and balance." % String.num_int64(current_hex_bits, 2).pad_zeros(6)
+				autonomous_thought_requested.emit(prompt)
 
-func _classify_upper_trigram_from_heading(heading_deg: float) -> int:
-	# Later Heaven (King Wen) Compass Rose Cardinal Mapping:
-	# Sector angle = 45 degrees per trigram (centered at each cardinal/intercardinal)
-	var norm_deg: float = posmod(heading_deg + 22.5, 360.0)
-	var sector: int = int(norm_deg / 45.0)
-	match sector:
-		0: return 2 # North: 坎 Water
-		1: return 4 # North-East: 艮 Mountain
-		2: return 1 # East: 震 Thunder
-		3: return 6 # South-East: 巽 Wind
-		4: return 5 # South: 離 Fire
-		5: return 0 # South-West: 坤 Earth
-		6: return 3 # West: 兌 Lake
-		7: return 7 # North-West: 乾 Heaven
-	return 5 # Default South Fire
+func _sample_hardware_extensions() -> void:
+	if Engine.has_singleton("IxMnn"):
+		var mnn = Engine.get_singleton("IxMnn")
+		if mnn:
+			if mnn.has_method("get_ambient_lux"):
+				var lux_val: float = mnn.get_ambient_lux()
+				if lux_val >= 0.0:
+					current_lux = lerp(current_lux, lux_val, 0.15)
+			if mnn.has_method("get_proximity"):
+				var prox: float = mnn.get_proximity()
+				if prox >= 0.0:
+					current_proximity = prox
+			if mnn.has_method("get_battery_level"):
+				var bat: float = mnn.get_battery_level()
+				if bat >= 0.0:
+					current_battery = bat
 
 func _execute_coin_toss_cast() -> void:
-	# Classical 3-Coin Divination Algorithm
 	var bits: int = 0
 	var moving_lines: Array[int] = []
 	for line in range(6):
@@ -221,30 +267,31 @@ func _execute_coin_toss_cast() -> void:
 	if moving_lines.size() > 0:
 		primary_moving = moving_lines[randi() % moving_lines.size()]
 		
-	current_hex_bits = bits
-	candidate_hex_bits = bits
-	candidate_dwell_time = 0.0
+	inject_manual_state(bits, primary_moving)
 	step_mutation_count = 0
 	
-	Input.vibrate_handheld(45) # Final affirmative cast haptic
+	Input.vibrate_handheld(45)
 	shake_cast_completed.emit(-1, primary_moving, bits)
 
 func get_telemetry_snapshot() -> Dictionary:
-	var l_tri: int = _classify_lower_trigram_from_gravity(filtered_grav)
-	var u_tri: int = _classify_upper_trigram_from_heading(current_heading_deg)
-	var cand_l_tri: int = candidate_hex_bits & 0b111
 	return {
 		"gravity": filtered_grav,
 		"gyro": filtered_gyro,
 		"heading": current_heading_deg,
 		"jerk": filtered_jerk,
+		"lux": current_lux,
+		"proximity": current_proximity,
+		"battery": current_battery,
+		"solar_hour": solar_hour,
+		"kinetic_excitation": kinetic_excitation,
+		"line_strains": line_strains.duplicate(),
 		"shake_energy": shake_energy,
 		"shake_progress": clamp(shake_energy / energy_to_cast, 0.0, 1.0),
-		"dwell_progress": clamp(candidate_dwell_time / DWELL_THRESHOLD, 0.0, 1.0),
-		"lower_trigram": l_tri,
-		"upper_trigram": u_tri,
-		"candidate_trigram": cand_l_tri,
+		"dwell_progress": kinetic_excitation,
+		"lower_trigram": current_hex_bits & 0x07,
+		"upper_trigram": (current_hex_bits >> 3) & 0x07,
+		"candidate_trigram": current_hex_bits & 0x07,
 		"current_bits": current_hex_bits,
-		"candidate_bits": candidate_hex_bits,
+		"candidate_bits": current_hex_bits,
 		"is_shaking": is_shaking
 	}

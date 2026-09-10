@@ -183,7 +183,7 @@ Java_com_ix64_hexy_mnn_IxMnnNative_nativeEmbeddingCreate(JNIEnv* env, jobject, j
 JNIEXPORT jint JNICALL
 Java_com_ix64_hexy_mnn_IxMnnNative_nativeEmbeddingDim(JNIEnv*, jobject, jlong handle) {
     auto* e = reinterpret_cast<Embedding*>(handle);
-    return e ? static_cast<jint>(e->getDimension()) : 0;
+    return e ? static_cast<jint>(e->dim()) : 0;
 }
 
 JNIEXPORT jfloatArray JNICALL
@@ -192,7 +192,7 @@ Java_com_ix64_hexy_mnn_IxMnnNative_nativeEmbed(JNIEnv* env, jobject, jlong handl
     if (!e) return env->NewFloatArray(0);
     std::vector<float> out;
     try {
-        auto var = e->embedding(toStd(env, text));
+        auto var = e->txt_embedding(toStd(env, text));
         if (var.get()) {
             auto info = var->getInfo();
             if (info && info->size > 0) {

@@ -25,6 +25,7 @@ window/stretch/aspect="expand"
 sensors/enable_accelerometer=true
 sensors/enable_gravity=true
 sensors/enable_gyroscope=true
+sensors/enable_magnetometer=true
 
 [rendering]
 

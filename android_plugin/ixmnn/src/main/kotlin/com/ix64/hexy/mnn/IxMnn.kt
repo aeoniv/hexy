@@ -2,6 +2,14 @@ package com.ix64.hexy.mnn
 
 import android.app.ActivityManager
 import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+
 import android.util.Log
 import org.godotengine.godot.Godot
 import org.godotengine.godot.plugin.GodotPlugin
@@ -18,7 +26,7 @@ const val PLUGIN_VERSION = "ixmnn/1"
  * MNN runtime host for MnnRuntime (scripts/brain/mnn_runtime.gd).
  * Provides JNI bindings for on-device Qwen LLM inference and GTE embeddings.
  */
-class IxMnn(godot: Godot) : GodotPlugin(godot) {
+class IxMnn(godot: Godot) : GodotPlugin(godot), SensorEventListener {
 
 	private companion object {
 		const val TAG = "IxMnn"
@@ -172,6 +180,62 @@ class IxMnn(godot: Godot) : GodotPlugin(godot) {
 	@UsedByGodot
 	fun chat_streaming(): Boolean = streaming.get()
 
+	
+	private var sensorManager: SensorManager? = null
+	private var lightSensor: Sensor? = null
+	private var proximitySensor: Sensor? = null
+	@Volatile private var ambientLux: Float = -1f
+	@Volatile private var proximityDistance: Float = -1f
+
+	private fun ensureSensors() {
+		if (sensorManager != null) return
+		val act = activity ?: return
+		val sm = act.getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+		sensorManager = sm
+		lightSensor = sm.getDefaultSensor(Sensor.TYPE_LIGHT)?.also {
+			sm.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+		}
+		proximitySensor = sm.getDefaultSensor(Sensor.TYPE_PROXIMITY)?.also {
+			sm.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+		}
+		Log.i(TAG, "Hardware sensors registered: light=" + (lightSensor != null) + ", prox=" + (proximitySensor != null))
+	}
+
+	override fun onSensorChanged(event: SensorEvent) {
+		when (event.sensor.type) {
+			Sensor.TYPE_LIGHT -> ambientLux = event.values[0]
+			Sensor.TYPE_PROXIMITY -> proximityDistance = event.values[0]
+		}
+	}
+
+	override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
+
+	@UsedByGodot
+	fun get_ambient_lux(): Float {
+		ensureSensors()
+		return ambientLux
+	}
+
+	@UsedByGodot
+	fun get_proximity(): Float {
+		ensureSensors()
+		return proximityDistance
+	}
+
+	@UsedByGodot
+	fun get_battery_level(): Float {
+		val act = activity ?: return -1f
+		return try {
+			val ifilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+			val batteryStatus = act.registerReceiver(null, ifilter) ?: return -1f
+			val level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+			val scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+			if (level >= 0 && scale > 0) (level.toFloat() / scale.toFloat()) * 100f else -1f
+		} catch (e: Exception) {
+			-1f
+		}
+	}
+
 	@UsedByGodot
 	fun release(): Unit = onWorker(Unit) {
 		if (embedHandle != 0L) IxMnnNative.nativeEmbeddingRelease(embedHandle)
@@ -182,6 +246,7 @@ class IxMnn(godot: Godot) : GodotPlugin(godot) {
 	}
 
 	override fun onMainDestroy() {
+		sensorManager?.unregisterListener(this)
 		release()
 		worker.shutdown()
 	}

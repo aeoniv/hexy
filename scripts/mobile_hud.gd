@@ -1,4 +1,4 @@
-extends Control
+﻿extends Control
 
 const MnnRuntime = preload("res://scripts/brain/mnn_runtime.gd")
 const MandalaDial2D = preload("res://scripts/mandala_dial_2d.gd")
@@ -183,22 +183,38 @@ func _on_sensor_telemetry_updated(g: Vector3, heading: float, jerk: float, lower
 		_update_telemetry_view()
 
 func _update_telemetry_view() -> void:
-	if last_telemetry_data.is_empty():
+	if not sensor_oracle:
 		return
-	var g: Vector3 = last_telemetry_data["g"]
-	var heading: float = last_telemetry_data["heading"]
-	var lower_name: String = SensorOracle.TRIGRAM_NAMES[last_telemetry_data["lower"]]
-	var upper_name: String = SensorOracle.TRIGRAM_NAMES[last_telemetry_data["upper"]]
-	lbl_thought.text = """⚡ Autonomous Sensor Fusion Telemetry:
-Posture (Lower): %s | Heading (Upper): %s (%.1f°)
-Gravity: (%.2f, %.2f, %.2f) m/s² | Jerk: %.2f
-Autonomous Hysteresis: Dwell Coherent (d=1 walk)
-MNN Neural Brain: %s (%s)
-Creature Mode: %s""" % [
-		lower_name, upper_name, heading,
-		g.x, g.y, g.z, last_telemetry_data["jerk"],
-		mnn.backend_name(), mnn.chat_model(),
-		creature_node.get_current_geometry_name() if creature_node else "N/A"
+	var telem: Dictionary = sensor_oracle.get_telemetry_snapshot()
+	var g: Vector3 = telem.get("gravity", Vector3.ZERO)
+	var heading: float = telem.get("heading", 0.0)
+	var lux_val: float = telem.get("lux", 0.0)
+	var prox_val: float = telem.get("proximity", 0.0)
+	var bat_val: float = telem.get("battery", 0.0)
+	var hr_val: float = telem.get("solar_hour", 12.0)
+	var exc_val: float = telem.get("kinetic_excitation", 0.0)
+	var strains: Array = telem.get("line_strains", [0, 0, 0, 0, 0, 0])
+	
+	var low_idx: int = telem.get("lower_trigram", 7)
+	var up_idx: int = telem.get("upper_trigram", 7)
+	var lower_name: String = SensorOracle.TRIGRAM_NAMES[low_idx]
+	var upper_name: String = SensorOracle.TRIGRAM_NAMES[up_idx]
+	
+	lbl_thought.text = """☸ MULTI-MODAL SENSOR MANDALA TELEMETRY:
+• Light: %.1f lux | Proximity: %.1f cm | Battery: %.0f%%
+• Gravity: (%.1f, %.1f, %.1f) m/s² | Heading: %.1f°
+• Solar Time: %02d:%02d | Jerk: %.1f m/s²
+• Lower Trigram: %s | Upper: %s
+• Kinetic Excitation: %.0f%% (Homeostatic Stillness)
+• Physical Strains: [L1:%.0f%%, L2:%.0f%%, L3:%.0f%%, L4:%.0f%%, L5:%.0f%%, L6:%.0f%%]
+• 8 Orbital Sensor Nodes: Active on 3D Mandala HUD""" % [
+		lux_val, prox_val, bat_val,
+		g.x, g.y, g.z, heading,
+		int(hr_val), int(fmod(hr_val * 60.0, 60.0)), telem.get("jerk", 0.0),
+		lower_name, upper_name,
+		exc_val * 100.0,
+		strains[0] * 100.0, strains[1] * 100.0, strains[2] * 100.0,
+		strains[3] * 100.0, strains[4] * 100.0, strains[5] * 100.0
 	]
 
 func _on_geo_toggle_pressed() -> void:
@@ -235,6 +251,9 @@ func _on_hexagram_changed(wen: int, bits: int, hex_name: String, zh: String) -> 
 	lbl_hex_char.text = zh
 	lbl_hex_title.text = "#%d %s %s" % [wen, zh, hex_name]
 	
+	if sensor_oracle:
+		sensor_oracle.inject_manual_state(bits, (wen % 6))
+	
 	if is_enhanced_mode:
 		lbl_hex_subtitle.text = "Binary: 0b%06s  (Lower: %d, Upper: %d)" % [
 			String.num_int64(bits, 2).pad_zeros(6),
@@ -260,8 +279,10 @@ func _on_cast_pressed() -> void:
 	mandala_dial._emit_current()
 	
 	var cur: Dictionary = mandala_dial.KING_WEN_DATA[rand_idx]
+	if sensor_oracle:
+		sensor_oracle.inject_manual_state(cur["bits"], (cur["wen"] % 6))
 	if is_enhanced_mode:
-		lbl_thought.text = "🪙 Cast Hexagram #%d %s: '%s'. Structural equilibrium adapting..." % [cur["wen"], cur["zh"], cur["name"]]
+		lbl_thought.text = "🪙 Cast Hexagram #%d %s: '%s'. Sovereign equilibrium anchored." % [cur["wen"], cur["zh"], cur["name"]]
 	else:
 		lbl_thought.text = "🪙 Cast Hexagram #%d %s: '%s'. Pure I-Ching persona consultation ready." % [cur["wen"], cur["zh"], cur["name"]]
 
