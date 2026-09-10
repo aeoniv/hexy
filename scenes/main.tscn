@@ -105,9 +105,14 @@ text = "🌀 HEXY"
 layout_mode = 2
 size_flags_horizontal = 3
 
+[node name="BtnGeoToggle" type="Button" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "⬡ ICOSA"
+
 [node name="BtnModeToggle" type="Button" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 11
 text = "⚡ ENHANCED"
 
 [node name="Spacer2" type="Control" parent="HUD/MobileHUD/TopBar/Margin/HBox"]

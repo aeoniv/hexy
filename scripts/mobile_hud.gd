@@ -6,6 +6,7 @@ const CreatureBall3D = preload("res://scripts/creature_ball_3d.gd")
 
 @onready var top_bar: PanelContainer = $TopBar
 @onready var lbl_title: Label = $TopBar/Margin/HBox/Title
+@onready var btn_geo_toggle: Button = $TopBar/Margin/HBox/BtnGeoToggle
 @onready var btn_mode_toggle: Button = $TopBar/Margin/HBox/BtnModeToggle
 @onready var lbl_fps: Label = $TopBar/Margin/HBox/FPS
 
@@ -44,6 +45,7 @@ func _ready() -> void:
 	if mandala_dial.has_signal("hexagram_changed"):
 		mandala_dial.connect("hexagram_changed", Callable(self, "_on_hexagram_changed"))
 	
+	btn_geo_toggle.pressed.connect(_on_geo_toggle_pressed)
 	btn_mode_toggle.pressed.connect(_on_mode_toggle_pressed)
 	btn_cast.pressed.connect(_on_cast_pressed)
 	btn_ask.pressed.connect(_on_ask_pressed)
@@ -60,6 +62,8 @@ func _ready() -> void:
 
 func setup_creature(creature: Node3D) -> void:
 	creature_node = creature
+	if creature_node and creature_node.has_method("get_current_geometry_name"):
+		btn_geo_toggle.text = creature_node.get_current_geometry_name()
 	if mandala_dial:
 		var cur_data: Dictionary = mandala_dial.KING_WEN_DATA[mandala_dial.current_hex_index]
 		if creature_node.has_method("set_hexagram"):
@@ -67,6 +71,14 @@ func setup_creature(creature: Node3D) -> void:
 
 func _process(_delta: float) -> void:
 	lbl_fps.text = "%d FPS" % Engine.get_frames_per_second()
+
+func _on_geo_toggle_pressed() -> void:
+	if creature_node and creature_node.has_method("cycle_geometry_mode"):
+		var _next_mode: int = creature_node.cycle_geometry_mode()
+		btn_geo_toggle.text = creature_node.get_current_geometry_name()
+		Input.vibrate_handheld(25)
+		var cur_name: String = creature_node.get_current_geometry_name()
+		lbl_thought.text = "Geometry Switched: %s. Re-anchoring tensegrity equilibrium across 6-bit cybernetic lines." % cur_name
 
 func _on_mode_toggle_pressed() -> void:
 	is_enhanced_mode = !is_enhanced_mode
@@ -77,12 +89,15 @@ func _update_mode_ui() -> void:
 	if is_enhanced_mode:
 		btn_mode_toggle.text = "⚡ ENHANCED"
 		btn_mode_toggle.modulate = Color(0.3, 0.95, 1.0)
+		btn_geo_toggle.visible = true
 		if creature_node:
 			creature_node.visible = true
+			btn_geo_toggle.text = creature_node.get_current_geometry_name()
 		lbl_thought.text = "⚡ Mode: ENHANCED (Structural Cybernetics). Hexagram 6-bit states, moving line mutations, and tensegrity equilibrium active."
 	else:
 		btn_mode_toggle.text = "☯ PURE"
 		btn_mode_toggle.modulate = Color(0.95, 0.8, 0.3)
+		btn_geo_toggle.visible = false
 		if creature_node:
 			creature_node.visible = false
 		lbl_thought.text = "☯ Mode: PURE (I-Ching Character Persona). Qwen acts strictly as the Book of Changes oracle persona without structural tensegrity math."
