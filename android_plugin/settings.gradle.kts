@@ -14,10 +14,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "ixhexy"
-include(":ixmesh")
 include(":ixmnn")
-include(":ixloc")
-include(":ixbody")
-include(":ixvoice")
-include(":ixcap")
-include(":ixlens")

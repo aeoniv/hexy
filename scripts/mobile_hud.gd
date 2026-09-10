@@ -27,14 +27,13 @@ const CreatureBall3D = preload("res://scripts/creature_ball_3d.gd")
 @onready var btn_next: Button = $Controls/HBox/BtnNext
 
 @onready var nav_bar: PanelContainer = $BottomNav
-@onready var tab_companion: Button = $BottomNav/HBox/TabCompanion
 @onready var tab_oracle: Button = $BottomNav/HBox/TabOracle
-@onready var tab_brain: Button = $BottomNav/HBox/TabBrain
-@onready var tab_telemetry: Button = $BottomNav/HBox/TabTelemetry
+@onready var tab_qwen: Button = $BottomNav/HBox/TabQwen
+@onready var tab_mnn: Button = $BottomNav/HBox/TabMnn
 
 var mnn: MnnRuntime
 var creature_node: Node3D
-var active_mode: String = "companion"
+var active_mode: String = "oracle"
 
 func _ready() -> void:
 	mnn = MnnRuntime.new()
@@ -50,12 +49,11 @@ func _ready() -> void:
 	btn_prev.pressed.connect(mandala_dial.select_prev)
 	btn_next.pressed.connect(mandala_dial.select_next)
 	
-	tab_companion.pressed.connect(func(): _switch_mode("companion"))
 	tab_oracle.pressed.connect(func(): _switch_mode("oracle"))
-	tab_brain.pressed.connect(func(): _switch_mode("brain"))
-	tab_telemetry.pressed.connect(func(): _switch_mode("telemetry"))
+	tab_qwen.pressed.connect(func(): _switch_mode("qwen"))
+	tab_mnn.pressed.connect(func(): _switch_mode("mnn"))
 	
-	_switch_mode("companion")
+	_switch_mode("oracle")
 
 func setup_creature(creature: Node3D) -> void:
 	creature_node = creature
@@ -95,39 +93,40 @@ func _on_cast_pressed() -> void:
 func _on_ask_pressed() -> void:
 	Input.vibrate_handheld(20)
 	var cur: Dictionary = mandala_dial.KING_WEN_DATA[mandala_dial.current_hex_index]
-	lbl_thought.text = "🧠 Consulting MNN (%s)...\nPrompt: 'Guidance on Hexagram #%d %s'" % [mnn.chat_model(), cur["wen"], cur["name"]]
+	lbl_thought.text = "🧠 Consulting Qwen via MNN...
+Prompt: 'Counsel on Hexagram #%d %s'" % [cur["wen"], cur["name"]]
 	
 	var reply: String = mnn.chat("What is the counsel of Hexagram %d %s?" % [cur["wen"], cur["name"]])
-	lbl_thought.text = "💬 Hexy (%s):\n%s" % [mnn.backend_name(), reply]
+	lbl_thought.text = "💬 Qwen (%s):
+%s" % [mnn.backend_name(), reply]
 
 func _switch_mode(mode: String) -> void:
 	active_mode = mode
-	tab_companion.modulate = Color(1.0, 1.0, 1.0, 1.0 if mode == "companion" else 0.5)
 	tab_oracle.modulate = Color(1.0, 1.0, 1.0, 1.0 if mode == "oracle" else 0.5)
-	tab_brain.modulate = Color(1.0, 1.0, 1.0, 1.0 if mode == "brain" else 0.5)
-	tab_telemetry.modulate = Color(1.0, 1.0, 1.0, 1.0 if mode == "telemetry" else 0.5)
+	tab_qwen.modulate = Color(1.0, 1.0, 1.0, 1.0 if mode == "qwen" else 0.5)
+	tab_mnn.modulate = Color(1.0, 1.0, 1.0, 1.0 if mode == "mnn" else 0.5)
 	
-	if mode == "companion":
+	if mode == "oracle":
 		mandala_container.visible = true
 		thought_bubble.visible = true
 		hex_card.visible = true
-	elif mode == "oracle":
-		mandala_container.visible = true
-		thought_bubble.visible = true
-		hex_card.visible = true
-	elif mode == "brain":
+	elif mode == "qwen":
 		mandala_container.visible = false
 		thought_bubble.visible = true
-		var v1: PackedFloat32Array = mnn.embed("hexy creature tensegrity")
-		var v2: PackedFloat32Array = mnn.embed("hexy creature tensegrity")
+		hex_card.visible = true
+		_on_ask_pressed()
+	elif mode == "mnn":
+		mandala_container.visible = false
+		thought_bubble.visible = true
+		hex_card.visible = false
+		var v1: PackedFloat32Array = mnn.embed("I-Ching Hexagram Balance")
+		var v2: PackedFloat32Array = mnn.embed("I-Ching Hexagram Balance")
 		var sim: float = MnnRuntime.cosine(v1, v2)
-		lbl_thought.text = "🧠 MNN Neural Brain Space:\nEmbed Dimension: %d\nSelf-Cosine Similarity: %.4f\nBackend: %s\nModel: %s" % [
-			mnn.embed_start(), sim, mnn.backend_name(), mnn.chat_model()
-		]
-	elif mode == "telemetry":
-		mandala_container.visible = false
-		thought_bubble.visible = true
-		var grav: Vector3 = Input.get_gravity()
-		lbl_thought.text = "⚡ Hardware & JNI Telemetry:\nDevice: Samsung Galaxy A22\nGPU: Mali-G57 MC2 (Vulkan 1.1)\nGravity Sensor: (%.2f, %.2f, %.2f)\nJNI Attached: %s\nStrut Count: 6 | Cord Count: 24" % [
-			grav.x, grav.y, grav.z, str(mnn.available())
+		lbl_thought.text = "⚡ MNN Runtime Telemetry:
+Backend: %s
+Model: %s
+Embedding Dim: %d
+Self-Cosine Similarity: %.4f
+JNI Attached: %s" % [
+			mnn.backend_name(), mnn.chat_model(), mnn.embed_dim(), sim, str(mnn.available())
 		]

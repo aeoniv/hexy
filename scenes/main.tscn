@@ -7,13 +7,13 @@
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
-background_color = Color(0.0588235, 0.0823529, 0.12549, 1)
+background_color = Color(0.05, 0.07, 0.1, 1)
 glow_enabled = true
 glow_intensity = 0.6
 glow_bloom = 0.25
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_glass"]
-bg_color = Color(0.0784314, 0.117647, 0.180392, 0.8)
+bg_color = Color(0.08, 0.11, 0.16, 0.8)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -86,19 +86,20 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_glass")
 
 [node name="Margin" type="MarginContainer" parent="HUD/MobileHUD/TopBar"]
 layout_mode = 2
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 8
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 6
 
 [node name="HBox" type="HBoxContainer" parent="HUD/MobileHUD/TopBar/Margin"]
 layout_mode = 2
+theme_override_constants/separation = 12
 
 [node name="Title" type="Label" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 0.85, 1, 1)
-theme_override_font_sizes/font_size = 20
-text = "🌀 HEXY"
+theme_override_font_sizes/font_size = 15
+text = "🌀 MNN + QWEN + I-CHING"
 
 [node name="Spacer" type="Control" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
 layout_mode = 2
@@ -106,37 +107,33 @@ size_flags_horizontal = 3
 
 [node name="Status" type="Label" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.75, 0.2, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.2, 0.9, 0.5, 1)
+theme_override_font_sizes/font_size = 13
 text = "MNN: ACTIVE"
-
-[node name="Spacer2" type="Control" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
-custom_minimum_size = Vector2(16, 0)
-layout_mode = 2
 
 [node name="FPS" type="Label" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.4, 0.9, 0.5, 1)
-theme_override_font_sizes/font_size = 14
-text = "60 FPS"
+theme_override_font_sizes/font_size = 13
+text = "80 FPS"
 
 [node name="HexCard" type="PanelContainer" parent="HUD/MobileHUD"]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
 offset_left = 16.0
-offset_top = 86.0
+offset_top = 84.0
 offset_right = -16.0
-offset_bottom = 176.0
+offset_bottom = 172.0
 grow_horizontal = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_glass")
 
 [node name="Margin" type="MarginContainer" parent="HUD/MobileHUD/HexCard"]
 layout_mode = 2
 theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 10
+theme_override_constants/margin_top = 8
 theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 10
+theme_override_constants/margin_bottom = 8
 
 [node name="VBox" type="VBoxContainer" parent="HUD/MobileHUD/HexCard/Margin"]
 layout_mode = 2
@@ -145,10 +142,10 @@ layout_mode = 2
 layout_mode = 2
 
 [node name="HexChar" type="Label" parent="HUD/MobileHUD/HexCard/Margin/VBox/HBox"]
-custom_minimum_size = Vector2(50, 0)
+custom_minimum_size = Vector2(46, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 0.75, 0.2, 1)
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 30
 text = "乾"
 horizontal_alignment = 1
 
@@ -159,19 +156,19 @@ size_flags_horizontal = 3
 [node name="HexTitle" type="Label" parent="HUD/MobileHUD/HexCard/Margin/VBox/HBox/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 15
 text = "#1 乾 The Creative"
 
 [node name="HexSubtitle" type="Label" parent="HUD/MobileHUD/HexCard/Margin/VBox/HBox/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.75, 0.9, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 11
 text = "Binary: 0b111111"
 
 [node name="MovingLine" type="Label" parent="HUD/MobileHUD/HexCard/Margin/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.3, 0.8, 1, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 11
 text = "Moving Line: Line 4 -> Mutating"
 
 [node name="ThoughtBubble" type="PanelContainer" parent="HUD/MobileHUD"]
@@ -179,24 +176,24 @@ layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
 offset_left = 16.0
-offset_top = 186.0
+offset_top = 180.0
 offset_right = -16.0
-offset_bottom = 266.0
+offset_bottom = 254.0
 grow_horizontal = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_glass")
 
 [node name="Margin" type="MarginContainer" parent="HUD/MobileHUD/ThoughtBubble"]
 layout_mode = 2
-theme_override_constants/margin_left = 14
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 8
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 6
 
 [node name="ThoughtLabel" type="Label" parent="HUD/MobileHUD/ThoughtBubble/Margin"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
-theme_override_font_sizes/font_size = 13
-text = "💬 Drag on screen to rotate creature. Spin the dial below to change hexagram."
+theme_override_font_sizes/font_size = 12
+text = "💬 Drag tensegrity ball to rotate. Turn dial to inspect 64 hexagrams."
 autowrap_mode = 2
 
 [node name="MandalaContainer" type="Control" parent="HUD/MobileHUD"]
@@ -248,7 +245,7 @@ grow_vertical = 2
 theme_override_constants/separation = 8
 
 [node name="BtnPrev" type="Button" parent="HUD/MobileHUD/Controls/HBox"]
-custom_minimum_size = Vector2(60, 0)
+custom_minimum_size = Vector2(56, 0)
 layout_mode = 2
 text = "◀"
 
@@ -260,10 +257,10 @@ text = "🪙 Cast Oracle"
 [node name="BtnAsk" type="Button" parent="HUD/MobileHUD/Controls/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "🧠 Ask MNN"
+text = "🧠 Ask Qwen"
 
 [node name="BtnNext" type="Button" parent="HUD/MobileHUD/Controls/HBox"]
-custom_minimum_size = Vector2(60, 0)
+custom_minimum_size = Vector2(56, 0)
 layout_mode = 2
 text = "▶"
 
@@ -285,26 +282,20 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_glass")
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="TabCompanion" type="Button" parent="HUD/MobileHUD/BottomNav/HBox"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "🪐 Hexy"
-flat = true
-
 [node name="TabOracle" type="Button" parent="HUD/MobileHUD/BottomNav/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "🪙 Oracle"
+text = "🪙 I-Ching"
 flat = true
 
-[node name="TabBrain" type="Button" parent="HUD/MobileHUD/BottomNav/HBox"]
+[node name="TabQwen" type="Button" parent="HUD/MobileHUD/BottomNav/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "🧠 Brain"
+text = "🧠 Qwen"
 flat = true
 
-[node name="TabTelemetry" type="Button" parent="HUD/MobileHUD/BottomNav/HBox"]
+[node name="TabMnn" type="Button" parent="HUD/MobileHUD/BottomNav/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "⚡ Telemetry"
+text = "⚡ MNN"
 flat = true
