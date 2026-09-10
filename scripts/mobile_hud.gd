@@ -39,6 +39,7 @@ var is_enhanced_mode: bool = true
 
 func _ready() -> void:
 	mnn = MnnRuntime.new()
+	mnn.chat_start()
 	
 	if mandala_dial.has_signal("hexagram_changed"):
 		mandala_dial.connect("hexagram_changed", Callable(self, "_on_hexagram_changed"))

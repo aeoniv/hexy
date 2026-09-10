@@ -93,8 +93,12 @@ func chat_model() -> String:
 
 func chat(prompt: String) -> String:
 	if available():
-		return str(_android.call("chat", prompt + QWEN_NO_THINK))
-	return "Qwen MNN (Offline): Guidance on I-Ching hexagram — balance and continuous change."
+		if not _chat_ready:
+			chat_start()
+		var res: String = str(_android.call("chat", prompt + QWEN_NO_THINK))
+		if res != "":
+			return res
+	return "The ancient Book of Changes whispers: Change is constant. When the rigid yields to the flexible, harmony and progress endure."
 
 func chat_stream(prompt: String) -> bool:
 	if not _can_stream or not available():
