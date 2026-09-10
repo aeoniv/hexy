@@ -93,25 +93,25 @@ theme_override_constants/margin_bottom = 8
 
 [node name="HBox" type="HBoxContainer" parent="HUD/MobileHUD/TopBar/Margin"]
 layout_mode = 2
+theme_override_constants/separation = 8
 
 [node name="Title" type="Label" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 0.85, 1, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 18
 text = "🌀 HEXY"
 
 [node name="Spacer" type="Control" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="Status" type="Label" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
+[node name="BtnModeToggle" type="Button" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.75, 0.2, 1)
-theme_override_font_sizes/font_size = 14
-text = "MNN: ACTIVE"
+theme_override_font_sizes/font_size = 12
+text = "⚡ ENHANCED"
 
 [node name="Spacer2" type="Control" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
-custom_minimum_size = Vector2(16, 0)
+custom_minimum_size = Vector2(8, 0)
 layout_mode = 2
 
 [node name="FPS" type="Label" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
