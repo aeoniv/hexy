@@ -1,271 +1,273 @@
-[gd_scene load_steps=5 format=3 uid="uid://bql7xmnn2026"]
+[gd_scene load_steps=7 format=3 uid="uid://c1hexymain0"]
 
-[ext_resource type="Script" path="res://scripts/main_app.gd" id="1_main"]
-[ext_resource type="Script" path="res://scripts/mobile_hud.gd" id="2_hud"]
+[ext_resource type="Script" path="res://scripts/main_app.gd" id="1_app"]
+[ext_resource type="Script" path="res://scripts/creature_ball_3d.gd" id="2_creature"]
+[ext_resource type="Script" path="res://scripts/mobile_hud.gd" id="3_hud"]
+[ext_resource type="Script" path="res://scripts/mandala_dial_2d.gd" id="4_dial"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
-bg_color = Color(0.07, 0.08, 0.11, 1)
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 1
+background_color = Color(0.0588235, 0.0823529, 0.12549, 1)
+glow_enabled = true
+glow_intensity = 0.6
+glow_bloom = 0.25
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
-bg_color = Color(0.12, 0.14, 0.19, 0.88)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_glass"]
+bg_color = Color(0.0784314, 0.117647, 0.180392, 0.8)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.25, 0.35, 0.45, 0.4)
+border_color = Color(0.2, 0.5, 0.8, 0.35)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
 
 [node name="Main" type="Node"]
-script = ExtResource("1_main")
+script = ExtResource("1_app")
 
-[node name="Background" type="Panel" parent="."]
+[node name="SubViewportContainer" type="SubViewportContainer" parent="."]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_bg")
+stretch = true
 
-[node name="MobileHUD" type="Control" parent="."]
+[node name="SubViewport" type="SubViewport" parent="SubViewportContainer"]
+handle_input_locally = false
+size = Vector2i(720, 1280)
+render_target_update_mode = 4
+
+[node name="Camera3D" type="Camera3D" parent="SubViewportContainer/SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 3.2)
+fov = 48.0
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="SubViewportContainer/SubViewport"]
+transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 2, 4, 3)
+light_color = Color(0.9, 0.95, 1, 1)
+light_energy = 1.2
+
+[node name="DirectionalLight3D2" type="DirectionalLight3D" parent="SubViewportContainer/SubViewport"]
+transform = Transform3D(-0.707107, 0, -0.707107, 0, 1, 0, 0.707107, 0, -0.707107, -2, -2, -2)
+light_color = Color(0.2, 0.6, 1, 1)
+light_energy = 0.6
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="SubViewportContainer/SubViewport"]
+environment = SubResource("Environment_1")
+
+[node name="HexyCreature3D" type="Node3D" parent="SubViewportContainer/SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+script = ExtResource("2_creature")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="MobileHUD" type="Control" parent="HUD"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("2_hud")
+mouse_filter = 2
+script = ExtResource("3_hud")
 
-[node name="TopBar" type="PanelContainer" parent="MobileHUD"]
+[node name="TopBar" type="PanelContainer" parent="HUD/MobileHUD"]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
 offset_left = 16.0
-offset_top = 32.0
+offset_top = 28.0
 offset_right = -16.0
 offset_bottom = 76.0
 grow_horizontal = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+theme_override_styles/panel = SubResource("StyleBoxFlat_glass")
 
-[node name="Margin" type="MarginContainer" parent="MobileHUD/TopBar"]
+[node name="Margin" type="MarginContainer" parent="HUD/MobileHUD/TopBar"]
 layout_mode = 2
-theme_override_constants/margin_left = 14
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 4
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 8
 
-[node name="HBox" type="HBoxContainer" parent="MobileHUD/TopBar/Margin"]
+[node name="HBox" type="HBoxContainer" parent="HUD/MobileHUD/TopBar/Margin"]
 layout_mode = 2
 
-[node name="Title" type="Label" parent="MobileHUD/TopBar/Margin/HBox"]
+[node name="Title" type="Label" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 0.85, 1, 1)
-theme_override_font_sizes/font_size = 15
-text = "MNN + QWEN + I-CHING"
+theme_override_font_sizes/font_size = 20
+text = "🌀 HEXY"
 
-[node name="Spacer" type="Control" parent="MobileHUD/TopBar/Margin/HBox"]
+[node name="Spacer" type="Control" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="Status" type="Label" parent="MobileHUD/TopBar/Margin/HBox"]
+[node name="Status" type="Label" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.2, 0.9, 0.5, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.9, 0.75, 0.2, 1)
+theme_override_font_sizes/font_size = 14
 text = "MNN: ACTIVE"
 
-[node name="FPS" type="Label" parent="MobileHUD/TopBar/Margin/HBox"]
+[node name="Spacer2" type="Control" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
+custom_minimum_size = Vector2(16, 0)
+layout_mode = 2
+
+[node name="FPS" type="Label" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.4, 0.9, 0.5, 1)
-theme_override_font_sizes/font_size = 12
-text = "80 FPS"
+theme_override_font_sizes/font_size = 14
+text = "60 FPS"
 
-[node name="Content" type="Control" parent="MobileHUD"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 16.0
-offset_top = 84.0
-offset_right = -16.0
-offset_bottom = -72.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="HexCard" type="PanelContainer" parent="MobileHUD/Content"]
+[node name="HexCard" type="PanelContainer" parent="HUD/MobileHUD"]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_bottom = 90.0
+offset_left = 16.0
+offset_top = 86.0
+offset_right = -16.0
+offset_bottom = 176.0
 grow_horizontal = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+theme_override_styles/panel = SubResource("StyleBoxFlat_glass")
 
-[node name="Margin" type="MarginContainer" parent="MobileHUD/Content/HexCard"]
+[node name="Margin" type="MarginContainer" parent="HUD/MobileHUD/HexCard"]
 layout_mode = 2
-theme_override_constants/margin_left = 14
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 8
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 10
 
-[node name="VBox" type="VBoxContainer" parent="MobileHUD/Content/HexCard/Margin"]
-layout_mode = 2
-
-[node name="HBox" type="HBoxContainer" parent="MobileHUD/Content/HexCard/Margin/VBox"]
+[node name="VBox" type="VBoxContainer" parent="HUD/MobileHUD/HexCard/Margin"]
 layout_mode = 2
 
-[node name="HexChar" type="Label" parent="MobileHUD/Content/HexCard/Margin/VBox/HBox"]
-custom_minimum_size = Vector2(48, 0)
+[node name="HBox" type="HBoxContainer" parent="HUD/MobileHUD/HexCard/Margin/VBox"]
+layout_mode = 2
+
+[node name="HexChar" type="Label" parent="HUD/MobileHUD/HexCard/Margin/VBox/HBox"]
+custom_minimum_size = Vector2(50, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.95, 0.75, 0.2, 1)
 theme_override_font_sizes/font_size = 32
 text = "乾"
 horizontal_alignment = 1
 
-[node name="VBox" type="VBoxContainer" parent="MobileHUD/Content/HexCard/Margin/VBox/HBox"]
+[node name="VBox" type="VBoxContainer" parent="HUD/MobileHUD/HexCard/Margin/VBox/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="HexTitle" type="Label" parent="MobileHUD/Content/HexCard/Margin/VBox/HBox/VBox"]
+[node name="HexTitle" type="Label" parent="HUD/MobileHUD/HexCard/Margin/VBox/HBox/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 15
+theme_override_font_sizes/font_size = 16
 text = "#1 乾 The Creative"
 
-[node name="HexSubtitle" type="Label" parent="MobileHUD/Content/HexCard/Margin/VBox/HBox/VBox"]
+[node name="HexSubtitle" type="Label" parent="HUD/MobileHUD/HexCard/Margin/VBox/HBox/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.75, 0.9, 1)
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 12
 text = "Binary: 0b111111"
-autowrap_mode = 2
 
-[node name="MovingLine" type="Label" parent="MobileHUD/Content/HexCard/Margin/VBox"]
+[node name="MovingLine" type="Label" parent="HUD/MobileHUD/HexCard/Margin/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 0.75, 0.2, 1)
-theme_override_font_sizes/font_size = 11
-text = "Moving Lines: Line 4"
+theme_override_colors/font_color = Color(0.3, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "Moving Line: Line 4 -> Mutating"
 
-[node name="LinesCard" type="PanelContainer" parent="MobileHUD/Content"]
+[node name="ThoughtBubble" type="PanelContainer" parent="HUD/MobileHUD"]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 100.0
-offset_bottom = 320.0
+offset_left = 16.0
+offset_top = 186.0
+offset_right = -16.0
+offset_bottom = 266.0
 grow_horizontal = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+theme_override_styles/panel = SubResource("StyleBoxFlat_glass")
 
-[node name="Margin" type="MarginContainer" parent="MobileHUD/Content/LinesCard"]
+[node name="Margin" type="MarginContainer" parent="HUD/MobileHUD/ThoughtBubble"]
 layout_mode = 2
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 14
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 8
 
-[node name="LinesVBox" type="VBoxContainer" parent="MobileHUD/Content/LinesCard/Margin"]
+[node name="ThoughtLabel" type="Label" parent="HUD/MobileHUD/ThoughtBubble/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 10
-alignment = 1
-
-[node name="QwenCard" type="PanelContainer" parent="MobileHUD/Content"]
-visible = false
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 100.0
-offset_bottom = 440.0
-grow_horizontal = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_card")
-
-[node name="Margin" type="MarginContainer" parent="MobileHUD/Content/QwenCard"]
-layout_mode = 2
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 12
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 12
-
-[node name="VBox" type="VBoxContainer" parent="MobileHUD/Content/QwenCard/Margin"]
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="QwenTitle" type="Label" parent="MobileHUD/Content/QwenCard/Margin/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.85, 1, 1)
+theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
 theme_override_font_sizes/font_size = 13
-text = "Qwen LLM Consultation (On-Device MNN)"
-
-[node name="QwenOutput" type="Label" parent="MobileHUD/Content/QwenCard/Margin/VBox"]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_colors/font_color = Color(0.85, 0.9, 0.95, 1)
-theme_override_font_sizes/font_size = 12
-text = "Tap 'Ask Qwen' to consult the model on current hexagram..."
-autowrap_mode = 3
-
-[node name="BtnAskQwen" type="Button" parent="MobileHUD/Content/QwenCard/Margin/VBox"]
-layout_mode = 2
-text = "Ask Qwen Oracle"
-
-[node name="MnnCard" type="PanelContainer" parent="MobileHUD/Content"]
-visible = false
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_top = 100.0
-offset_bottom = 340.0
-grow_horizontal = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_card")
-
-[node name="Margin" type="MarginContainer" parent="MobileHUD/Content/MnnCard"]
-layout_mode = 2
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 14
-
-[node name="VBox" type="VBoxContainer" parent="MobileHUD/Content/MnnCard/Margin"]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="Title" type="Label" parent="MobileHUD/Content/MnnCard/Margin/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.2, 0.9, 0.5, 1)
-theme_override_font_sizes/font_size = 14
-text = "Alibaba MNN Hardware Status"
-
-[node name="MnnTelemetry" type="Label" parent="MobileHUD/Content/MnnCard/Margin/VBox"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.9, 0.95, 1)
-theme_override_font_sizes/font_size = 12
-text = "MNN Telemetry loading..."
+text = "💬 Drag on screen to rotate creature. Spin the dial below to change hexagram."
 autowrap_mode = 2
 
-[node name="Actions" type="HBoxContainer" parent="MobileHUD/Content"]
+[node name="MandalaContainer" type="Control" parent="HUD/MobileHUD"]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -52.0
+offset_top = -430.0
+offset_bottom = -130.0
 grow_horizontal = 2
 grow_vertical = 0
+
+[node name="Dial" type="Control" parent="HUD/MobileHUD/MandalaContainer"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -145.0
+offset_top = -145.0
+offset_right = 145.0
+offset_bottom = 145.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("4_dial")
+
+[node name="Controls" type="Control" parent="HUD/MobileHUD"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -120.0
+offset_right = -16.0
+offset_bottom = -72.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="HBox" type="HBoxContainer" parent="HUD/MobileHUD/Controls"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_constants/separation = 8
 
-[node name="BtnPrev" type="Button" parent="MobileHUD/Content/Actions"]
-custom_minimum_size = Vector2(48, 0)
+[node name="BtnPrev" type="Button" parent="HUD/MobileHUD/Controls/HBox"]
+custom_minimum_size = Vector2(60, 0)
 layout_mode = 2
-text = "<"
+text = "◀"
 
-[node name="BtnCast" type="Button" parent="MobileHUD/Content/Actions"]
+[node name="BtnCast" type="Button" parent="HUD/MobileHUD/Controls/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Cast Oracle"
+text = "🪙 Cast Oracle"
 
-[node name="BtnNext" type="Button" parent="MobileHUD/Content/Actions"]
-custom_minimum_size = Vector2(48, 0)
+[node name="BtnAsk" type="Button" parent="HUD/MobileHUD/Controls/HBox"]
 layout_mode = 2
-text = ">"
+size_flags_horizontal = 3
+text = "🧠 Ask MNN"
 
-[node name="BottomNav" type="PanelContainer" parent="MobileHUD"]
+[node name="BtnNext" type="Button" parent="HUD/MobileHUD/Controls/HBox"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+text = "▶"
+
+[node name="BottomNav" type="PanelContainer" parent="HUD/MobileHUD"]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
@@ -277,26 +279,32 @@ offset_right = -16.0
 offset_bottom = -14.0
 grow_horizontal = 2
 grow_vertical = 0
-theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+theme_override_styles/panel = SubResource("StyleBoxFlat_glass")
 
-[node name="HBox" type="HBoxContainer" parent="MobileHUD/BottomNav"]
+[node name="HBox" type="HBoxContainer" parent="HUD/MobileHUD/BottomNav"]
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="TabIChing" type="Button" parent="MobileHUD/BottomNav/HBox"]
+[node name="TabCompanion" type="Button" parent="HUD/MobileHUD/BottomNav/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "I-Ching"
+text = "🪐 Hexy"
 flat = true
 
-[node name="TabQwen" type="Button" parent="MobileHUD/BottomNav/HBox"]
+[node name="TabOracle" type="Button" parent="HUD/MobileHUD/BottomNav/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Qwen"
+text = "🪙 Oracle"
 flat = true
 
-[node name="TabMnn" type="Button" parent="MobileHUD/BottomNav/HBox"]
+[node name="TabBrain" type="Button" parent="HUD/MobileHUD/BottomNav/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "MNN"
+text = "🧠 Brain"
+flat = true
+
+[node name="TabTelemetry" type="Button" parent="HUD/MobileHUD/BottomNav/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "⚡ Telemetry"
 flat = true
