@@ -2,26 +2,24 @@
 
 An on-device mobile experiment combining **Alibaba MNN**, **Qwen LLM**, and the **I-Ching** in Godot 4.7 Forward Mobile for Android.
 
-## Architecture
+## Overview
 
-This experiment integrates three core components:
+This repository is strictly scoped to three core pillars:
 
-1. **I-Ching Cybernetic System**:
-   - **64-Hexagram King Wen System**: Maps hexagrams to geometric balance states.
-   - **3D Tensegrity Ball Creature** (`scripts/creature_ball_3d.gd`): An icosahedral tensegrity structure (6 struts, 24 elastic cords). The 6 struts represent the 6 hexagram lines, dynamically mutating color and pulsating on moving lines.
-   - **Radial Mandala Dial** (`scripts/mandala_dial_2d.gd`): 64-hexagram touch-draggable radial dial with snap-to-closest and haptic feedback.
+1. **Alibaba MNN Engine**:
+   - Native C++ JNI bridge (ndroid_plugin/ixmnn) directly hosting Alibaba MNN (llm.hpp).
+   - Runs on-device quantized Qwen LLM for chat completions and GTE sentence embeddings.
+   - Zero cloud dependencies — pure local silicon inference.
 
-2. **Alibaba MNN Hardware Bridge**:
-   - **Native JNI/NDK Bridge** (`android_plugin/ixmnn`): Direct C++ bindings to Alibaba MNN (`llm.hpp`).
-   - **Local Inference**: Runs quantized Qwen (0.6B) and GTE multilingual sentence embeddings on device silicon (Mali-G57 MC2 GPU / NPU).
-   - **MnnRuntime** (`scripts/brain/mnn_runtime.gd`): GDScript interface for chat and embedding generation.
+2. **Qwen LLM**:
+   - On-device philosophical counsel and interpretation.
+   - Real-time token streaming via JNI callbacks into Godot.
 
-3. **Mobile Interface**:
-   - **Cast Oracle**: Yarrow stalks / 3-coins probability algorithm generating hexagrams and changing lines.
-   - **Ask MNN**: Queries the on-device Qwen model for hexagram interpretation and guidance.
-   - **Telemetry**: Real-time GPU FPS, gravity vector, and JNI bridge status.
+3. **I-Ching Oracle**:
+   - 64 King Wen hexagrams lookup with trigrams and judgments.
+   - Authentic 3-coins probability casting (generating static and moving lines).
+   - Dynamic 6-line visualization (solid Yang and divided Yin lines, moving line mutations).
 
-## Target Hardware
-- Tested on: **Samsung Galaxy A22** (`SM-A226B`)
-- GPU: ARM Mali-G57 MC2 (Vulkan 1.1 / Forward Mobile)
-- Frame Rate: 75–90 FPS
+## Hardware Target
+- Tested on: **Samsung Galaxy A22** (SM-A226B)
+- Engine: Godot 4.7 Forward Mobile
