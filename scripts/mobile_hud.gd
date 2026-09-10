@@ -54,6 +54,9 @@ func _ready() -> void:
 	sensor_oracle.shake_started.connect(_on_shake_started)
 	sensor_oracle.shake_progress.connect(_on_shake_progress)
 	sensor_oracle.shake_cast_completed.connect(_on_shake_cast_completed)
+	sensor_oracle.autonomous_mutation_stepped.connect(_on_autonomous_mutation_stepped)
+	sensor_oracle.autonomous_thought_requested.connect(_on_autonomous_thought_requested)
+	sensor_oracle.sensor_telemetry_updated.connect(_on_sensor_telemetry_updated)
 	
 	btn_geo_toggle.pressed.connect(_on_geo_toggle_pressed)
 	btn_cast_mode.pressed.connect(_on_cast_mode_toggle_pressed)
@@ -69,6 +72,7 @@ func _ready() -> void:
 	tab_telemetry.pressed.connect(func(): _switch_mode("telemetry"))
 	
 	_update_mode_ui()
+	_update_cast_mode_ui()
 	_switch_mode("companion")
 
 func setup_creature(creature: Node3D) -> void:
@@ -129,6 +133,51 @@ func _on_shake_cast_completed(_wen: int, moving_line: int, hex_bits: int) -> voi
 		cur["wen"], cur["zh"], cur["name"],
 		String.num_int64(hex_bits, 2).pad_zeros(6),
 		move_desc
+	]
+
+func _on_autonomous_mutation_stepped(new_bits: int, moving_line: int, reason: String) -> void:
+	var dial_idx: int = mandala_dial.find_index_by_bits(new_bits)
+	mandala_dial.select_by_index(dial_idx)
+	var cur: Dictionary = mandala_dial.KING_WEN_DATA[dial_idx]
+	if creature_node and creature_node.has_method("set_hexagram"):
+		creature_node.set_hexagram(new_bits, moving_line)
+	lbl_thought.text = "🌊 Autonomous Mutation: #%d %s '%s'
+%s" % [
+		cur["wen"], cur["zh"], cur["name"], reason
+	]
+
+func _on_autonomous_thought_requested(prompt: String) -> void:
+	if mnn and mnn.chat_ready():
+		var reply: String = mnn.chat(prompt)
+		lbl_thought.text = "🧠 Autonomous Reflection:
+%s" % reply
+
+var last_telemetry_data: Dictionary = {}
+func _on_sensor_telemetry_updated(g: Vector3, heading: float, jerk: float, lower_tri: int, upper_tri: int) -> void:
+	last_telemetry_data = {
+		"g": g, "heading": heading, "jerk": jerk,
+		"lower": lower_tri, "upper": upper_tri
+	}
+	if active_mode == "telemetry":
+		_update_telemetry_view()
+
+func _update_telemetry_view() -> void:
+	if last_telemetry_data.is_empty():
+		return
+	var g: Vector3 = last_telemetry_data["g"]
+	var heading: float = last_telemetry_data["heading"]
+	var lower_name: String = SensorOracle.TRIGRAM_NAMES[last_telemetry_data["lower"]]
+	var upper_name: String = SensorOracle.TRIGRAM_NAMES[last_telemetry_data["upper"]]
+	lbl_thought.text = """⚡ Autonomous Sensor Fusion Telemetry:
+Posture (Lower): %s | Heading (Upper): %s (%.1f°)
+Gravity: (%.2f, %.2f, %.2f) m/s² | Jerk: %.2f
+Autonomous Hysteresis: Dwell Coherent (d=1 walk)
+MNN Neural Brain: %s (%s)
+Creature Mode: %s""" % [
+		lower_name, upper_name, heading,
+		g.x, g.y, g.z, last_telemetry_data["jerk"],
+		mnn.backend_name(), mnn.chat_model(),
+		creature_node.get_current_geometry_name() if creature_node else "N/A"
 	]
 
 func _on_geo_toggle_pressed() -> void:
@@ -254,14 +303,11 @@ Model: %s" % [
 	elif mode == "telemetry":
 		mandala_container.visible = false
 		thought_bubble.visible = true
-		var grav: Vector3 = Input.get_gravity()
-		lbl_thought.text = "⚡ Hardware & JNI Telemetry:
-Mode: %s
-Device: Samsung Galaxy A22
-GPU: Mali-G57 MC2 (Vulkan 1.1)
-Gravity: (%.2f, %.2f, %.2f)
-JNI Attached: %s
-Creature Struts: 6 | Cords: 24" % [
-			"ENHANCED" if is_enhanced_mode else "PURE",
-			grav.x, grav.y, grav.z, str(mnn.available())
-		]
+		if sensor_oracle:
+			var g: Vector3 = Input.get_gravity()
+			var mag: Vector3 = Input.get_magnetometer()
+			var heading: float = posmod(rad_to_deg(atan2(-mag.x, -mag.y)), 360.0) if mag.length_squared() > 0.01 else 0.0
+			var low: int = sensor_oracle._classify_lower_trigram_from_gravity(g)
+			var up: int = sensor_oracle._classify_upper_trigram_from_heading(heading)
+			last_telemetry_data = {"g": g, "heading": heading, "jerk": 0.0, "lower": low, "upper": up}
+		_update_telemetry_view()
