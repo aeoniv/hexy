@@ -37,6 +37,7 @@ const SensorOracle = preload("res://scripts/sensor_oracle.gd")
 
 var mnn: MnnRuntime
 var creature_node: Node3D
+var mandala_3d_node: Node3D
 var active_mode: String = "companion"
 var is_enhanced_mode: bool = true
 var is_sensor_mode: bool = false
@@ -45,6 +46,8 @@ var sensor_oracle: SensorOracle
 func _ready() -> void:
 	mnn = MnnRuntime.new()
 	mnn.chat_start()
+	mnn.chat_token.connect(_on_mnn_chat_token)
+	mnn.chat_done.connect(_on_mnn_chat_done)
 	
 	if mandala_dial.has_signal("hexagram_changed"):
 		mandala_dial.connect("hexagram_changed", Callable(self, "_on_hexagram_changed"))
@@ -75,8 +78,9 @@ func _ready() -> void:
 	_update_cast_mode_ui()
 	_switch_mode("companion")
 
-func setup_creature(creature: Node3D) -> void:
+func setup_creature(creature: Node3D, mandala: Node3D = null) -> void:
 	creature_node = creature
+	mandala_3d_node = mandala
 	if creature_node:
 		if "sensor_mode_enabled" in creature_node:
 			creature_node.sensor_mode_enabled = is_sensor_mode
@@ -89,6 +93,8 @@ func setup_creature(creature: Node3D) -> void:
 
 func _process(_delta: float) -> void:
 	lbl_fps.text = "%d FPS" % Engine.get_frames_per_second()
+	if sensor_oracle and mandala_3d_node and mandala_3d_node.has_method("update_telemetry"):
+		mandala_3d_node.update_telemetry(sensor_oracle.get_telemetry_snapshot())
 
 func _on_cast_mode_toggle_pressed() -> void:
 	is_sensor_mode = !is_sensor_mode
@@ -146,11 +152,26 @@ func _on_autonomous_mutation_stepped(new_bits: int, moving_line: int, reason: St
 		cur["wen"], cur["zh"], cur["name"], reason
 	]
 
+func _on_mnn_chat_token(token: String) -> void:
+	thought_bubble.visible = true
+	lbl_thought.text += token
+
+func _on_mnn_chat_done(full_text: String) -> void:
+	if creature_node and creature_node.has_method("set_thinking"):
+		creature_node.set_thinking(false)
+	if mandala_3d_node and mandala_3d_node.has_method("set_thinking"):
+		mandala_3d_node.set_thinking(false)
+	lbl_thought.text = "💬 Qwen (%s):\n%s" % [mnn.backend_name(), full_text]
+
 func _on_autonomous_thought_requested(prompt: String) -> void:
 	if mnn and mnn.chat_ready():
-		var reply: String = mnn.chat(prompt)
-		lbl_thought.text = "🧠 Autonomous Reflection:
-%s" % reply
+		lbl_thought.text = "🧠 Autonomous Reflection:\n"
+		thought_bubble.visible = true
+		if creature_node and creature_node.has_method("set_thinking"):
+			creature_node.set_thinking(true)
+		if mandala_3d_node and mandala_3d_node.has_method("set_thinking"):
+			mandala_3d_node.set_thinking(true)
+		mnn.chat_stream(prompt)
 
 var last_telemetry_data: Dictionary = {}
 func _on_sensor_telemetry_updated(g: Vector3, heading: float, jerk: float, lower_tri: int, upper_tri: int) -> void:
@@ -264,9 +285,13 @@ Hexagram #%d %s" % [cur["wen"], cur["name"]]
 			cur["wen"], cur["zh"], cur["name"]
 		]
 	
-	var reply: String = mnn.chat(prompt)
-	lbl_thought.text = "💬 Qwen (%s - %s):
-%s" % [mnn.backend_name(), "ENHANCED" if is_enhanced_mode else "PURE", reply]
+	thought_bubble.visible = true
+	lbl_thought.text = "🧠 Consulting Qwen (%s - %s)...\n" % [mnn.backend_name(), "ENHANCED" if is_enhanced_mode else "PURE"]
+	if creature_node and creature_node.has_method("set_thinking"):
+		creature_node.set_thinking(true)
+	if mandala_3d_node and mandala_3d_node.has_method("set_thinking"):
+		mandala_3d_node.set_thinking(true)
+	mnn.chat_stream(prompt)
 
 func _switch_mode(mode: String) -> void:
 	active_mode = mode

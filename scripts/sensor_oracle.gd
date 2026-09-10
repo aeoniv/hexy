@@ -228,3 +228,23 @@ func _execute_coin_toss_cast() -> void:
 	
 	Input.vibrate_handheld(45) # Final affirmative cast haptic
 	shake_cast_completed.emit(-1, primary_moving, bits)
+
+func get_telemetry_snapshot() -> Dictionary:
+	var l_tri: int = _classify_lower_trigram_from_gravity(filtered_grav)
+	var u_tri: int = _classify_upper_trigram_from_heading(current_heading_deg)
+	var cand_l_tri: int = candidate_hex_bits & 0b111
+	return {
+		"gravity": filtered_grav,
+		"gyro": filtered_gyro,
+		"heading": current_heading_deg,
+		"jerk": filtered_jerk,
+		"shake_energy": shake_energy,
+		"shake_progress": clamp(shake_energy / energy_to_cast, 0.0, 1.0),
+		"dwell_progress": clamp(candidate_dwell_time / DWELL_THRESHOLD, 0.0, 1.0),
+		"lower_trigram": l_tri,
+		"upper_trigram": u_tri,
+		"candidate_trigram": cand_l_tri,
+		"current_bits": current_hex_bits,
+		"candidate_bits": candidate_hex_bits,
+		"is_shaking": is_shaking
+	}

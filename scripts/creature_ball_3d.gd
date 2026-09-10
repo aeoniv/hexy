@@ -18,6 +18,10 @@ enum GeometryMode {
 @export var fold_factor: float = 0.0
 @export var extension: float = 0.15
 @export var sensor_mode_enabled: bool = false
+@export var is_thinking: bool = false
+
+func set_thinking(val: bool) -> void:
+	is_thinking = val
 var gravity_strain: Vector3 = Vector3.ZERO
 
 const PHI: float = 1.61803398875 # Golden Ratio
@@ -490,6 +494,8 @@ func _update_geometry(anim_time: float) -> void:
 		var is_yang: bool = ((hexagram_bits >> line_idx) & 1) == 1
 		var is_moving: bool = (line_idx == moving_line or (geometry_mode == GeometryMode.RHOMBIC_DODECAHEDRON and line_idx + 1 == moving_line))
 		var pulse: float = (sin(anim_time * 8.0) * 0.5 + 0.5) if is_moving else 0.0
+		if is_thinking:
+			pulse = max(pulse, sin(anim_time * 5.0) * 0.5 + 0.5)
 		
 		var mat: StandardMaterial3D = node.material_override
 		if is_moving:
