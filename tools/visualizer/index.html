@@ -1,0 +1,3734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hexy: Minimal MNN + Qwen + I-Ching (Pure vs Enhanced Benchmark Studio)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070a12;
+      --card-bg: rgba(15, 23, 42, 0.88);
+      --card-border: rgba(255, 255, 255, 0.09);
+      --accent-blue: #38bdf8;
+      --accent-cyan: #22d3ee;
+      --accent-purple: #c084fc;
+      --accent-green: #4ade80;
+      --accent-amber: #fbbf24;
+      --accent-orange: #fb923c;
+      --accent-rose: #fb7185;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0f172a 45%, var(--bg) 95%);
+      color: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      user-select: none;
+    }
+
+    /* Top Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .header-title h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc, #fb923c);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header-title p {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+    .header-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent-blue);
+      font-size: 0.74rem;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .badge-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+    }
+
+    /* Controls Bar */
+    .controls-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 7px 10px;
+      border-radius: 10px;
+      backdrop-filter: blur(16px);
+    }
+    .btn {
+      padding: 5px 11px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn:hover {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent-blue);
+      transform: translateY(-1px);
+    }
+    .btn.active {
+      background: rgba(56, 189, 248, 0.25);
+      border-color: var(--accent-blue);
+      color: #fff;
+    }
+    .btn-play {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      border-color: #60a5fa;
+      color: white;
+    }
+    .btn-play:hover {
+      background: linear-gradient(135deg, #0369a1, #1d4ed8);
+    }
+    .prompt-input {
+      flex: 1;
+      min-width: 220px;
+      padding: 5px 9px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--card-border);
+      color: #fff;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+    }
+
+    /* Main Dual Viewport */
+    .viewport-grid {
+      display: grid;
+      grid-template-columns: 1.52fr 1fr;
+      gap: 10px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Diagram Stage & Zoom Container */
+    .diagram-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      position: relative;
+    }
+
+    .diagram-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.45);
+      border-bottom: 1px solid var(--card-border);
+      z-index: 10;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .tabs-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+    }
+    .tab-btn {
+      padding: 4px 9px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .tab-btn.active {
+      color: var(--accent-cyan);
+      background: rgba(34, 211, 238, 0.12);
+      border-color: rgba(34, 211, 238, 0.3);
+    }
+    .tab-btn.engine-tab {
+      color: var(--accent-orange);
+    }
+    .tab-btn.engine-tab.active {
+      color: #fb923c;
+      background: rgba(251, 146, 60, 0.15);
+      border-color: rgba(251, 146, 60, 0.35);
+    }
+
+    /* Zoom / Pan Toolbar Controls */
+    .zoom-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 2px 5px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+    }
+    .zoom-btn {
+      width: 24px;
+      height: 22px;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-main);
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .zoom-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--card-border);
+    }
+    .zoom-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--accent-cyan);
+      padding: 0 4px;
+      min-width: 44px;
+      text-align: center;
+    }
+
+    /* Viewport Area */
+    .diagram-viewport {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      cursor: grab;
+      background: radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.45) 0%, rgba(8, 12, 20, 0.95) 100%);
+      min-height: 540px;
+    }
+    .diagram-viewport:active {
+      cursor: grabbing;
+    }
+
+    .diagram-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      transform-origin: 0 0;
+      transition: transform 0.05s linear;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    svg.interactive-svg {
+      width: 900px;
+      height: 540px;
+      user-select: none;
+      filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.4));
+    }
+
+    /* SVG Interactive Nodes */
+    .interactive-node {
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .interactive-node:hover rect,
+    .interactive-node:hover polygon,
+    .interactive-node:hover circle {
+      filter: drop-shadow(0 0 12px var(--accent-cyan));
+      stroke: var(--accent-cyan) !important;
+    }
+    .interactive-node.active rect,
+    .interactive-node.active polygon,
+    .interactive-node.active circle {
+      stroke: var(--accent-green) !important;
+      fill: #1e3a5f !important;
+      filter: drop-shadow(0 0 14px var(--accent-green));
+    }
+
+    .interactive-arrow {
+      stroke: var(--text-muted);
+      stroke-width: 1.8;
+      fill: none;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .interactive-arrow:hover {
+      stroke: var(--accent-cyan);
+      stroke-width: 2.8;
+    }
+    .interactive-arrow.active {
+      stroke: var(--accent-green) !important;
+      stroke-width: 3.2 !important;
+      filter: drop-shadow(0 0 10px var(--accent-green));
+      animation: pulse-line 1.2s infinite;
+    }
+
+    .interactive-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      fill: var(--text-muted);
+      cursor: pointer;
+      transition: fill 0.2s ease;
+    }
+    .interactive-label:hover { fill: #fff; }
+    .interactive-label.active {
+      fill: var(--accent-green);
+      font-weight: 700;
+      filter: drop-shadow(0 0 6px var(--accent-green));
+    }
+
+    @keyframes pulse-line {
+      0%, 100% { stroke-opacity: 1; }
+      50% { stroke-opacity: 0.35; }
+    }
+
+    /* Options Popover Modal */
+    .options-popover {
+      position: absolute;
+      top: 45px;
+      right: 14px;
+      width: 330px;
+      background: rgba(13, 20, 36, 0.96);
+      border: 1px solid var(--accent-cyan);
+      border-radius: 10px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
+      padding: 12px;
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .popover-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 6px;
+    }
+    .popover-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+    }
+    .popover-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .popover-close:hover { color: #fff; }
+    .popover-desc {
+      font-size: 0.76rem;
+      color: var(--text-main);
+      line-height: 1.4;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 7px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .popover-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .action-btn {
+      padding: 5px 9px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.76rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    .action-btn:hover {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent-blue);
+      color: var(--accent-cyan);
+    }
+
+    /* Interactive Guided Lesson HUD */
+    .tutorial-card {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      right: 12px;
+      background: rgba(13, 20, 36, 0.96);
+      border: 1px solid #f59e0b;
+      border-radius: 10px;
+      padding: 12px 14px;
+      backdrop-filter: blur(24px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.75), 0 0 24px rgba(245, 158, 11, 0.2);
+      z-index: 95;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .tutorial-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .tutorial-step-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #000;
+      background: #fbbf24;
+      padding: 2px 7px;
+      border-radius: 4px;
+      letter-spacing: 0.05em;
+    }
+    .tutorial-title {
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: #fff;
+      flex: 1;
+    }
+    .tutorial-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .tutorial-close:hover { color: #fff; }
+    .tutorial-body {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 10px;
+    }
+    .tutorial-concept {
+      font-size: 0.77rem;
+      color: var(--text-main);
+      line-height: 1.45;
+    }
+    .tutorial-code-box {
+      background: rgba(0, 0, 0, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--accent-cyan);
+      line-height: 1.4;
+      overflow-x: auto;
+      max-height: 95px;
+    }
+    .tutorial-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 8px;
+    }
+    .tutorial-nav-btns {
+      display: flex;
+      gap: 6px;
+    }
+
+    /* Right: Code Execution & State Inspector */
+    .inspector-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      backdrop-filter: blur(16px);
+    }
+    .card-title {
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* 4-Layer Status Track */
+    .layer-mini-track {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 5px;
+    }
+    .mini-node {
+      padding: 5px 6px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .mini-node:hover { border-color: var(--accent-blue); }
+    .mini-node.active {
+      border-color: var(--accent-cyan);
+      background: rgba(34, 211, 238, 0.15);
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.2);
+    }
+    .mini-node.warning {
+      border-color: var(--accent-orange);
+      background: rgba(251, 146, 60, 0.15);
+      box-shadow: 0 0 10px rgba(251, 146, 60, 0.2);
+    }
+    .mini-node.success {
+      border-color: var(--accent-green);
+      background: rgba(74, 222, 128, 0.15);
+      box-shadow: 0 0 10px rgba(74, 222, 128, 0.2);
+    }
+    .mini-node-title {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .mini-node-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      color: #fff;
+    }
+
+    /* MNN C++ Engine Telemetry Grid */
+    .mnn-telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .telemetry-item {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      padding: 5px 7px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .telemetry-label {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    .telemetry-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: var(--accent-orange);
+    }
+    .kv-progress-track {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 2px;
+    }
+    .kv-progress-fill {
+      height: 100%;
+      width: 2%;
+      background: linear-gradient(90deg, #38bdf8, #fb923c);
+      transition: width 0.2s ease;
+    }
+
+    /* Top-5 Candidate Tokens Bar Chart */
+    .sampler-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      background: rgba(0, 0, 0, 0.45);
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+    .prob-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+    }
+    .prob-tok {
+      width: 70px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .prob-tok.winner {
+      color: var(--accent-green);
+      font-weight: 700;
+    }
+    .prob-bar-bg {
+      flex: 1;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .prob-bar-fill {
+      height: 100%;
+      background: var(--accent-blue);
+      border-radius: 3px;
+      transition: width 0.2s;
+    }
+    .prob-bar-fill.winner {
+      background: var(--accent-green);
+    }
+    .prob-pct {
+      width: 44px;
+      text-align: right;
+      color: var(--text-muted);
+      font-size: 0.66rem;
+    }
+
+    /* Hex & Decision Box */
+    .hex-display {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.74rem;
+      background: rgba(0, 0, 0, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      padding: 6px;
+      line-height: 1.35;
+      min-height: 34px;
+    }
+    .byte-tag {
+      display: inline-block;
+      padding: 1px 4px;
+      margin: 1px;
+      border-radius: 3px;
+      font-size: 0.68rem;
+    }
+    .byte-ascii {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .byte-lead {
+      background: rgba(192, 132, 252, 0.2);
+      color: var(--accent-purple);
+      border: 1px solid rgba(192, 132, 252, 0.4);
+    }
+    .byte-continuation {
+      background: rgba(251, 146, 60, 0.2);
+      color: var(--accent-orange);
+      border: 1px solid rgba(251, 146, 60, 0.4);
+    }
+
+    .log-box {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      line-height: 1.4;
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.45);
+      min-height: 48px;
+      border-left: 3px solid var(--accent-cyan);
+    }
+
+    .speech-box {
+      font-size: 0.9rem;
+      line-height: 1.45;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.4);
+      min-height: 60px;
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .cursor-pulse {
+      display: inline-block;
+      width: 5px;
+      height: 1em;
+      background: var(--accent-cyan);
+      vertical-align: middle;
+      margin-left: 2px;
+      animation: pulse 0.8s infinite;
+    }
+    @keyframes pulse {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    /* =========================================================================
+       Educational Lab & Math Sandbox Styles
+       ========================================================================= */
+    .edu-container {
+      width: 900px;
+      height: 540px;
+      background: rgba(13, 20, 36, 0.96);
+      border: 1px solid rgba(251, 191, 36, 0.35);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65), 0 0 24px rgba(251, 191, 36, 0.15);
+      animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .edu-subnav {
+      display: flex;
+      background: rgba(0, 0, 0, 0.55);
+      border-bottom: 1px solid var(--card-border);
+      padding: 6px 12px;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .edu-tab-btn {
+      padding: 5px 11px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .edu-tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .edu-tab-btn.active {
+      color: #fbbf24;
+      background: rgba(251, 191, 36, 0.15);
+      border-color: rgba(251, 191, 36, 0.4);
+      box-shadow: 0 0 10px rgba(251, 191, 36, 0.2);
+    }
+    .edu-body {
+      flex: 1;
+      padding: 14px 18px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .edu-card {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .edu-card-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .edu-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .edu-formula {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: #fbbf24;
+      line-height: 1.45;
+    }
+    .edu-control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .edu-control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .edu-control-label span:last-child {
+      color: #fff;
+      font-weight: 700;
+    }
+    .edu-tag-active {
+      background: rgba(74, 222, 128, 0.2);
+      border: 1px solid #4ade80;
+      color: #4ade80;
+    }
+    .quiz-opt {
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      font-size: 0.76rem;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s;
+    }
+    .quiz-opt:hover {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: var(--accent-blue);
+    }
+    .quiz-opt.correct {
+      background: rgba(74, 222, 128, 0.2) !important;
+      border-color: #4ade80 !important;
+      color: #4ade80 !important;
+      font-weight: 700;
+    }
+    .quiz-opt.incorrect {
+      background: rgba(248, 113, 113, 0.2) !important;
+      border-color: #f87171 !important;
+      color: #f87171 !important;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-title">
+      <h1>Hexy C++ Native & Alibaba MNN Full Engine Studio</h1>
+      <p>Pan/Zoom Architecture UML, TokenStream Filters & MNN C++ Deep-Dive (Transformer, KV-Cache, Sampler)</p>
+    </div>
+    <div class="header-badges">
+      <button class="btn" id="tutorialBtn" onclick="toggleTutorial()" style="background: linear-gradient(135deg, #f59e0b, #ea580c); color: #fff; border-color: #fcd34d; font-weight: 700; box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);">
+        🎓 Interactive Lesson: How MNN C++ Works
+      </button>
+      <div class="badge-status">
+        <span class="badge-dot"></span>
+        <span id="headerStatus">MNN 3.6.1 / C++ LLM ENGINE</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Controls Bar -->
+  <div class="controls-panel">
+    <span style="font-size: 0.76rem; font-weight: 700; color: var(--text-muted);">SCENARIOS:</span>
+    <button class="btn" onclick="setScenario(0)">1. Standard Dialogue</button>
+    <button class="btn" onclick="setScenario(1)">2. Split Emoji (😀)</button>
+    <button class="btn" onclick="setScenario(2)">3. &lt;think&gt; Filter</button>
+    <button class="btn" onclick="setScenario(3)">4. CJK Multilingual</button>
+
+    <input type="text" id="promptText" class="prompt-input" value="Your keys are waiting on the counter by the door." />
+
+    <button class="btn btn-play" id="playBtn" onclick="togglePlay()">▶ Play Stream</button>
+    <button class="btn" onclick="stepToken()">⏭ Step Token</button>
+    <button class="btn" onclick="resetState()">↺ Reset</button>
+
+    <div style="display: flex; align-items: center; gap: 5px; margin-left: auto;">
+      <span style="font-size: 0.72rem; color: var(--text-muted);">Speed:</span>
+      <input type="range" id="speedSlider" min="50" max="600" step="25" value="200" style="cursor: pointer;" />
+      <span id="speedDisplay" style="font-family: 'JetBrains Mono'; font-size: 0.7rem; color: var(--accent-cyan);">200ms</span>
+    </div>
+  </div>
+
+  <!-- Dual Viewport Grid -->
+  <div class="viewport-grid">
+
+    <!-- Left: Diagram Stage with Pan & Zoom & Options Popover -->
+    <div class="diagram-panel">
+      <div class="diagram-nav">
+        <div class="tabs-group">
+          <button class="tab-btn active" id="tab0" onclick="switchTab(0)">1. Streaming Sequence UML</button>
+          <button class="tab-btn" id="tab1" onclick="switchTab(1)">2. 4-Layer Architecture</button>
+          <button class="tab-btn" id="tab2" onclick="switchTab(2)">3. Safety Filters Flow</button>
+          <button class="tab-btn engine-tab" id="tab3" onclick="switchTab(3)">4. MNN Transformer Block</button>
+          <button class="tab-btn engine-tab" id="tab4" onclick="switchTab(4)">5. KV-Cache Allocator</button>
+          <button class="tab-btn engine-tab" id="tab5" onclick="switchTab(5)">6. Sampler & Logits Pipeline</button>
+          <button class="tab-btn engine-tab" id="tab6" onclick="switchTab(6)" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.14); box-shadow: 0 0 10px rgba(251, 191, 36, 0.2);">7. 🎓 Educational Lab & Math Sandbox</button>
+          <button class="tab-btn engine-tab" id="tab7" onclick="switchTab(7)" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.45); background: rgba(56, 189, 248, 0.14); box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);">8. ☯ Pure vs Enhanced Benchmark & Cybernetics</button>
+        </div>
+
+        <div class="zoom-toolbar">
+          <button class="zoom-btn" onclick="zoomIn()" title="Zoom In">+</button>
+          <button class="zoom-btn" onclick="zoomOut()" title="Zoom Out">−</button>
+          <span class="zoom-badge" id="zoomBadge">100%</span>
+          <button class="zoom-btn" onclick="resetZoom()" title="Reset Zoom">↺</button>
+          <button class="zoom-btn" onclick="fitView()" title="Fit View">⛶</button>
+        </div>
+      </div>
+
+      <div class="diagram-viewport" id="diagramViewport">
+        <div class="diagram-canvas" id="diagramCanvas">
+          <div id="svgMount" style="display: flex; justify-content: center; align-items: center;"></div>
+        </div>
+
+        <!-- Interactive Options Popover Menu -->
+        <div class="options-popover" id="optionsPopover">
+          <div class="popover-header">
+            <span class="popover-title" id="popoverTitle">Node Options</span>
+            <button class="popover-close" onclick="closePopover()">✕</button>
+          </div>
+          <div class="popover-desc" id="popoverDesc">
+            Click an option below to simulate, inspect code, or verify contracts.
+          </div>
+          <div class="popover-actions" id="popoverActions">
+            <!-- Dynamic Actions Injected here -->
+          </div>
+        </div>
+
+        <!-- Guided Interactive Lesson HUD -->
+        <div class="tutorial-card" id="tutorialCard">
+          <div class="tutorial-header">
+            <span class="tutorial-step-tag" id="tutStepTag">LESSON 1 OF 5</span>
+            <span class="tutorial-title" id="tutTitle">1. Prefill (GEMM) vs Decode (GEMV)</span>
+            <button class="tutorial-close" onclick="endTutorial()">✕</button>
+          </div>
+          <div class="tutorial-body">
+            <div class="tutorial-concept" id="tutConcept">Loading concept...</div>
+            <div class="tutorial-code-box" id="tutCode">// Code snippet</div>
+          </div>
+          <div class="tutorial-footer">
+            <div class="tutorial-actions">
+              <button class="btn" id="tutActionBtn" onclick="runLessonAction()" style="background: linear-gradient(135deg, #0284c7, #2563eb); color: #fff; font-weight: 700;">
+                ⚡ Run Lesson Action
+              </button>
+            </div>
+            <div class="tutorial-nav-btns">
+              <button class="btn" id="tutPrevBtn" onclick="prevLesson()">← Back</button>
+              <button class="btn" id="tutNextBtn" onclick="nextLesson()" style="background: #fbbf24; color: #000; font-weight: 700;">Next Lesson →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Code Execution & State Inspector -->
+    <div class="inspector-panel">
+
+      <!-- 4-Layer Status Track -->
+      <div class="card">
+        <div class="card-title">
+          <span>Live 4-Layer Stack Status</span>
+          <span id="tokenCounter" style="font-size: 0.68rem; color: var(--accent-blue); font-family: 'JetBrains Mono';">0 / 0 Tokens</span>
+        </div>
+        <div class="layer-mini-track">
+          <div class="mini-node" id="nodeGD" onclick="openNodeOptions('godot')">
+            <span class="mini-node-title">1. Godot</span>
+            <span class="mini-node-val" id="valGD">IDLE</span>
+          </div>
+          <div class="mini-node" id="nodeKT" onclick="openNodeOptions('kotlin')">
+            <span class="mini-node-title">2. Kotlin</span>
+            <span class="mini-node-val" id="valKT">IDLE</span>
+          </div>
+          <div class="mini-node" id="nodeCPP" onclick="openNodeOptions('jni')">
+            <span class="mini-node-title">3. C++ JNI</span>
+            <span class="mini-node-val" id="valCPP">IDLE</span>
+          </div>
+          <div class="mini-node" id="nodeMNN" onclick="openNodeOptions('mnn')">
+            <span class="mini-node-title">4. MNN Engine</span>
+            <span class="mini-node-val" id="valMNN">IDLE</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- MNN C++ Engine Live Telemetry -->
+      <div class="card">
+        <div class="card-title">
+          <span>MNN C++ Execution Telemetry</span>
+          <span id="backendBadge" style="font-size: 0.68rem; color: var(--accent-orange); font-family: 'JetBrains Mono';">ARM NEON / FP16</span>
+        </div>
+        <div class="mnn-telemetry-grid">
+          <div class="telemetry-item" onclick="switchTab(4); openNodeOptions('mnn_prefill');" style="cursor: pointer;">
+            <span class="telemetry-label">Inference Phase</span>
+            <span class="telemetry-val" id="phaseVal">PREFILL (Standby)</span>
+          </div>
+          <div class="telemetry-item" onclick="switchTab(4); openNodeOptions('mnn_kv_buffer');" style="cursor: pointer;">
+            <span class="telemetry-label">KV-Cache Context</span>
+            <span class="telemetry-val" id="kvVal">0 / 2048 (0 MB)</span>
+            <div class="kv-progress-track">
+              <div class="kv-progress-fill" id="kvBar"></div>
+            </div>
+          </div>
+          <div class="telemetry-item">
+            <span class="telemetry-label">Prefill / TTFT Latency</span>
+            <span class="telemetry-val" id="prefillLatVal">12.5 ms</span>
+          </div>
+          <div class="telemetry-item">
+            <span class="telemetry-label">Decode Generation Speed</span>
+            <span class="telemetry-val" id="decodeSpeedVal" style="color: var(--accent-green);">25.0 tok/s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top-5 Candidate Tokens Sampler Distribution & Dynamic Controls -->
+      <div class="card">
+        <div class="card-title">
+          <span>Live Logits Sampler (Top-5 Candidates)</span>
+          <span id="activeSamplingLabel" style="font-size: 0.66rem; color: var(--accent-cyan); font-family: 'JetBrains Mono';">T: 0.70 | P: 0.90 | Rep: 1.15</span>
+        </div>
+
+        <!-- Dynamic Sampling Controls -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; background: rgba(0,0,0,0.3); padding: 5px 7px; border-radius: 6px; font-family: 'JetBrains Mono'; font-size: 0.65rem;">
+          <div>
+            <div style="display:flex; justify-content:space-between; color:var(--text-muted);">
+              <span>Temp:</span><span id="tempValLabel" style="color:#fff;">0.70</span>
+            </div>
+            <input type="range" id="tempRange" min="0.1" max="2.0" step="0.05" value="0.7" style="width:100%; cursor:pointer;" />
+          </div>
+          <div>
+            <div style="display:flex; justify-content:space-between; color:var(--text-muted);">
+              <span>Top-P:</span><span id="topPValLabel" style="color:#fff;">0.90</span>
+            </div>
+            <input type="range" id="topPRange" min="0.1" max="1.0" step="0.05" value="0.9" style="width:100%; cursor:pointer;" />
+          </div>
+          <div>
+            <div style="display:flex; justify-content:space-between; color:var(--text-muted);">
+              <span>RepPen:</span><span id="repPenValLabel" style="color:#fff;">1.15</span>
+            </div>
+            <input type="range" id="repPenRange" min="1.0" max="2.0" step="0.05" value="1.15" style="width:100%; cursor:pointer;" />
+          </div>
+        </div>
+
+        <div class="sampler-bars" id="samplerBars">
+          <div class="prob-row">
+            <span class="prob-tok winner" id="cand0_tok">-</span>
+            <div class="prob-bar-bg"><div class="prob-bar-fill winner" id="cand0_bar" style="width: 0%;"></div></div>
+            <span class="prob-pct" id="cand0_pct">-%</span>
+          </div>
+          <div class="prob-row">
+            <span class="prob-tok" id="cand1_tok">-</span>
+            <div class="prob-bar-bg"><div class="prob-bar-fill" id="cand1_bar" style="width: 0%;"></div></div>
+            <span class="prob-pct" id="cand1_pct">-%</span>
+          </div>
+          <div class="prob-row">
+            <span class="prob-tok" id="cand2_tok">-</span>
+            <div class="prob-bar-bg"><div class="prob-bar-fill" id="cand2_bar" style="width: 0%;"></div></div>
+            <span class="prob-pct" id="cand2_pct">-%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interactive Tokenizer Playground -->
+      <div class="card">
+        <div class="card-title">
+          <span>Native Tokenizer (BPE Encode & Decode)</span>
+          <span id="tokCountBadge" style="font-size: 0.66rem; color: var(--accent-blue); font-family: 'JetBrains Mono';">3 Tokens</span>
+        </div>
+        <div style="display: flex; gap: 4px;">
+          <input type="text" id="tokTestInput" class="prompt-input" value="avatar memory ledger" style="min-width: 140px; font-size: 0.72rem; padding: 3px 6px;" />
+          <button class="btn" onclick="runInteractiveTokenizer()" style="padding: 3px 8px; font-size: 0.72rem;">Encode</button>
+        </div>
+        <div id="tokChipsMount" style="display: flex; flex-wrap: wrap; gap: 3px; min-height: 22px;"></div>
+      </div>
+
+      <!-- Hex Byte Stream -->
+      <div class="card">
+        <div class="card-title">
+          <span>Incoming Byte Wire (MNN ➔ xsputn)</span>
+          <span id="accumLabel" style="font-size: 0.68rem; color: var(--text-muted); font-family: 'JetBrains Mono';">0B in buffer</span>
+        </div>
+        <div class="hex-display" id="hexContainer">[Standby: Waiting for token]</div>
+      </div>
+
+      <!-- Decision Engine Log -->
+      <div class="card">
+        <div class="card-title">
+          <span>C++ Filter Logic (danglingUtf8 & tagPrefixLen)</span>
+        </div>
+        <div class="log-box" id="logContainer">Ready. Step through or play to see C++ branches execute.</div>
+      </div>
+
+      <!-- Spoken Transcript Output -->
+      <div class="card" style="flex: 1;">
+        <div class="card-title">
+          <span>Emitted Speech Transcript (Godot Receiver)</span>
+          <span id="ttftBadge" style="font-size: 0.68rem; color: var(--accent-green); font-family: 'JetBrains Mono';">TTFT: -</span>
+        </div>
+        <div class="speech-box">
+          <span id="speechText"></span><span class="cursor-pulse"></span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // =========================================================================
+    // Pan & Zoom Engine
+    // =========================================================================
+
+    let scale = 1.0;
+    let panX = 0;
+    let panY = 0;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    const viewport = document.getElementById('diagramViewport');
+    const canvas = document.getElementById('diagramCanvas');
+    const zoomBadge = document.getElementById('zoomBadge');
+
+    function applyTransform() {
+      canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+      zoomBadge.innerText = `${Math.round(scale * 100)}%`;
+    }
+
+    function zoomIn() {
+      scale = Math.min(scale * 1.2, 3.2);
+      applyTransform();
+    }
+
+    function zoomOut() {
+      scale = Math.max(scale / 1.2, 0.4);
+      applyTransform();
+    }
+
+    function resetZoom() {
+      scale = 1.0;
+      panX = 0;
+      panY = 0;
+      applyTransform();
+    }
+
+    function fitView() {
+      const vRect = viewport.getBoundingClientRect();
+      scale = Math.min(vRect.width / 920, vRect.height / 560, 1.2);
+      panX = (vRect.width - 900 * scale) / 2;
+      panY = (vRect.height - 540 * scale) / 2;
+      applyTransform();
+    }
+
+    viewport.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const rect = viewport.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const factor = e.deltaY < 0 ? 1.15 : 0.85;
+      const newScale = Math.min(Math.max(0.4, scale * factor), 3.5);
+
+      panX = mouseX - (mouseX - panX) * (newScale / scale);
+      panY = mouseY - (mouseY - panY) * (newScale / scale);
+      scale = newScale;
+
+      applyTransform();
+    }, { passive: false });
+
+    viewport.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.options-popover') || e.target.closest('.zoom-toolbar')) return;
+      isDragging = true;
+      startX = e.clientX - panX;
+      startY = e.clientY - panY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      panX = e.clientX - startX;
+      panY = e.clientY - startY;
+      applyTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    // =========================================================================
+    // Options Popover & Interactive Node Handlers
+    // =========================================================================
+
+    function openNodeOptions(key) {
+      const popover = document.getElementById('optionsPopover');
+      const title = document.getElementById('popoverTitle');
+      const desc = document.getElementById('popoverDesc');
+      const actions = document.getElementById('popoverActions');
+
+      popover.style.display = 'flex';
+
+      if (key === 'godot') {
+        title.innerText = "⚙ Layer 1: Godot Seam (mnn_runtime.gd)";
+        desc.innerText = "Decouples LLM inference from rendering. Ingests signals: chat_token, chat_done.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="triggerPresetText('Test message from Godot.')">▶ Trigger Sample Utterance</button>
+          <button class="action-btn" onclick="alert('File: res://scripts/brain/mnn_runtime.gd\\nSignals: chat_token(chunk), chat_done(full)')">📄 View Script Interface</button>
+          <button class="action-btn" onclick="alert('Rule: Never block the main rendering thread. Uses single worker thread.')">🛡️ Thread Safety Guarantee</button>
+        `;
+      } else if (key === 'kotlin') {
+        title.innerText = "⚙ Layer 2: Kotlin Worker (IxMnn.kt)";
+        desc.innerText = "Serializes calls onto a single background thread. Guarantees non-reentrant safety.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="alert('IxMnn.kt uses single-threaded executor to prevent concurrent access to MNN session.')">🛡️ Non-Reentrant Contract</button>
+          <button class="action-btn" onclick="alert('Method: onChatToken(byte[])\\nAvoids ART NewStringUTF Modified-UTF-8 crashes.')">📄 JNI Wire Contract</button>
+        `;
+      } else if (key === 'jni' || key === 'stream') {
+        title.innerText = "⚙ Layer 3: C++ JNI TokenStream (ixmnn_jni.cpp)";
+        desc.innerText = "Custom std::streambuf hooking xsputn(). Executes danglingUtf8() and tagPrefixLen().";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="setScenario(1)">⚡ Simulate Split Emoji (danglingUtf8)</button>
+          <button class="action-btn" onclick="setScenario(2)">⚡ Simulate Reasoning Filter (<think>)</button>
+          <button class="action-btn" onclick="alert('Memory Rule: JNI_OnLoad caches global ref (NewGlobalRef). Local refs are never held across frames.')">🛡️ Memory & Lifetime Safety</button>
+        `;
+      } else if (key === 'mnn') {
+        title.innerText = "⚙ Layer 4: Alibaba MNN Core (libllm.so)";
+        desc.innerText = "Autoregressive neural decoder using Key-Value (KV) cache for fast edge inference.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="switchTab(3)">🔬 View Transformer Block Deep-Dive</button>
+          <button class="action-btn" onclick="switchTab(4)">💾 Inspect KV-Cache Memory</button>
+          <button class="action-btn" onclick="switchTab(5)">📊 Inspect Sampler & Logits</button>
+        `;
+      } else if (key.startsWith('step_')) {
+        const num = key.replace('step_', '');
+        title.innerText = `⚙ Step ${num} in Sequence`;
+        desc.innerText = `Message transfer step #${num} in the streaming sequence pipeline.`;
+        actions.innerHTML = `
+          <button class="action-btn" onclick="jumpToStep(${num})">🎯 Jump Simulation to Step ${num}</button>
+          <button class="action-btn" onclick="alert('Step ${num} executed during autoregressive token cycle.')">📄 View Sequence Rationale</button>
+        `;
+      } else if (key === 'filter_think') {
+        title.innerText = "🛡 Filter 1: <think> Reasoning Filter";
+        desc.innerText = "Detects and suppresses Qwen/DeepSeek internal thought tokens so they aren't spoken.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="setScenario(2)">⚡ Test <think> Tag Filter</button>
+          <button class="action-btn" onclick="alert('tagPrefixLen() holds back trailing <thi prefixes until completed.')">📄 Algorithm Details</button>
+        `;
+      } else if (key === 'filter_utf8') {
+        title.innerText = "🛡 Filter 2: danglingUtf8 Boundary Guard";
+        desc.innerText = "Detects split multi-byte characters at chunk boundaries and delays them until completed.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="setScenario(1)">⚡ Test Split Multi-Byte Emoji (😀)</button>
+          <button class="action-btn" onclick="alert('Inspects trailing byte headers: 110xxxxx, 1110xxxx, 11110xxx.')">📄 UTF-8 Byte Table</button>
+        `;
+      } else if (key === 'filter_wire') {
+        title.innerText = "🛡 Filter 3: Raw Byte Wire Format";
+        desc.innerText = "Passes jbyteArray directly to JVM. Bypasses Android ART NewStringUTF crashes.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="alert('Android ART Modified UTF-8 encodes code points >= U+10000 into 6-byte surrogate pairs. NewStringUTF crashes on emojis.')">📄 Why Not jstring?</button>
+        `;
+      } else if (key === 'mnn_rope') {
+        title.innerText = "🔬 RoPE (Rotary Position Embedding)";
+        desc.innerText = "Rotates Query & Key vectors in 2D coordinate pairs based on token position m. Zero learned parameters.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="alert('Formula:\\n[q0, q1] * [[cos mθ, -sin mθ], [sin mθ, cos mθ]]\\nPreserves relative distance (m - n) across infinite context.')">📐 Mathematical Formula</button>
+          <button class="action-btn" onclick="alert('MNN C++ Kernel: MNN::Express::apply_rotary_emb vectorized with ARM NEON vld2q_f16.')">⚡ ARM NEON Vector Kernel</button>
+        `;
+      } else if (key === 'mnn_gqa') {
+        title.innerText = "🔬 GQA (Grouped-Query Attention)";
+        desc.innerText = "Shares 1 Key/Value head across 4 or 8 Query heads. Cuts KV-Cache memory consumption by 87.5%!";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="switchTab(4)">💾 View KV-Cache Memory Savings</button>
+          <button class="action-btn" onclick="alert('Qwen2.5/3 uses GQA with 14 Q-heads and 2 KV-heads (7:1 ratio). Allows 2048 tokens on 2GB RAM devices.')">📄 Architecture Specifications</button>
+        `;
+      } else if (key === 'mnn_swiglu') {
+        title.innerText = "🔬 SwiGLU Feed-Forward (MLP)";
+        desc.innerText = "Gated Non-Linearity: SwiGLU(x) = (SiLU(x * W_gate) ⊙ (x * W_up)) * W_down. Stores knowledge weights.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="alert('SiLU(x) = x * sigmoid(x).\\nFused into a single streaming C++ kernel in MNN libllm.so to avoid intermediate RAM copies.')">⚡ Kernel Fusion Optimization</button>
+        `;
+      } else if (key === 'mnn_rmsnorm') {
+        title.innerText = "🔬 RMSNorm (Root Mean Square Norm)";
+        desc.innerText = "Normalizes activations by root mean square without subtracting mean: x / sqrt(mean(x²) + ε) * γ.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="alert('Cuts 50% of normalization compute vs standard LayerNorm because mean calculation is eliminated.')">⚡ Speedup Rationale</button>
+        `;
+      } else if (key === 'mnn_prefill') {
+        title.innerText = "⚡ PREFILL Phase (Prompt Ingestion)";
+        desc.innerText = "Computes full N×D matrix multiplication for the entire user prompt simultaneously. Initializes the KV-Cache.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="alert('High compute bound (GEMM). Determines TTFT (Time To First Token). Scales quadratically with prompt length.')">⏱ TTFT Analysis</button>
+        `;
+      } else if (key === 'mnn_decode') {
+        title.innerText = "⚡ DECODE Phase (Autoregressive)";
+        desc.innerText = "Generates 1 token per step. Reuses past keys & values from the KV-Cache, avoiding recomputing past tokens.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="alert('Memory-bandwidth bound (GEMV). Each token requires streaming all model weights through CPU/GPU caches once.')">⚡ Bandwidth Bound Analysis</button>
+        `;
+      } else if (key === 'mnn_kv_buffer') {
+        title.innerText = "💾 KV-Cache Buffer Layout";
+        desc.innerText = "Stores past Key & Value tensors in contiguous circular buffers to avoid allocations per token.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="alert('Memory per token = 2 * Layers * KV_Heads * Head_Dim * sizeof(fp16)\\nFor Qwen-0.6B: ~40 KB per token.')">📐 Memory Calculation</button>
+        `;
+      } else if (key === 'mnn_sampler') {
+        title.innerText = "📊 Sampler & Logits Pipeline";
+        desc.innerText = "Transforms raw logits vector into probability distribution through Temperature, Repetition Penalty, and Top-P.";
+        actions.innerHTML = `
+          <button class="action-btn" onclick="switchTab(5)">📊 Open Sampler Pipeline View</button>
+          <button class="action-btn" onclick="alert('MNN Sampler executes Top-P (nucleus sampling) by partial quickselect on logits to avoid O(V log V) full sorting.')">⚡ Top-P Quickselect Optimization</button>
+        `;
+      }
+    }
+
+    function closePopover() {
+      document.getElementById('optionsPopover').style.display = 'none';
+    }
+
+    function triggerPresetText(txt) {
+      document.getElementById('promptText').value = txt;
+      resetState();
+      buildTokenQueue();
+      togglePlay();
+      closePopover();
+    }
+
+    function jumpToStep(num) {
+      closePopover();
+      highlightArrow(`s${num}`);
+    }
+
+    // =========================================================================
+    // 6 Interactive SVG Diagrams (Including MNN C++ Engine)
+    // =========================================================================
+
+    // Diagram 1: Sequence Diagram
+    function renderSequenceSvg() {
+      return `
+        <svg class="interactive-svg" viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="#94a3b8" />
+            </marker>
+            <marker id="arrow-active" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="#4ade80" />
+            </marker>
+          </defs>
+
+          <!-- Autoregressive Loop Box -->
+          <rect x="50" y="230" width="800" height="175" rx="8" fill="rgba(30, 41, 59, 0.35)" stroke="rgba(148, 163, 184, 0.3)" stroke-dasharray="6 3" />
+          <rect x="50" y="230" width="160" height="22" fill="rgba(56, 189, 248, 0.25)" rx="4" />
+          <text x="60" y="245" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="#38bdf8">LOOP [Token Generation]</text>
+
+          <!-- Lifelines -->
+          <line x1="90" y1="50" x2="90" y2="520" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="4 4" />
+          <line x1="270" y1="50" x2="270" y2="520" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="4 4" />
+          <line x1="460" y1="50" x2="460" y2="520" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="4 4" />
+          <line x1="640" y1="50" x2="640" y2="520" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="4 4" />
+          <line x1="810" y1="50" x2="810" y2="520" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="4 4" />
+
+          <!-- Activation Bars -->
+          <rect x="85" y="80" width="10" height="420" rx="2" fill="rgba(56, 189, 248, 0.25)" stroke="#38bdf8" />
+          <rect x="265" y="85" width="10" height="415" rx="2" fill="rgba(192, 132, 252, 0.25)" stroke="#c084fc" />
+          <rect x="455" y="125" width="10" height="345" rx="2" fill="rgba(56, 189, 248, 0.25)" stroke="#38bdf8" />
+          <rect x="635" y="160" width="10" height="280" rx="2" fill="rgba(74, 222, 128, 0.25)" stroke="#4ade80" />
+          <rect x="805" y="195" width="10" height="215" rx="2" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" />
+
+          <!-- Steps -->
+          <line class="interactive-arrow" id="arrow_s1" x1="95" y1="85" x2="265" y2="85" marker-end="url(#arrow)" onclick="openNodeOptions('step_1')" />
+          <text class="interactive-label" id="label_s1" x="180" y="80" text-anchor="middle" onclick="openNodeOptions('step_1')">1. chat_stream("prompt")</text>
+
+          <line class="interactive-arrow" id="arrow_s2" x1="275" y1="125" x2="455" y2="125" marker-end="url(#arrow)" onclick="openNodeOptions('step_2')" />
+          <text class="interactive-label" id="label_s2" x="365" y="120" text-anchor="middle" onclick="openNodeOptions('step_2')">2. nativeChatStream(handle)</text>
+
+          <line class="interactive-arrow" id="arrow_s3" x1="465" y1="160" x2="635" y2="160" marker-end="url(#arrow)" onclick="openNodeOptions('step_3')" />
+          <text class="interactive-label" id="label_s3" x="550" y="155" text-anchor="middle" onclick="openNodeOptions('step_3')">3. Attach TokenStream(os)</text>
+
+          <line class="interactive-arrow" id="arrow_s4" x1="465" y1="195" x2="805" y2="195" marker-end="url(#arrow)" onclick="openNodeOptions('step_4')" />
+          <text class="interactive-label" id="label_s4" x="635" y="190" text-anchor="middle" onclick="openNodeOptions('step_4')">4. llm->response(&os)</text>
+
+          <!-- Loop Section -->
+          <line class="interactive-arrow" id="arrow_s5" x1="805" y1="265" x2="645" y2="265" marker-end="url(#arrow)" onclick="openNodeOptions('step_5')" />
+          <text class="interactive-label" id="label_s5" x="725" y="260" text-anchor="middle" onclick="openNodeOptions('step_5')">5. xsputn("the ", 4)</text>
+
+          <path class="interactive-arrow" id="arrow_s6" d="M 645 295 H 680 V 315 H 646" marker-end="url(#arrow)" onclick="openNodeOptions('step_6')" />
+          <text class="interactive-label" id="label_s6" x="690" y="308" onclick="openNodeOptions('step_6')">6. danglingUtf8 & tagPrefixLen</text>
+
+          <line class="interactive-arrow" id="arrow_s7" x1="635" y1="345" x2="275" y2="345" marker-end="url(#arrow)" onclick="openNodeOptions('step_7')" />
+          <text class="interactive-label" id="label_s7" x="455" y="340" text-anchor="middle" onclick="openNodeOptions('step_7')">7. onChatToken(byte[])</text>
+
+          <line class="interactive-arrow" id="arrow_s8" x1="265" y1="375" x2="95" y2="375" marker-end="url(#arrow)" onclick="openNodeOptions('step_8')" />
+          <text class="interactive-label" id="label_s8" x="180" y="370" text-anchor="middle" onclick="openNodeOptions('step_8')">8. emit_signal("chat_token")</text>
+
+          <!-- Completion -->
+          <line class="interactive-arrow" id="arrow_s9" x1="805" y1="430" x2="465" y2="430" marker-end="url(#arrow)" onclick="openNodeOptions('step_9')" />
+          <text class="interactive-label" id="label_s9" x="635" y="425" text-anchor="middle" onclick="openNodeOptions('step_9')">9. Inference Finished (EOS)</text>
+
+          <path class="interactive-arrow" id="arrow_s10" d="M 645 455 H 675 V 470 H 646" marker-end="url(#arrow)" onclick="openNodeOptions('step_10')" />
+          <text class="interactive-label" id="label_s10" x="685" y="465" onclick="openNodeOptions('step_10')">10. buf.finish()</text>
+
+          <line class="interactive-arrow" id="arrow_s11" x1="455" y1="485" x2="275" y2="485" marker-end="url(#arrow)" onclick="openNodeOptions('step_11')" />
+          <text class="interactive-label" id="label_s11" x="365" y="480" text-anchor="middle" onclick="openNodeOptions('step_11')">11. Returns byte[]</text>
+
+          <line class="interactive-arrow" id="arrow_s12" x1="265" y1="510" x2="95" y2="510" marker-end="url(#arrow)" onclick="openNodeOptions('step_12')" />
+          <text class="interactive-label" id="label_s12" x="180" y="505" text-anchor="middle" onclick="openNodeOptions('step_12')">12. emit_signal("chat_done")</text>
+
+          <!-- Participants Headers -->
+          <g class="interactive-node" onclick="openNodeOptions('godot')">
+            <rect x="25" y="8" width="130" height="38" rx="6" fill="#111827" stroke="#67e8f9" stroke-width="1.5" />
+            <text x="90" y="24" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#f8fafc" text-anchor="middle">Godot (GDScript)</text>
+            <text x="90" y="38" font-family="'JetBrains Mono', monospace" font-size="8" fill="#67e8f9" text-anchor="middle">mnn_runtime.gd</text>
+          </g>
+
+          <g class="interactive-node" onclick="openNodeOptions('kotlin')">
+            <rect x="205" y="8" width="130" height="38" rx="6" fill="#111827" stroke="#c084fc" stroke-width="1.5" />
+            <text x="270" y="24" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#f8fafc" text-anchor="middle">Kotlin Worker</text>
+            <text x="270" y="38" font-family="'JetBrains Mono', monospace" font-size="8" fill="#c084fc" text-anchor="middle">IxMnn.kt</text>
+          </g>
+
+          <g class="interactive-node" onclick="openNodeOptions('jni')">
+            <rect x="395" y="8" width="130" height="38" rx="6" fill="#111827" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="460" y="24" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#f8fafc" text-anchor="middle">C++ JNI Bridge</text>
+            <text x="460" y="38" font-family="'JetBrains Mono', monospace" font-size="8" fill="#38bdf8" text-anchor="middle">ixmnn_jni.cpp</text>
+          </g>
+
+          <g class="interactive-node" onclick="openNodeOptions('stream')">
+            <rect x="575" y="8" width="130" height="38" rx="6" fill="#111827" stroke="#34d399" stroke-width="1.5" />
+            <text x="640" y="24" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#f8fafc" text-anchor="middle">TokenStream</text>
+            <text x="640" y="38" font-family="'JetBrains Mono', monospace" font-size="8" fill="#34d399" text-anchor="middle">std::streambuf</text>
+          </g>
+
+          <g class="interactive-node" onclick="openNodeOptions('mnn')">
+            <rect x="745" y="8" width="130" height="38" rx="6" fill="#111827" stroke="#fb923c" stroke-width="1.5" />
+            <text x="810" y="24" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#f8fafc" text-anchor="middle">MNN Core</text>
+            <text x="810" y="38" font-family="'JetBrains Mono', monospace" font-size="8" fill="#fb923c" text-anchor="middle">libllm.so</text>
+          </g>
+        </svg>
+      `;
+    }
+
+    // Diagram 2: Architecture Pipeline
+    function renderArchitectureSvg() {
+      return `
+        <svg class="interactive-svg" viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg">
+          <!-- Layer 1: Godot -->
+          <g class="interactive-node" onclick="openNodeOptions('godot')">
+            <rect x="80" y="40" width="740" height="90" rx="10" fill="#0f172a" stroke="#38bdf8" stroke-width="2" />
+            <text x="105" y="70" font-family="'Outfit', sans-serif" font-size="14" font-weight="700" fill="#38bdf8">LAYER 1: GODOT GAMEPLAY ENGINE (GDScript)</text>
+            <text x="105" y="92" font-family="'JetBrains Mono', monospace" font-size="11" fill="#94a3b8">scripts/brain/mnn_runtime.gd  •  res://scenes/hexy.tscn  •  scripts/broker.gd</text>
+            <text x="105" y="112" font-family="'Outfit', sans-serif" font-size="11" fill="#4ade80">✓ 60 FPS Main Loop  •  Lip Sync Visemes  •  Desktop Deterministic Mock</text>
+          </g>
+
+          <!-- Bridge 1 -->
+          <line x1="450" y1="130" x2="450" y2="170" stroke="#38bdf8" stroke-width="3" stroke-dasharray="4 4" />
+          <text x="465" y="155" font-family="'JetBrains Mono', monospace" font-size="10" fill="#38bdf8">Godot Android Plugin API</text>
+
+          <!-- Layer 2: Android JVM -->
+          <g class="interactive-node" onclick="openNodeOptions('kotlin')">
+            <rect x="80" y="170" width="740" height="90" rx="10" fill="#0f172a" stroke="#c084fc" stroke-width="2" />
+            <text x="105" y="200" font-family="'Outfit', sans-serif" font-size="14" font-weight="700" fill="#c084fc">LAYER 2: ANDROID PLUGIN & THREAD SERIALIZER (Kotlin)</text>
+            <text x="105" y="222" font-family="'JetBrains Mono', monospace" font-size="11" fill="#94a3b8">IxMnn.kt  •  IxMnnNative.kt  •  workerExecutor (Executors.newSingleThreadExecutor())</text>
+            <text x="105" y="242" font-family="'Outfit', sans-serif" font-size="11" fill="#c084fc">✓ Non-Reentrant Protection  •  Signals dispatch back to Godot</text>
+          </g>
+
+          <!-- Bridge 2 -->
+          <line x1="450" y1="260" x2="450" y2="300" stroke="#c084fc" stroke-width="3" stroke-dasharray="4 4" />
+          <text x="465" y="285" font-family="'JetBrains Mono', monospace" font-size="10" fill="#c084fc">JNI Boundary (jbyteArray)</text>
+
+          <!-- Layer 3: C++ JNI Bridge -->
+          <g class="interactive-node" onclick="openNodeOptions('jni')">
+            <rect x="80" y="300" width="740" height="90" rx="10" fill="#0f172a" stroke="#22d3ee" stroke-width="2" />
+            <text x="105" y="330" font-family="'Outfit', sans-serif" font-size="14" font-weight="700" fill="#22d3ee">LAYER 3: NATIVE C++ JNI & STREAMBUF FILTERS (ixmnn_jni.cpp)</text>
+            <text x="105" y="352" font-family="'JetBrains Mono', monospace" font-size="11" fill="#94a3b8">TokenStream : public std::streambuf  •  danglingUtf8()  •  tagPrefixLen()</text>
+            <text x="105" y="372" font-family="'Outfit', sans-serif" font-size="11" fill="#22d3ee">✓ Zero-Copy Streaming  •  Cached JNI Handles at Load  •  Mutes internal thoughts</text>
+          </g>
+
+          <!-- Bridge 3 -->
+          <line x1="450" y1="390" x2="450" y2="430" stroke="#22d3ee" stroke-width="3" stroke-dasharray="4 4" />
+          <text x="465" y="415" font-family="'JetBrains Mono', monospace" font-size="10" fill="#22d3ee">C++ std::ostream&</text>
+
+          <!-- Layer 4: MNN Core -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn')">
+            <rect x="80" y="430" width="740" height="85" rx="10" fill="#0f172a" stroke="#fb923c" stroke-width="2" />
+            <text x="105" y="460" font-family="'Outfit', sans-serif" font-size="14" font-weight="700" fill="#fb923c">LAYER 4: ALIBABA MNN TRANSFORMER COMPUTE (libllm.so + libMNN.so)</text>
+            <text x="105" y="482" font-family="'JetBrains Mono', monospace" font-size="11" fill="#94a3b8">MNN::Transformer::Llm  •  Qwen3-0.6B Weights  •  Vulkan/OpenCL/CPU Backends</text>
+            <text x="105" y="502" font-family="'Outfit', sans-serif" font-size="11" fill="#fb923c">✓ Autoregressive KV-Cached Edge AI Inference</text>
+          </g>
+        </svg>
+      `;
+    }
+
+    // Diagram 3: Safety Filter Flow
+    function renderSafetyFilterSvg() {
+      return `
+        <svg class="interactive-svg" viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg">
+          <!-- Input Box -->
+          <g class="interactive-node" onclick="openNodeOptions('stream')">
+            <rect x="325" y="20" width="250" height="50" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2" />
+            <text x="450" y="42" font-family="'Outfit', sans-serif" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">Raw Bytes from MNN Engine</text>
+            <text x="450" y="57" font-family="'JetBrains Mono', monospace" font-size="9" fill="#38bdf8" text-anchor="middle">TokenStream::xsputn(s, n)</text>
+          </g>
+
+          <line x1="450" y1="70" x2="450" y2="110" stroke="#94a3b8" stroke-width="2" />
+
+          <!-- Filter 1 Diamond -->
+          <g class="interactive-node" onclick="openNodeOptions('filter_think')">
+            <polygon points="450,110 570,165 450,220 330,165" fill="#1e293b" stroke="#c084fc" stroke-width="2" />
+            <text x="450" y="160" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">Filter 1: Inside &lt;think&gt;?</text>
+            <text x="450" y="176" font-family="'JetBrains Mono', monospace" font-size="9" fill="#c084fc" text-anchor="middle">tagPrefixLen()</text>
+          </g>
+
+          <!-- Branch 1 Left: Drop -->
+          <line x1="330" y1="165" x2="160" y2="165" stroke="#f87171" stroke-width="2" />
+          <g class="interactive-node" onclick="openNodeOptions('filter_think')">
+            <rect x="60" y="140" width="180" height="50" rx="6" fill="#1e293b" stroke="#f87171" stroke-width="1.5" />
+            <text x="150" y="162" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#f87171" text-anchor="middle">Drop Reasoning Bytes</text>
+            <text x="150" y="177" font-family="'JetBrains Mono', monospace" font-size="9" fill="#94a3b8" text-anchor="middle">Do not speak thoughts</text>
+          </g>
+
+          <!-- Branch 1 Down: Clean to Filter 2 -->
+          <line x1="450" y1="220" x2="450" y2="260" stroke="#4ade80" stroke-width="2" />
+
+          <!-- Filter 2 Diamond -->
+          <g class="interactive-node" onclick="openNodeOptions('filter_utf8')">
+            <polygon points="450,260 570,315 450,370 330,315" fill="#1e293b" stroke="#fbbf24" stroke-width="2" />
+            <text x="450" y="310" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">Filter 2: Split UTF-8?</text>
+            <text x="450" y="326" font-family="'JetBrains Mono', monospace" font-size="9" fill="#fbbf24" text-anchor="middle">danglingUtf8()</text>
+          </g>
+
+          <!-- Branch 2 Left: Hold back -->
+          <line x1="330" y1="315" x2="160" y2="315" stroke="#fbbf24" stroke-width="2" />
+          <g class="interactive-node" onclick="openNodeOptions('filter_utf8')">
+            <rect x="60" y="290" width="180" height="50" rx="6" fill="#1e293b" stroke="#fbbf24" stroke-width="1.5" />
+            <text x="150" y="312" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#fbbf24" text-anchor="middle">Hold Back 1-3 Bytes</text>
+            <text x="150" y="327" font-family="'JetBrains Mono', monospace" font-size="9" fill="#94a3b8" text-anchor="middle">Wait for next token chunk</text>
+          </g>
+
+          <!-- Branch 2 Down: Clean to Filter 3 -->
+          <line x1="450" y1="370" x2="450" y2="410" stroke="#4ade80" stroke-width="2" />
+
+          <!-- Filter 3: Raw Byte Wire Format -->
+          <g class="interactive-node" onclick="openNodeOptions('filter_wire')">
+            <rect x="325" y="410" width="250" height="50" rx="8" fill="#1e293b" stroke="#4ade80" stroke-width="2" />
+            <text x="450" y="432" font-family="'Outfit', sans-serif" font-size="12" font-weight="700" fill="#4ade80" text-anchor="middle">Filter 3: Raw Byte Wire Format</text>
+            <text x="450" y="447" font-family="'JetBrains Mono', monospace" font-size="9" fill="#94a3b8" text-anchor="middle">jbyteArray (Zero Modified-UTF8 Crashes)</text>
+          </g>
+
+          <!-- Final Emission Box -->
+          <line x1="450" y1="460" x2="450" y2="490" stroke="#4ade80" stroke-width="2" />
+          <g class="interactive-node" onclick="openNodeOptions('godot')">
+            <rect x="310" y="490" width="280" height="40" rx="6" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="450" y="514" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#f8fafc" text-anchor="middle">Emit onChatToken() to Godot Engine</text>
+          </g>
+        </svg>
+      `;
+    }
+
+    // Diagram 4: MNN Transformer Block Core (NEW)
+    function renderTransformerSvg() {
+      return `
+        <svg class="interactive-svg" viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg">
+          <!-- Background Block Container -->
+          <rect x="50" y="45" width="800" height="450" rx="12" fill="rgba(15, 23, 42, 0.7)" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="6 3" />
+          <rect x="65" y="32" width="260" height="24" rx="4" fill="#fb923c" />
+          <text x="75" y="48" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#000">MNN::Transformer::Llm Layer Block (L = 24)</text>
+
+          <!-- Input Vector -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_embed')">
+            <rect x="80" y="80" width="130" height="42" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="145" y="98" font-family="'Outfit', sans-serif" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">Hidden State x_l</text>
+            <text x="145" y="112" font-family="'JetBrains Mono', monospace" font-size="8" fill="#38bdf8" text-anchor="middle">dim = 1536 (FP16)</text>
+          </g>
+
+          <line x1="210" y1="101" x2="250" y2="101" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)" />
+
+          <!-- Input RMSNorm -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_rmsnorm')">
+            <rect x="250" y="80" width="120" height="42" rx="6" fill="#1e293b" stroke="#c084fc" stroke-width="1.5" />
+            <text x="310" y="98" font-family="'Outfit', sans-serif" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">Input RMSNorm</text>
+            <text x="310" y="112" font-family="'JetBrains Mono', monospace" font-size="8" fill="#c084fc" text-anchor="middle">x / sqrt(mean(x²)+ε)</text>
+          </g>
+
+          <!-- Branch into Q, K, V -->
+          <line x1="370" y1="101" x2="410" y2="101" stroke="#c084fc" stroke-width="2" />
+          <path d="M 410 101 V 70 H 450" stroke="#c084fc" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+          <path d="M 410 101 H 450" stroke="#c084fc" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+          <path d="M 410 101 V 132 H 450" stroke="#c084fc" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+
+          <!-- Projections: Q, K, V -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_rope')">
+            <rect x="450" y="52" width="105" height="34" rx="5" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="502" y="68" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="700" fill="#38bdf8" text-anchor="middle">W_q + RoPE(m)</text>
+            <text x="502" y="80" font-family="'JetBrains Mono', monospace" font-size="8" fill="#94a3b8" text-anchor="middle">14 Q-Heads</text>
+          </g>
+
+          <g class="interactive-node" onclick="openNodeOptions('mnn_rope')">
+            <rect x="450" y="90" width="105" height="34" rx="5" fill="#1e293b" stroke="#fbbf24" stroke-width="1.5" />
+            <text x="502" y="106" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="700" fill="#fbbf24" text-anchor="middle">W_k + RoPE(m)</text>
+            <text x="502" y="118" font-family="'JetBrains Mono', monospace" font-size="8" fill="#94a3b8" text-anchor="middle">2 KV-Heads (GQA)</text>
+          </g>
+
+          <g class="interactive-node" onclick="openNodeOptions('mnn_gqa')">
+            <rect x="450" y="128" width="105" height="34" rx="5" fill="#1e293b" stroke="#fb923c" stroke-width="1.5" />
+            <text x="502" y="144" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="700" fill="#fb923c" text-anchor="middle">W_v (Values)</text>
+            <text x="502" y="156" font-family="'JetBrains Mono', monospace" font-size="8" fill="#94a3b8" text-anchor="middle">2 KV-Heads</text>
+          </g>
+
+          <!-- Lines to GQA Core -->
+          <line x1="555" y1="69" x2="600" y2="95" stroke="#38bdf8" stroke-width="2" />
+          <line x1="555" y1="107" x2="600" y2="107" stroke="#fbbf24" stroke-width="2" />
+          <line x1="555" y1="145" x2="600" y2="119" stroke="#fb923c" stroke-width="2" />
+
+          <!-- KV Cache Box Interacting with K and V -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_kv_buffer')">
+            <rect x="430" y="185" width="150" height="50" rx="6" fill="#0f172a" stroke="#22d3ee" stroke-width="1.5" />
+            <text x="505" y="205" font-family="'Outfit', sans-serif" font-size="10" font-weight="700" fill="#22d3ee" text-anchor="middle">KV-Cache Buffer</text>
+            <text x="505" y="222" font-family="'JetBrains Mono', monospace" font-size="8" fill="#94a3b8" text-anchor="middle">Append & Read Past K,V</text>
+          </g>
+          <path d="M 505 162 V 185" stroke="#22d3ee" stroke-width="2" stroke-dasharray="3 3" />
+          <path d="M 580 210 H 640 V 155" stroke="#22d3ee" stroke-width="2" stroke-dasharray="3 3" fill="none" marker-end="url(#arrow)" />
+
+          <!-- Grouped-Query Attention Engine -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_gqa')">
+            <rect x="600" y="80" width="140" height="70" rx="8" fill="#1e293b" stroke="#4ade80" stroke-width="2" />
+            <text x="670" y="105" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#4ade80" text-anchor="middle">GQA Core Engine</text>
+            <text x="670" y="122" font-family="'JetBrains Mono', monospace" font-size="9" fill="#fff" text-anchor="middle">Softmax(QK^T / √d) V</text>
+            <text x="670" y="138" font-family="'JetBrains Mono', monospace" font-size="8" fill="#94a3b8" text-anchor="middle">ARM NEON GEMV Kernel</text>
+          </g>
+
+          <!-- Projection W_o -->
+          <line x1="740" y1="115" x2="770" y2="115" stroke="#4ade80" stroke-width="2" marker-end="url(#arrow)" />
+          <g class="interactive-node" onclick="openNodeOptions('mnn_gqa')">
+            <rect x="770" y="98" width="60" height="34" rx="4" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="800" y="119" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="700" fill="#38bdf8" text-anchor="middle">W_out</text>
+          </g>
+
+          <!-- Residual Connection 1 -->
+          <path d="M 145 122 V 260 H 790 V 145" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 4" fill="none" />
+          <circle cx="790" cy="260" r="10" fill="#1e293b" stroke="#38bdf8" stroke-width="2" />
+          <text x="790" y="264" font-family="'JetBrains Mono', monospace" font-size="12" fill="#38bdf8" text-anchor="middle">+</text>
+
+          <!-- Lower Half: Post RMSNorm & SwiGLU MLP -->
+          <line x1="790" y1="270" x2="790" y2="310" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)" />
+
+          <!-- Post RMSNorm -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_rmsnorm')">
+            <rect x="730" y="310" width="120" height="42" rx="6" fill="#1e293b" stroke="#c084fc" stroke-width="1.5" />
+            <text x="790" y="328" font-family="'Outfit', sans-serif" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">Post RMSNorm</text>
+            <text x="790" y="342" font-family="'JetBrains Mono', monospace" font-size="8" fill="#c084fc" text-anchor="middle">Pre-MLP Scaling</text>
+          </g>
+
+          <line x1="730" y1="331" x2="680" y2="331" stroke="#c084fc" stroke-width="2" marker-end="url(#arrow)" />
+
+          <!-- SwiGLU MLP Fused Kernel -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_swiglu')">
+            <rect x="360" y="300" width="320" height="65" rx="8" fill="#1e293b" stroke="#fb923c" stroke-width="2" />
+            <text x="520" y="322" font-family="'Outfit', sans-serif" font-size="12" font-weight="700" fill="#fb923c" text-anchor="middle">SwiGLU Feed-Forward Network (MLP)</text>
+            <text x="520" y="339" font-family="'JetBrains Mono', monospace" font-size="9" fill="#fff" text-anchor="middle">(SiLU(x * W_gate) ⊙ (x * W_up)) * W_down</text>
+            <text x="520" y="354" font-family="'JetBrains Mono', monospace" font-size="8" fill="#94a3b8" text-anchor="middle">intermediate_dim = 8960  •  Fused C++ Shader</text>
+          </g>
+
+          <!-- Residual Connection 2 -->
+          <line x1="360" y1="332" x2="260" y2="332" stroke="#fb923c" stroke-width="2" marker-end="url(#arrow)" />
+          <circle cx="250" cy="332" r="12" fill="#1e293b" stroke="#fb923c" stroke-width="2" />
+          <text x="250" y="337" font-family="'JetBrains Mono', monospace" font-size="14" fill="#fb923c" text-anchor="middle">+</text>
+
+          <path d="M 790 270 V 385 H 250 V 344" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 4" fill="none" />
+
+          <!-- Output State to Next Layer -->
+          <line x1="238" y1="332" x2="160" y2="332" stroke="#4ade80" stroke-width="2" marker-end="url(#arrow)" />
+          <g class="interactive-node" onclick="openNodeOptions('mnn')">
+            <rect x="70" y="312" width="90" height="42" rx="6" fill="#1e293b" stroke="#4ade80" stroke-width="1.5" />
+            <text x="115" y="330" font-family="'Outfit', sans-serif" font-size="10" font-weight="700" fill="#4ade80" text-anchor="middle">Output x_(l+1)</text>
+            <text x="115" y="344" font-family="'JetBrains Mono', monospace" font-size="8" fill="#94a3b8" text-anchor="middle">To Layer l+1</text>
+          </g>
+
+          <!-- Footer Explanatory Legend -->
+          <text x="80" y="475" font-family="'JetBrains Mono', monospace" font-size="9" fill="#94a3b8">
+            • 24 Identical Transformer Layers execute sequentially in C++ per token generation step.
+          </text>
+          <text x="80" y="490" font-family="'JetBrains Mono', monospace" font-size="9" fill="#94a3b8">
+            • Only 1 token vector is decoded at a time; past tokens are read from the KV-Cache without recalculation.
+          </text>
+        </svg>
+      `;
+    }
+
+    // Diagram 5: KV-Cache Memory Allocator (NEW)
+    function renderKvCacheSvg() {
+      return `
+        <svg class="interactive-svg" viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg">
+          <!-- Prefill vs Decode Comparison -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_prefill')">
+            <rect x="50" y="40" width="380" height="150" rx="10" fill="#111827" stroke="#38bdf8" stroke-width="2" />
+            <text x="70" y="70" font-family="'Outfit', sans-serif" font-size="13" font-weight="700" fill="#38bdf8">PHASE A: PREFILL (PROMPT PROCESSING)</text>
+            <text x="70" y="92" font-family="'JetBrains Mono', monospace" font-size="10" fill="#94a3b8">Compute Bound (GEMM)  •  Input: N Tokens parallel</text>
+            <text x="70" y="112" font-family="'JetBrains Mono', monospace" font-size="9" fill="#fff">• Matrix dimension: [Batch=1, SeqLen=N, Dim=1536]</text>
+            <text x="70" y="128" font-family="'JetBrains Mono', monospace" font-size="9" fill="#fff">• Writes all N key/value vectors into KV-Cache at once</text>
+            <text x="70" y="148" font-family="'JetBrains Mono', monospace" font-size="10" fill="#4ade80">✓ Determines TTFT (Time To First Token) latency</text>
+          </g>
+
+          <g class="interactive-node" onclick="openNodeOptions('mnn_decode')">
+            <rect x="470" y="40" width="380" height="150" rx="10" fill="#111827" stroke="#fb923c" stroke-width="2" />
+            <text x="490" y="70" font-family="'Outfit', sans-serif" font-size="13" font-weight="700" fill="#fb923c">PHASE B: DECODE (AUTOREGRESSIVE)</text>
+            <text x="490" y="92" font-family="'JetBrains Mono', monospace" font-size="10" fill="#94a3b8">Memory-Bandwidth Bound (GEMV)  •  Input: 1 Token</text>
+            <text x="490" y="112" font-family="'JetBrains Mono', monospace" font-size="9" fill="#fff">• Matrix dimension: [Batch=1, SeqLen=1, Dim=1536]</text>
+            <text x="490" y="128" font-family="'JetBrains Mono', monospace" font-size="9" fill="#fff">• Reads past [0..m-1] keys from KV-Cache; appends K_m, V_m</text>
+            <text x="490" y="148" font-family="'JetBrains Mono', monospace" font-size="10" fill="#fb923c">✓ Determines TPS (Tokens Per Second) speed</text>
+          </g>
+
+          <!-- KV-Cache Physical Buffer Matrix Visualization -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_kv_buffer')">
+            <rect x="50" y="215" width="800" height="200" rx="10" fill="#0f172a" stroke="#22d3ee" stroke-width="2" />
+            <text x="75" y="245" font-family="'Outfit', sans-serif" font-size="13" font-weight="700" fill="#22d3ee">KV-CACHE PHYSICAL TENSOR ALLOCATION IN RAM / VRAM</text>
+            <text x="75" y="265" font-family="'JetBrains Mono', monospace" font-size="10" fill="#94a3b8">Shape: [2 (K+V), Layers=24, KV_Heads=2, Max_Tokens=2048, Head_Dim=128] × FP16 (2B)</text>
+
+            <!-- Memory Slots Diagram -->
+            <g transform="translate(75, 280)">
+              <!-- Slot 0 to Slot 5 Filled -->
+              <rect x="0" y="0" width="85" height="45" fill="rgba(56, 189, 248, 0.25)" stroke="#38bdf8" rx="4" />
+              <text x="42" y="20" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="700" fill="#fff" text-anchor="middle">Tok 0: "Your"</text>
+              <text x="42" y="34" font-family="'JetBrains Mono', monospace" font-size="8" fill="#38bdf8" text-anchor="middle">[K0, V0] Cached</text>
+
+              <rect x="95" y="0" width="85" height="45" fill="rgba(56, 189, 248, 0.25)" stroke="#38bdf8" rx="4" />
+              <text x="137" y="20" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="700" fill="#fff" text-anchor="middle">Tok 1: "keys"</text>
+              <text x="137" y="34" font-family="'JetBrains Mono', monospace" font-size="8" fill="#38bdf8" text-anchor="middle">[K1, V1] Cached</text>
+
+              <rect x="190" y="0" width="85" height="45" fill="rgba(56, 189, 248, 0.25)" stroke="#38bdf8" rx="4" />
+              <text x="232" y="20" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="700" fill="#fff" text-anchor="middle">Tok 2: "are"</text>
+              <text x="232" y="34" font-family="'JetBrains Mono', monospace" font-size="8" fill="#38bdf8" text-anchor="middle">[K2, V2] Cached</text>
+
+              <rect x="285" y="0" width="85" height="45" fill="rgba(74, 222, 128, 0.35)" stroke="#4ade80" stroke-width="2" rx="4" />
+              <text x="327" y="20" font-family="'JetBrains Mono', monospace" font-size="9" font-weight="700" fill="#4ade80" text-anchor="middle">Tok 3: "waiting"</text>
+              <text x="327" y="34" font-family="'JetBrains Mono', monospace" font-size="8" fill="#fff" text-anchor="middle">NEW [K3, V3] ⚡</text>
+
+              <!-- Empty Unused Slots -->
+              <rect x="380" y="0" width="85" height="45" fill="rgba(255, 255, 255, 0.04)" stroke="rgba(255, 255, 255, 0.15)" stroke-dasharray="3 3" rx="4" />
+              <text x="422" y="26" font-family="'JetBrains Mono', monospace" font-size="9" fill="#64748b" text-anchor="middle">Slot 4: Free</text>
+
+              <rect x="475" y="0" width="85" height="45" fill="rgba(255, 255, 255, 0.04)" stroke="rgba(255, 255, 255, 0.15)" stroke-dasharray="3 3" rx="4" />
+              <text x="517" y="26" font-family="'JetBrains Mono', monospace" font-size="9" fill="#64748b" text-anchor="middle">Slot 5: Free</text>
+
+              <rect x="570" y="0" width="170" height="45" fill="rgba(255, 255, 255, 0.02)" stroke="rgba(255, 255, 255, 0.08)" stroke-dasharray="3 3" rx="4" />
+              <text x="655" y="26" font-family="'JetBrains Mono', monospace" font-size="9" fill="#475569" text-anchor="middle">... Free Context (up to 2048)</text>
+            </g>
+
+            <text x="75" y="365" font-family="'JetBrains Mono', monospace" font-size="10" fill="#fff">
+              💡 Zero Recomputation: Past tokens 0..2 are untouched. Only new token 3 computes K & V, reducing complexity from O(N²) to O(N).
+            </text>
+            <text x="75" y="385" font-family="'JetBrains Mono', monospace" font-size="9" fill="#4ade80">
+              Total Memory at 2048 tokens = 2 × 24 layers × 2 heads × 2048 pos × 128 dim × 2 bytes = 50.3 MB VRAM (Fits easily on mobile phone).
+            </text>
+          </g>
+
+          <!-- GQA vs MHA Memory Comparison Box -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_gqa')">
+            <rect x="50" y="430" width="800" height="80" rx="8" fill="#111827" stroke="#4ade80" stroke-width="1.5" />
+            <text x="75" y="455" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#4ade80">WHY GQA (GROUPED-QUERY ATTENTION) ENABLES ON-DEVICE INFERENCE:</text>
+            <text x="75" y="475" font-family="'JetBrains Mono', monospace" font-size="9" fill="#fff">
+              • Standard MHA (14 Key/Value heads) would require 352 MB of KV-Cache at 2048 context.
+            </text>
+            <text x="75" y="492" font-family="'JetBrains Mono', monospace" font-size="9" fill="#22d3ee">
+              • Grouped-Query Attention (2 Key/Value heads shared across 14 Query heads) cuts memory footprint by 85.7% to just 50 MB!
+            </text>
+          </g>
+        </svg>
+      `;
+    }
+
+    // Diagram 6: Logits & Sampler Pipeline (NEW)
+    function renderSamplerSvg() {
+      return `
+        <svg class="interactive-svg" viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg">
+          <!-- Final Hidden State Input -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn')">
+            <rect x="40" y="100" width="120" height="60" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2" />
+            <text x="100" y="125" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">Hidden State h_L</text>
+            <text x="100" y="142" font-family="'JetBrains Mono', monospace" font-size="9" fill="#38bdf8" text-anchor="middle">dim = 1536</text>
+          </g>
+
+          <line x1="160" y1="130" x2="200" y2="130" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)" />
+
+          <!-- Final RMSNorm -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_rmsnorm')">
+            <rect x="200" y="100" width="120" height="60" rx="8" fill="#1e293b" stroke="#c084fc" stroke-width="1.5" />
+            <text x="260" y="125" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">Final RMSNorm</text>
+            <text x="260" y="142" font-family="'JetBrains Mono', monospace" font-size="9" fill="#c084fc" text-anchor="middle">Output Scaling</text>
+          </g>
+
+          <line x1="320" y1="130" x2="360" y2="130" stroke="#c084fc" stroke-width="2" marker-end="url(#arrow)" />
+
+          <!-- LM Head Projection -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_sampler')">
+            <rect x="360" y="90" width="150" height="80" rx="8" fill="#1e293b" stroke="#fbbf24" stroke-width="2" />
+            <text x="435" y="115" font-family="'Outfit', sans-serif" font-size="12" font-weight="700" fill="#fbbf24" text-anchor="middle">LM Head Projection</text>
+            <text x="435" y="135" font-family="'JetBrains Mono', monospace" font-size="9" fill="#fff" text-anchor="middle">W_lm: [1536 × 151936]</text>
+            <text x="435" y="152" font-family="'JetBrains Mono', monospace" font-size="8" fill="#94a3b8" text-anchor="middle">Emits 151k Logits</text>
+          </g>
+
+          <line x1="510" y1="130" x2="550" y2="130" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrow)" />
+
+          <!-- Repetition Penalty -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_sampler')">
+            <rect x="550" y="100" width="140" height="60" rx="8" fill="#1e293b" stroke="#fb923c" stroke-width="1.5" />
+            <text x="620" y="125" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">Repetition Penalty</text>
+            <text x="620" y="142" font-family="'JetBrains Mono', monospace" font-size="9" fill="#fb923c" text-anchor="middle">logits[past] /= 1.15</text>
+          </g>
+
+          <line x1="690" y1="130" x2="730" y2="130" stroke="#fb923c" stroke-width="2" marker-end="url(#arrow)" />
+
+          <!-- Temperature Scaling -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_sampler')">
+            <rect x="730" y="100" width="130" height="60" rx="8" fill="#1e293b" stroke="#f87171" stroke-width="1.5" />
+            <text x="795" y="125" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">Temperature (T)</text>
+            <text x="795" y="142" font-family="'JetBrains Mono', monospace" font-size="9" fill="#f87171" text-anchor="middle">logits /= 0.7</text>
+          </g>
+
+          <!-- Downwards into Sampler Filters -->
+          <path d="M 795 160 V 230 H 710" stroke="#f87171" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+
+          <!-- Softmax Probabilities -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_sampler')">
+            <rect x="530" y="205" width="180" height="50" rx="8" fill="#1e293b" stroke="#c084fc" stroke-width="1.5" />
+            <text x="620" y="227" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">Softmax Normalization</text>
+            <text x="620" y="244" font-family="'JetBrains Mono', monospace" font-size="9" fill="#c084fc" text-anchor="middle">p_i = exp(z_i) / Σ exp(z_j)</text>
+          </g>
+
+          <line x1="530" y1="230" x2="490" y2="230" stroke="#c084fc" stroke-width="2" marker-end="url(#arrow)" />
+
+          <!-- Top-K & Top-P (Nucleus) Truncation -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_sampler')">
+            <rect x="250" y="195" width="240" height="70" rx="8" fill="#1e293b" stroke="#4ade80" stroke-width="2" />
+            <text x="370" y="220" font-family="'Outfit', sans-serif" font-size="12" font-weight="700" fill="#4ade80" text-anchor="middle">Top-K & Top-P (Nucleus)</text>
+            <text x="370" y="238" font-family="'JetBrains Mono', monospace" font-size="9" fill="#fff" text-anchor="middle">Keep cumulative sum ≤ 0.90</text>
+            <text x="370" y="252" font-family="'JetBrains Mono', monospace" font-size="8" fill="#94a3b8" text-anchor="middle">C++ Quickselect avoids full sort</text>
+          </g>
+
+          <line x1="250" y1="230" x2="190" y2="230" stroke="#4ade80" stroke-width="2" marker-end="url(#arrow)" />
+
+          <!-- Multinomial Sampling -->
+          <g class="interactive-node" onclick="openNodeOptions('mnn_sampler')">
+            <rect x="40" y="195" width="150" height="70" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2" />
+            <text x="115" y="220" font-family="'Outfit', sans-serif" font-size="11" font-weight="700" fill="#38bdf8" text-anchor="middle">Multinomial Sample</text>
+            <text x="115" y="238" font-family="'JetBrains Mono', monospace" font-size="9" fill="#fff" text-anchor="middle">Pick Winning ID</text>
+            <text x="115" y="252" font-family="'JetBrains Mono', monospace" font-size="8" fill="#4ade80" text-anchor="middle">Selected: Token 4983</text>
+          </g>
+
+          <!-- Final Conversion to Bytes -->
+          <path d="M 115 265 V 320" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)" />
+
+          <g class="interactive-node" onclick="openNodeOptions('stream')">
+            <rect x="40" y="320" width="820" height="75" rx="10" fill="#0f172a" stroke="#22d3ee" stroke-width="2" />
+            <text x="65" y="348" font-family="'Outfit', sans-serif" font-size="12" font-weight="700" fill="#22d3ee">DETOKENIZE TO RAW BYTES & EMIT INTO C++ std::ostream</text>
+            <text x="65" y="368" font-family="'JetBrains Mono', monospace" font-size="10" fill="#fff">
+              Token ID 4983 ➔ Byte sequence [0x77, 0x61, 0x69, 0x74, 0x69, 0x6e, 0x67, 0x20] ("waiting ")
+            </text>
+            <text x="65" y="384" font-family="'JetBrains Mono', monospace" font-size="9" fill="#4ade80">
+              ➔ Enters TokenStream::xsputn(s, 8) ➔ Evaluates danglingUtf8() and tagPrefixLen() ➔ Emits to Godot!
+            </text>
+          </g>
+
+          <text x="65" y="440" font-family="'JetBrains Mono', monospace" font-size="10" fill="#94a3b8">
+            • Temperature (0.7) sharpens high-probability tokens while retaining natural conversational variety.
+          </text>
+          <text x="65" y="460" font-family="'JetBrains Mono', monospace" font-size="10" fill="#94a3b8">
+            • Repetition Penalty (1.15) prevents the on-device avatar from getting caught in endless loop phrases.
+          </text>
+        </svg>
+      `;
+    }
+
+    let activeTab = 0;
+
+    function switchTab(idx) {
+      activeTab = idx;
+      for (let i = 0; i < 8; i++) {
+        const tab = document.getElementById(`tab${i}`);
+        if (tab) {
+          if (i === idx) tab.classList.add('active');
+          else tab.classList.remove('active');
+        }
+      }
+
+      const mount = document.getElementById('svgMount');
+      if (idx === 0) mount.innerHTML = renderSequenceSvg();
+      else if (idx === 1) mount.innerHTML = renderArchitectureSvg();
+      else if (idx === 2) mount.innerHTML = renderSafetyFilterSvg();
+      else if (idx === 3) mount.innerHTML = renderTransformerSvg();
+      else if (idx === 4) mount.innerHTML = renderKvCacheSvg();
+      else if (idx === 5) mount.innerHTML = renderSamplerSvg();
+      else if (idx === 6) {
+        mount.innerHTML = renderEducationalLabHtml();
+        initEduLab();
+      }
+      else if (idx === 7) {
+        mount.innerHTML = renderBenchmarkDualModeHtml();
+        initBenchmarkStudio();
+      }
+
+      closePopover();
+      resetZoom();
+    }
+
+    // =========================================================================
+    // Simulation Engine & Dynamic Live Sampler Updates
+    // =========================================================================
+
+    function highlightArrow(stepId) {
+      document.querySelectorAll('.interactive-arrow').forEach(a => {
+        a.classList.remove('active');
+        a.setAttribute('marker-end', 'url(#arrow)');
+      });
+      document.querySelectorAll('.interactive-label').forEach(l => l.classList.remove('active'));
+
+      const arrow = document.getElementById(`arrow_${stepId}`);
+      const label = document.getElementById(`label_${stepId}`);
+      if (arrow) {
+        arrow.classList.add('active');
+        arrow.setAttribute('marker-end', 'url(#arrow-active)');
+      }
+      if (label) label.classList.add('active');
+    }
+
+    // Exact C++ Logic
+    function danglingUtf8(bytes) {
+      const n = bytes.length;
+      for (let back = 1; back <= 4 && back <= n; ++back) {
+        const b = bytes[n - back];
+        if ((b & 0xC0) === 0x80) continue;
+        let need = 1;
+        if ((b & 0xE0) === 0xC0) need = 2;
+        else if ((b & 0xF0) === 0xE0) need = 3;
+        else if ((b & 0xF8) === 0xF0) need = 4;
+        return back < need ? back : 0;
+      }
+      return 0;
+    }
+
+    function tagPrefixLen(s, tag) {
+      const max = Math.min(s.length, tag.length - 1);
+      for (let n = max; n > 0; --n) {
+        if (s.endsWith(tag.slice(0, n))) return n;
+      }
+      return 0;
+    }
+
+    let queue = [];
+    let curTokenIdx = 0;
+    let playing = false;
+    let intervalTimer = null;
+    let cppBuffer = [];
+    let inThink = false;
+    let assembledSpeech = "";
+    let t0 = 0;
+
+    const presetPrompts = [
+      "Your keys are waiting on the counter by the door.",
+      "Awesome work! <split_emoji> See you soon!",
+      "<think>Analyzing coordinates: keys at table top.</think>The keys are right on your table.",
+      "你好！世界很大，我们一起探索。"
+    ];
+
+    function setScenario(idx) {
+      document.getElementById('promptText').value = presetPrompts[idx];
+      if (idx === 1 || idx === 2) switchTab(2);
+      else switchTab(0);
+      resetState();
+      buildTokenQueue();
+    }
+
+    function buildTokenQueue() {
+      const txt = document.getElementById('promptText').value;
+      if (txt.includes("<split_emoji>")) {
+        queue = [
+          { str: "Awesome ", bytes: [0x41, 0x77, 0x65, 0x73, 0x6f, 0x6d, 0x65, 0x20], alts: [["Great ", 12], ["Good ", 4]] },
+          { str: "work! ", bytes: [0x77, 0x6f, 0x72, 0x6b, 0x21, 0x20], alts: [["job! ", 10], ["going! ", 5]] },
+          { str: "[SPLIT_EMOJI_P1]", bytes: [0xF0, 0x9F, 0x98], alts: [["[ALT_BYTE]", 8], ["[RAW]", 2]] },
+          { str: "[SPLIT_EMOJI_P2]", bytes: [0x80, 0x20], alts: [["[CONT]", 5], ["[END]", 2]] },
+          { str: "See ", bytes: [0x53, 0x65, 0x65, 0x20], alts: [["Catch ", 8], ["Talk ", 6]] },
+          { str: "you ", bytes: [0x79, 0x6f, 0x75, 0x20], alts: [["ya ", 14], ["all ", 3]] },
+          { str: "soon!", bytes: [0x73, 0x6f, 0x6f, 0x6e, 0x21], alts: [["later!", 15], ["there!", 4]] }
+        ];
+      } else {
+        const words = txt.match(/\S+\s*/g) || [txt];
+        const enc = new TextEncoder();
+        queue = words.map((w, i) => {
+          let alts = [["alt_" + (i + 1), 12], ["cand_" + (i + 2), 4]];
+          if (w.trim() === "keys") alts = [["phone", 6], ["wallet", 4]];
+          else if (w.trim() === "door.") alts = [["table.", 8], ["desk.", 3]];
+          return { str: w, bytes: Array.from(enc.encode(w)), alts };
+        });
+      }
+      document.getElementById('tokenCounter').innerText = `0 / ${queue.length} Tokens`;
+    }
+
+    function resetState() {
+      pauseStream();
+      curTokenIdx = 0;
+      cppBuffer = [];
+      inThink = false;
+      assembledSpeech = "";
+      t0 = 0;
+      document.getElementById('speechText').innerText = "";
+      document.getElementById('hexContainer').innerHTML = "[Standby: Waiting for token]";
+      document.getElementById('logContainer').innerHTML = "Ready. Step through or play to see C++ branches execute.";
+      document.getElementById('accumLabel').innerText = "0B in buffer";
+      document.getElementById('ttftBadge').innerText = "TTFT: -";
+      document.getElementById('phaseVal').innerText = "PREFILL (Standby)";
+      document.getElementById('kvVal').innerText = "0 / 2048 (0 MB)";
+      document.getElementById('kvBar').style.width = "0%";
+      setNodeState('nodeGD', 'IDLE', '');
+      setNodeState('nodeKT', 'IDLE', '');
+      setNodeState('nodeCPP', 'IDLE', '');
+      setNodeState('nodeMNN', 'IDLE', '');
+      highlightArrow('');
+      updateSamplerBars("-", 0, [["-", 0], ["-", 0]]);
+    }
+
+    function setNodeState(id, text, type) {
+      const n = document.getElementById(id);
+      n.className = "mini-node " + type;
+      n.querySelector('.mini-node-val').innerText = text;
+    }
+
+    function updateSamplerBars(winnerTok, winnerPct, alts) {
+      document.getElementById('cand0_tok').innerText = winnerTok;
+      document.getElementById('cand0_bar').style.width = `${winnerPct}%`;
+      document.getElementById('cand0_pct').innerText = `${winnerPct}%`;
+
+      if (alts && alts[0]) {
+        document.getElementById('cand1_tok').innerText = alts[0][0];
+        document.getElementById('cand1_bar').style.width = `${alts[0][1]}%`;
+        document.getElementById('cand1_pct').innerText = `${alts[0][1]}%`;
+      }
+      if (alts && alts[1]) {
+        document.getElementById('cand2_tok').innerText = alts[1][0];
+        document.getElementById('cand2_bar').style.width = `${alts[1][1]}%`;
+        document.getElementById('cand2_pct').innerText = `${alts[1][1]}%`;
+      }
+    }
+
+    function stepToken() {
+      if (curTokenIdx >= queue.length) {
+        pauseStream();
+        setNodeState('nodeGD', 'DONE', 'success');
+        setNodeState('nodeKT', 'IDLE', '');
+        setNodeState('nodeCPP', 'FLUSHED', 'success');
+        setNodeState('nodeMNN', 'EOS', 'active');
+        highlightArrow('s12');
+        document.getElementById('phaseVal').innerText = "COMPLETE (EOS)";
+        document.getElementById('logContainer').innerHTML = `<span style="color: var(--accent-green);">✓ Stream completed successfully. 0 bytes lost. All UTF-8 boundaries preserved.</span>`;
+        return false;
+      }
+
+      if (curTokenIdx === 0) {
+        t0 = performance.now();
+        highlightArrow('s4');
+        document.getElementById('phaseVal').innerText = "PREFILL (GEMM)";
+      } else {
+        document.getElementById('phaseVal').innerText = "DECODE (GEMV)";
+      }
+
+      const tok = queue[curTokenIdx];
+      curTokenIdx++;
+      document.getElementById('tokenCounter').innerText = `${curTokenIdx} / ${queue.length} Tokens`;
+
+      // Update KV Cache Gauge
+      const kvTokens = 12 + curTokenIdx;
+      const kvPct = Math.round((kvTokens / 2048) * 100);
+      const kvMb = ((kvTokens * 40) / 1024).toFixed(1);
+      document.getElementById('kvVal').innerText = `${kvTokens} / 2048 (${kvMb} MB)`;
+      document.getElementById('kvBar').style.width = `${Math.max(kvPct, 2)}%`;
+
+      // Update Sampler Live Distribution
+      const winPct = 78 + Math.floor(Math.random() * 15);
+      updateSamplerBars(tok.str.trim() || tok.str, winPct, tok.alts || [["other", 10], ["alt", 3]]);
+
+      // 1. MNN Emits
+      setNodeState('nodeMNN', `TOK ${curTokenIdx}`, 'active');
+      highlightArrow('s5');
+
+      // 2. Render Hex View
+      let hexHtml = tok.bytes.map(b => {
+        let cls = "byte-tag";
+        if ((b & 0xC0) === 0xC0) cls += " byte-lead";
+        else if ((b & 0xC0) === 0x80) cls += " byte-continuation";
+        else cls += " byte-ascii";
+        return `<span class="${cls}">0x${b.toString(16).toUpperCase().padStart(2, '0')}</span>`;
+      }).join(' ');
+      document.getElementById('hexContainer').innerHTML = hexHtml;
+
+      // 3. C++ TokenStream xsputn()
+      cppBuffer.push(...tok.bytes);
+      document.getElementById('accumLabel').innerText = `${cppBuffer.length}B in buffer`;
+
+      const dang = danglingUtf8(cppBuffer);
+      let log = "";
+
+      if (dang > 0) {
+        log += `<span style="color: var(--accent-orange);">⚠ [danglingUtf8] Incomplete sequence (${dang} byte). Buffering in C++ buffer.</span><br/>`;
+        setNodeState('nodeCPP', `HOLD ${dang}B`, 'warning');
+      } else {
+        log += `<span style="color: var(--accent-green);">✓ [danglingUtf8] Clean UTF-8 boundary confirmed.</span><br/>`;
+        setNodeState('nodeCPP', 'STREAMING', 'active');
+      }
+
+      const emitLen = cppBuffer.length - dang;
+      const emitBytes = cppBuffer.slice(0, emitLen);
+      cppBuffer = cppBuffer.slice(emitLen);
+
+      const dec = new TextDecoder('utf-8');
+      const textChunk = dec.decode(new Uint8Array(emitBytes));
+
+      let speechChunk = "";
+      if (textChunk.length > 0) {
+        if (textChunk.includes("<think>")) {
+          inThink = true;
+          log += `<span style="color: var(--accent-purple);">⚡ [stripThink] Entering &lt;think&gt;. Output muted.</span><br/>`;
+        }
+        if (textChunk.includes("</think>")) {
+          inThink = false;
+          const parts = textChunk.split("</think>");
+          speechChunk = parts[1] || "";
+          log += `<span style="color: var(--accent-green);">✓ [stripThink] Exited &lt;/think&gt;. Output unmuted.</span><br/>`;
+        } else if (inThink) {
+          log += `<span style="color: var(--text-muted);">• [stripThink] Suppressing thought: "${textChunk}"</span><br/>`;
+        } else {
+          const pLen = tagPrefixLen(textChunk, "<think>");
+          if (pLen > 0) {
+            log += `<span style="color: var(--accent-amber);">⚠ [tagPrefixLen] Matches &lt;think&gt; prefix. Holding back ${pLen} chars.</span><br/>`;
+            speechChunk = textChunk.slice(0, textChunk.length - pLen);
+          } else {
+            speechChunk = textChunk;
+          }
+        }
+      }
+
+      document.getElementById('logContainer').innerHTML = log;
+
+      if (speechChunk.length > 0) {
+        if (document.getElementById('ttftBadge').innerText === "TTFT: -") {
+          const ttft = Math.round(performance.now() - t0);
+          document.getElementById('ttftBadge').innerText = `TTFT: ${ttft}ms`;
+        }
+        highlightArrow('s8');
+        setNodeState('nodeKT', 'DISPATCH', 'active');
+        setNodeState('nodeGD', 'SPEAKING', 'success');
+        assembledSpeech += speechChunk;
+        document.getElementById('speechText').innerText = assembledSpeech;
+      } else {
+        highlightArrow('s6');
+        setNodeState('nodeKT', 'WAITING', '');
+        setNodeState('nodeGD', 'LISTENING', 'warning');
+      }
+
+      return true;
+    }
+
+    function togglePlay() {
+      if (playing) {
+        pauseStream();
+      } else {
+        if (curTokenIdx >= queue.length) {
+          resetState();
+          buildTokenQueue();
+        }
+        playing = true;
+        document.getElementById('playBtn').innerText = "⏸ Pause";
+        loopRun();
+      }
+    }
+
+    function pauseStream() {
+      playing = false;
+      document.getElementById('playBtn').innerText = "▶ Play Stream";
+      if (intervalTimer) clearTimeout(intervalTimer);
+    }
+
+    function loopRun() {
+      if (!playing) return;
+      const spd = parseInt(document.getElementById('speedSlider').value);
+      if (stepToken()) {
+        intervalTimer = setTimeout(loopRun, spd);
+      } else {
+        pauseStream();
+      }
+    }
+
+    document.getElementById('speedSlider').oninput = function() {
+      document.getElementById('speedDisplay').innerText = `${this.value}ms`;
+    };
+
+    // =========================================================================
+    // Guided Interactive Academy / Lesson Controller
+    // =========================================================================
+
+    const lessons = [
+      {
+        step: "LESSON 1 OF 8",
+        title: "1. The Engine Life-Cycle: Prefill vs Decode",
+        tab: 4,
+        pan: { x: 0, y: 0, scale: 1.05 },
+        concept: "In mobile edge LLMs, generating 40 tokens does <b>NOT</b> mean running the prompt 40 times from scratch.<br/>Alibaba MNN splits inference into two distinct C++ phases:<br/><b>• PREFILL (Prompt Ingestion):</b> Multiplies the entire prompt matrix (N×D) in parallel using GEMM (<span style='color: var(--accent-cyan);'>Matrix.h / MNN::Matrix</span>). Populates initial KV-Cache and sets TTFT.<br/><b>• DECODE (Autoregressive):</b> Generates 1 token per step (1×D) via Vector-Matrix multiplication (GEMV). Reuses past KV-vectors without recomputation!",
+        code: "// In MNN transformers/llm/engine/llm.cpp\nif (mSeqLen == 0) {\n  // PREFILL: Full N-token prompt GEMM\n  forward(prompt_tokens); // TTFT determined here\n} else {\n  // DECODE: 1-token GEMV using KV-Cache\n  forward(last_token_id);\n}",
+        actionText: "⚡ Simulate Prefill Phase (Populate KV-Cache)",
+        action: () => {
+          resetState();
+          buildTokenQueue();
+          stepToken();
+          highlightArrow('s4');
+        }
+      },
+      {
+        step: "LESSON 2 OF 8",
+        title: "2. Inside a Transformer Layer: RMSNorm, RoPE, GQA, SwiGLU",
+        tab: 3,
+        pan: { x: -60, y: -20, scale: 1.15 },
+        concept: "Each of MNN's 24 layers runs through 4 key operations:<br/><b>1. RMSNorm:</b> Normalizes vector scale by root-mean-square without mean subtraction (50% less compute than LayerNorm).<br/><b>2. RoPE (Rotary Position Embedding):</b> Multiplies Query/Key 2D coordinate pairs by rotation angle mθ to preserve relative word distances without learned position vectors.<br/><b>3. GQA (Grouped-Query Attention):</b> 14 Query heads query just 2 Key/Value heads (7:1 ratio), slashing memory.<br/><b>4. SwiGLU:</b> Fused SiLU MLP non-linearity storing factual knowledge.",
+        code: "// RoPE 2D coordinate rotation (Matrix.h):\n// [q0, q1] * [[cos mθ, -sin mθ], [sin mθ, cos mθ]]\nauto q_rot = apply_rotary_emb(q, pos_m);\n// GQA: 14 Q-heads share 2 KV-heads\nauto attn = softmax(q_rot * k_rot.T / sqrt(d)) * v;",
+        actionText: "🔍 Zoom into RoPE & GQA Math",
+        action: () => {
+          openNodeOptions('mnn_rope');
+        }
+      },
+      {
+        step: "LESSON 3 OF 8",
+        title: "3. RoPE Geometric Invariance: 2D Cartesian Rotations",
+        tab: 6,
+        pan: { x: 0, y: 0, scale: 1.0 },
+        concept: "How does MNN know word order without position vectors?<br/><b>Rotary Position Embedding (RoPE)</b> treats every 2 consecutive hidden features $(x_{2i}, x_{2i+1})$ as coordinates on a 2D circle.<br/>When a token appears at position index $m$, MNN rotates its vector by angle $\\alpha = m \\times \\theta_i$.<br/>Because $\\langle R_m q, R_n k \\rangle = q^T R_{n-m} k$, the attention dot product depends <b>strictly on relative offset $(m - n)$</b>, allowing context to scale with zero degradation!",
+        code: "// In MNN C++ Matrix.h (ARM NEON vld2q_f16):\nfloat cos_val = cos(m * theta);\nfloat sin_val = sin(m * theta);\nq_out[2*i]   = q[2*i] * cos_val - q[2*i+1] * sin_val;\nq_out[2*i+1] = q[2*i] * sin_val + q[2*i+1] * cos_val;",
+        actionText: "📐 Open RoPE Interactive Vector Rotator",
+        action: () => {
+          switchTab(6);
+          switchEduTab(0);
+        }
+      },
+      {
+        step: "LESSON 4 OF 8",
+        title: "4. The KV-Cache Memory Grid & Zero Recomputation",
+        tab: 4,
+        pan: { x: 0, y: -90, scale: 1.1 },
+        concept: "Why doesn't the phone lag as sentences get longer?<br/><b>The O(N²) Trap:</b> Without caching, predicting token #50 would require recomputing tokens 1..49, freezing the UI.<br/><b>MNN's Circular Buffer:</b> Memory for 2048 tokens is pre-allocated in RAM: <code>[2, Layers=24, Heads=2, Tokens=2048, Dim=128] × FP16</code>.<br/>When token #3 arrives, only Slot 3 is written. Past slots are untouched! Total memory is capped at <b>50.3 MB</b> thanks to GQA.",
+        code: "// MNN pre-allocates contiguous Tensor buffer:\n// Memory per token = 2 * 24 * 2 * 128 * 2 bytes = 24.5 KB\nauto k_slot = mKVCache->host<int16_t>() + slot_offset;\nmemcpy(k_slot, new_k.data(), head_bytes);\n// Zero re-allocation during 60 FPS gameplay!",
+        actionText: "💾 Step Next Token (Watch Slot 3 Allocate)",
+        action: () => {
+          stepToken();
+        }
+      },
+      {
+        step: "LESSON 5 OF 8",
+        title: "5. Memory Sizing & Quantization Math (FP16 vs INT4)",
+        tab: 6,
+        pan: { x: 0, y: 0, scale: 1.0 },
+        concept: "Why do standard models crash on low-end Android phones?<br/><b>Unquantized Multi-Head Attention (MHA):</b> 14 KV-heads with FP16 weights require <b>~350 MB</b> for 2048 tokens.<br/><b>MNN Optimization:</b> Combining Grouped-Query Attention (2 KV-heads) with INT4 quantization cuts memory down to <b>~12.5 MB</b> (a 96.4% reduction!).<br/>This leaves plenty of GPU RAM for Godot's 3D avatar rendering and audio processing.",
+        code: "// Memory formula per context token:\n// Bytes = 2 * Layers(24) * KV_Heads(2) * Head_Dim(128) * DtypeBytes(0.5)\n// = 6,144 bytes per token (6 KB)!\n// 2048 tokens = 12.5 MB total KV RAM footprint.",
+        actionText: "🧮 Open KV-Cache Interactive Calculator",
+        action: () => {
+          switchTab(6);
+          switchEduTab(1);
+        }
+      },
+      {
+        step: "LESSON 6 OF 8",
+        title: "6. Sampler Pipeline: Temperature, Repetition & Top-P",
+        tab: 5,
+        pan: { x: 0, y: 0, scale: 1.05 },
+        concept: "How does MNN turn hidden vector numbers into actual human words?<br/><b>1. LM Head:</b> Projects 1536 hidden dimensions across 151,936 vocabulary logits.<br/><b>2. Repetition Penalty:</b> Divides logits of recently used words by 1.15 so Hexy doesn't repeat phrases.<br/><b>3. Temperature (0.7):</b> Sharpens probability distribution without being robotic.<br/><b>4. Top-P (Nucleus 0.90):</b> MNN runs a C++ partial Quickselect to keep only words in the top 90% probability mass, discarding 150,000 low-quality words.",
+        code: "// In MNN Sampler.cpp:\nlogits[prev_token] /= rep_penalty; // Mute loops\nfloat inv_t = 1.0f / temperature; \nfor (auto& l : logits) l *= inv_t;\n// Quickselect top_p candidates (avoids full sort):\nauto winner_id = sample_top_p(logits, 0.90f);",
+        actionText: "📊 Step Token & Inspect Top-5 Candidate Probabilities",
+        action: () => {
+          stepToken();
+        }
+      },
+      {
+        step: "LESSON 7 OF 8",
+        title: "7. Zero-Copy C++ Wire Sentry (TokenStream::xsputn)",
+        tab: 0,
+        pan: { x: 0, y: 0, scale: 1.0 },
+        concept: "How do tokens reach Godot at 60 FPS without crashing Android ART?<br/><b>• No Callback API in MNN:</b> MNN's <code>llm->response(&os)</code> only writes to an ostream. We subclass <code>std::streambuf</code> and hook <code>xsputn()</code> to intercept tokens as they are produced.<br/><b>• danglingUtf8 Sentry:</b> Catches multi-byte characters split across token boundaries (like emojis 😀).<br/><b>• tagPrefixLen Sentry:</b> Suppresses internal reasoning tokens (<code>&lt;think&gt;...&lt;/think&gt;</code>) from being spoken by TTS.<br/><b>• jbyteArray Wire:</b> Passes raw bytes across JNI, avoiding Android's NewStringUTF crashes!",
+        code: "// In ixmnn_jni.cpp:\nstd::streamsize xsputn(const char* s, std::streamsize n) {\n  feed(std::string(s, n)); // Runs danglingUtf8 & think filter\n  return n;\n}\n// Dispatches byte[] to Kotlin -> Godot main thread!",
+        actionText: "🛡️ Open UTF-8 Wire Sentry Sandbox",
+        action: () => {
+          switchTab(6);
+          switchEduTab(3);
+        }
+      },
+      {
+        step: "LESSON 8 OF 8",
+        title: "8. Godot 4 GDScript Seam & 60 FPS Non-Blocking Signals",
+        tab: 1,
+        pan: { x: 0, y: 0, scale: 1.0 },
+        concept: "How does Godot render silky-smooth 60 FPS gameplay while an LLM is thinking?<br/><b>• Single Worker Thread:</b> The Android plugin runs MNN inference on a dedicated background thread executor.<br/><b>• Signal Decoupling:</b> As tokens arrive, Kotlin dispatches <code>emit_signal('chat_token', chunk)</code> to GDScript.<br/><b>• Main Thread Safety:</b> Godot processes signals on its main loop without mutex contention or frame drops.<br/><b>• Desktop Mock:</b> When running on desktop without mobile weights, a deterministic mock enables full test suite verification!",
+        code: "// In res://scripts/brain/mnn_runtime.gd:\nfunc _on_chat_token(token_chunk: String) -> void:\n    dialogue_box.append_text(token_chunk)\n    tts_speaker.feed_phonemes(token_chunk)\n// Zero blocking on Godot render thread!",
+        actionText: "📝 Take Knowledge Certification Quiz",
+        action: () => {
+          switchTab(6);
+          switchEduTab(4);
+        }
+      }
+    ];
+
+    let currentLessonIdx = 0;
+    let tutorialActive = false;
+
+    function toggleTutorial() {
+      if (tutorialActive) endTutorial();
+      else startTutorial();
+    }
+
+    function startTutorial() {
+      tutorialActive = true;
+      currentLessonIdx = 0;
+      document.getElementById('tutorialCard').style.display = 'flex';
+      renderLesson();
+    }
+
+    function endTutorial() {
+      tutorialActive = false;
+      document.getElementById('tutorialCard').style.display = 'none';
+      resetZoom();
+    }
+
+    function renderLesson() {
+      const les = lessons[currentLessonIdx];
+      document.getElementById('tutStepTag').innerText = les.step;
+      document.getElementById('tutTitle').innerText = les.title;
+      document.getElementById('tutConcept').innerHTML = les.concept;
+      document.getElementById('tutCode').innerText = les.code;
+      document.getElementById('tutActionBtn').innerText = les.actionText;
+
+      document.getElementById('tutPrevBtn').style.opacity = currentLessonIdx === 0 ? "0.4" : "1";
+      document.getElementById('tutPrevBtn').style.pointerEvents = currentLessonIdx === 0 ? "none" : "auto";
+
+      if (currentLessonIdx === lessons.length - 1) {
+        document.getElementById('tutNextBtn').innerText = "✓ Finish Lesson";
+      } else {
+        document.getElementById('tutNextBtn').innerText = "Next Lesson →";
+      }
+
+      // Switch Tab & Pan/Zoom
+      switchTab(les.tab);
+      panX = les.pan.x;
+      panY = les.pan.y;
+      scale = les.pan.scale;
+      applyTransform();
+    }
+
+    function nextLesson() {
+      if (currentLessonIdx < lessons.length - 1) {
+        currentLessonIdx++;
+        renderLesson();
+      } else {
+        endTutorial();
+      }
+    }
+
+    function prevLesson() {
+      if (currentLessonIdx > 0) {
+        currentLessonIdx--;
+        renderLesson();
+      }
+    }
+
+    function runLessonAction() {
+      const les = lessons[currentLessonIdx];
+      if (les.action) les.action();
+    }
+
+    // =========================================================================
+    // Dynamic Sampling Sliders & Tokenizer Handlers
+    // =========================================================================
+
+    let currentTemp = 0.70;
+    let currentTopP = 0.90;
+    let currentRepPen = 1.15;
+
+    document.getElementById('tempRange').oninput = function() {
+      currentTemp = parseFloat(this.value);
+      document.getElementById('tempValLabel').innerText = currentTemp.toFixed(2);
+      updateSamplingHeader();
+    };
+
+    document.getElementById('topPRange').oninput = function() {
+      currentTopP = parseFloat(this.value);
+      document.getElementById('topPValLabel').innerText = currentTopP.toFixed(2);
+      updateSamplingHeader();
+    };
+
+    document.getElementById('repPenRange').oninput = function() {
+      currentRepPen = parseFloat(this.value);
+      document.getElementById('repPenValLabel').innerText = currentRepPen.toFixed(2);
+      updateSamplingHeader();
+    };
+
+    function updateSamplingHeader() {
+      document.getElementById('activeSamplingLabel').innerText = 
+        `T: ${currentTemp.toFixed(2)} | P: ${currentTopP.toFixed(2)} | Rep: ${currentRepPen.toFixed(2)}`;
+    }
+
+    const mockVocabDict = {};
+    let mockVocabCounter = 1000;
+
+    function runInteractiveTokenizer() {
+      const text = document.getElementById('tokTestInput').value;
+      const mount = document.getElementById('tokChipsMount');
+      mount.innerHTML = "";
+      
+      const words = text.split(/\s+/).filter(w => w.length > 0);
+      document.getElementById('tokCountBadge').innerText = `${words.length} Tokens`;
+
+      words.forEach((w) => {
+        const lower = w.toLowerCase();
+        if (!mockVocabDict[lower]) {
+          mockVocabDict[lower] = mockVocabCounter++;
+        }
+        const id = mockVocabDict[lower];
+
+        const chip = document.createElement('span');
+        chip.className = "byte-tag byte-ascii";
+        chip.style.cursor = "pointer";
+        chip.title = `Click to decode: "${w}"`;
+        chip.innerText = `#${id}: "${w}"`;
+        chip.onclick = () => {
+          alert(`Decoded Token ID ${id}:\nString: "${w}"\nHex: 0x${id.toString(16).toUpperCase()}`);
+        };
+        mount.appendChild(chip);
+      });
+    }
+
+    runInteractiveTokenizer();
+
+    // =========================================================================
+    // Educational Lab & Math Sandbox Engine
+    // =========================================================================
+
+    let eduActiveTab = 0;
+
+    function renderEducationalLabHtml() {
+      return `
+        <div class="edu-container">
+          <!-- Top Sub-Navigation -->
+          <div class="edu-subnav">
+            <span style="font-size: 0.74rem; font-weight: 700; color: #fbbf24; margin-right: 4px;">LAB MODULES:</span>
+            <button class="edu-tab-btn active" id="eduTab0" onclick="switchEduTab(0)">1. 📐 RoPE Vector Rotator</button>
+            <button class="edu-tab-btn" id="eduTab1" onclick="switchEduTab(1)">2. 💾 GQA & KV-Cache Sizer</button>
+            <button class="edu-tab-btn" id="eduTab2" onclick="switchEduTab(2)">3. 🌡️ Softmax & Sampler Sandbox</button>
+            <button class="edu-tab-btn" id="eduTab3" onclick="switchEduTab(3)">4. 🛡️ UTF-8 Wire Sentry</button>
+            <button class="edu-tab-btn" id="eduTab4" onclick="switchEduTab(4)">5. 📝 Knowledge Certification Quiz</button>
+          </div>
+
+          <!-- Body Content -->
+          <div class="edu-body">
+
+            <!-- Module 0: RoPE Vector Rotator -->
+            <div id="eduView0" class="edu-card" style="display: flex; flex-direction: column; gap: 10px;">
+              <div class="edu-card-title">
+                <span>📐 Rotary Position Embedding (RoPE) 2D Geometry</span>
+                <span style="font-size: 0.68rem; color: #fbbf24; font-family: 'JetBrains Mono';">ARM NEON Vector Kernel (Matrix.h)</span>
+              </div>
+              <div class="edu-split">
+                <!-- SVG Circle Visualization -->
+                <div style="display: flex; justify-content: center; align-items: center; background: rgba(0,0,0,0.5); border-radius: 8px; padding: 10px; border: 1px solid rgba(255,255,255,0.06);">
+                  <svg id="ropeSvg" viewBox="-125 -125 250 250" width="220" height="220">
+                    <circle cx="0" cy="0" r="95" fill="none" stroke="rgba(255,255,255,0.15)" stroke-dasharray="3 3" />
+                    <!-- Axes -->
+                    <line x1="-105" y1="0" x2="105" y2="0" stroke="rgba(255,255,255,0.2)" stroke-width="1.2" />
+                    <line x1="0" y1="-105" x2="0" y2="105" stroke="rgba(255,255,255,0.2)" stroke-width="1.2" />
+                    <!-- Unrotated Base Vector q (Reference) -->
+                    <line x1="0" y1="0" x2="80" y2="0" stroke="#38bdf8" stroke-width="2" stroke-dasharray="2 2" />
+                    <circle cx="80" cy="0" r="3" fill="#38bdf8" />
+                    <text x="85" y="-4" fill="#38bdf8" font-size="9" font-family="'JetBrains Mono'">q (Base)</text>
+                    <!-- Rotated Query Vector q_rot -->
+                    <line id="ropeQLine" x1="0" y1="0" x2="80" y2="0" stroke="#22d3ee" stroke-width="2.6" />
+                    <circle id="ropeQDot" cx="80" cy="0" r="4" fill="#22d3ee" filter="drop-shadow(0 0 6px #22d3ee)" />
+                    <text id="ropeQText" x="85" y="15" fill="#22d3ee" font-size="10" font-weight="700" font-family="'JetBrains Mono'">R_m · q</text>
+                    <!-- Rotated Key Vector k_rot -->
+                    <line id="ropeKLine" x1="0" y1="0" x2="80" y2="0" stroke="#c084fc" stroke-width="2.6" />
+                    <circle id="ropeKDot" cx="80" cy="0" r="4" fill="#c084fc" filter="drop-shadow(0 0 6px #c084fc)" />
+                    <text id="ropeKText" x="85" y="30" fill="#c084fc" font-size="10" font-weight="700" font-family="'JetBrains Mono'">R_n · k</text>
+                  </svg>
+                </div>
+
+                <!-- Controls & Math Breakdown -->
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <div class="edu-control-group">
+                    <div class="edu-control-label">
+                      <span>Query Position (m):</span>
+                      <span id="ropeMVal">8</span>
+                    </div>
+                    <input type="range" id="ropeMSlider" min="0" max="64" value="8" style="width: 100%; cursor: pointer;" />
+                  </div>
+                  <div class="edu-control-group">
+                    <div class="edu-control-label">
+                      <span>Key Position (n):</span>
+                      <span id="ropeNVal">4</span>
+                    </div>
+                    <input type="range" id="ropeNSlider" min="0" max="64" value="4" style="width: 100%; cursor: pointer;" />
+                  </div>
+                  <div class="edu-control-group">
+                    <div class="edu-control-label">
+                      <span>Feature Dimension Pair (i):</span>
+                      <span id="ropeIVal">0 (θ₀ = 1.000)</span>
+                    </div>
+                    <input type="range" id="ropeISlider" min="0" max="7" value="0" style="width: 100%; cursor: pointer;" />
+                  </div>
+
+                  <div class="edu-formula">
+                    <div><b>Rotation Matrix:</b> R(θ) = [[cos(mθ), -sin(mθ)], [sin(mθ), cos(mθ)]]</div>
+                    <div style="margin-top: 4px; color: #4ade80;">
+                      <b>Inner Product Invariance:</b> &lang;R_m·q, R_n·k&rang; = qᵀ · R(n - m) · k
+                    </div>
+                    <div id="ropeScoreVal" style="margin-top: 4px; font-weight: 700; color: #fff;">
+                      Relative Offset (m - n): 4 | Attention Dot Product: +0.653
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style="font-size: 0.74rem; color: var(--text-muted); line-height: 1.4; background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px;">
+                💡 <b>Why RoPE matters in MNN:</b> Traditional transformers learn an absolute position vector table. RoPE rotates Query and Key 2D coordinate pairs directly during GEMM. The dot product depends strictly on relative offset (m - n), enabling MNN to scale context without learned weight lookup!
+              </div>
+            </div>
+
+            <!-- Module 1: KV-Cache & GQA Memory Allocator -->
+            <div id="eduView1" class="edu-card" style="display: none; flex-direction: column; gap: 10px;">
+              <div class="edu-card-title">
+                <span>💾 Grouped-Query Attention (GQA) & KV-Cache Sizer</span>
+                <span style="font-size: 0.68rem; color: var(--accent-green); font-family: 'JetBrains Mono';">Sliding-Window Ring Buffer</span>
+              </div>
+              <div class="edu-split">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <div class="edu-control-group">
+                    <div class="edu-control-label">
+                      <span>Context Window (Tokens):</span>
+                      <span id="kvCtxVal">2048</span>
+                    </div>
+                    <input type="range" id="kvCtxSlider" min="128" max="8192" step="128" value="2048" style="width: 100%; cursor: pointer;" />
+                  </div>
+                  <div style="display: flex; gap: 6px; align-items: center;">
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">Attention Architecture:</span>
+                    <button class="btn" id="btnMha" onclick="setKvArch('mha')" style="font-size: 0.7rem; padding: 2px 7px;">MHA (14 KV-Heads)</button>
+                    <button class="btn active" id="btnGqa" onclick="setKvArch('gqa')" style="font-size: 0.7rem; padding: 2px 7px;">GQA (2 KV-Heads)</button>
+                  </div>
+                  <div style="display: flex; gap: 6px; align-items: center;">
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">KV Quantization:</span>
+                    <button class="btn" id="btnFp16" onclick="setKvDtype('fp16')" style="font-size: 0.7rem; padding: 2px 7px;">FP16 (2B)</button>
+                    <button class="btn" id="btnInt8" onclick="setKvDtype('int8')" style="font-size: 0.7rem; padding: 2px 7px;">INT8 (1B)</button>
+                    <button class="btn active" id="btnInt4" onclick="setKvDtype('int4')" style="font-size: 0.7rem; padding: 2px 7px;">INT4 (0.5B)</button>
+                  </div>
+
+                  <div style="display: flex; gap: 6px; margin-top: 4px;">
+                    <button class="btn" onclick="stepKvToken(100)" style="font-size: 0.72rem;">+100 Tokens</button>
+                    <button class="btn" onclick="stepKvToken(1024)" style="font-size: 0.72rem;">Fill 1024</button>
+                    <button class="btn" onclick="simulateTrimHistory(1024)" style="font-size: 0.72rem; background: rgba(239, 68, 68, 0.2); border-color: #ef4444; color: #fff;">
+                      ✂ trim_history(1024)
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Live Memory Comparison Gauge -->
+                <div style="display: flex; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.5); border-radius: 8px; padding: 10px; border: 1px solid rgba(255,255,255,0.06);">
+                  <div style="font-size: 0.72rem; font-weight: 700; color: #fff;">Memory Footprint Breakdown:</div>
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted); font-family: 'JetBrains Mono';">
+                      <span>Standard MHA (FP16 Baseline):</span>
+                      <span id="mhaRamVal" style="color: #f87171;">353.9 MB</span>
+                    </div>
+                    <div style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                      <div style="width: 100%; height: 100%; background: #f87171;"></div>
+                    </div>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted); font-family: 'JetBrains Mono';">
+                      <span>MNN Active Configuration:</span>
+                      <span id="activeRamVal" style="color: #4ade80; font-weight: 700;">12.6 MB</span>
+                    </div>
+                    <div style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                      <div id="activeRamBar" style="width: 3.5%; height: 100%; background: #4ade80; transition: width 0.3s;"></div>
+                    </div>
+                  </div>
+
+                  <div class="edu-formula" id="kvSavingsLabel" style="color: #4ade80; text-align: center; font-size: 0.76rem; font-weight: 700;">
+                    🚀 96.4% RAM Savings! Seamless fit for 2GB Android RAM.
+                  </div>
+                </div>
+              </div>
+              <div style="font-size: 0.74rem; color: var(--text-muted); line-height: 1.4; background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px;">
+                💡 <b>Sliding Window Trim Contract:</b> Mobile games cannot allow context to grow infinitely. <code>MnnRuntime.trim_history(keepCount)</code> calls native <code>llm->eraseHistory()</code> to drop the oldest key-value slots in-place, keeping RAM perfectly flat.
+              </div>
+            </div>
+
+            <!-- Module 2: Softmax & Sampler Sandbox -->
+            <div id="eduView2" class="edu-card" style="display: none; flex-direction: column; gap: 10px;">
+              <div class="edu-card-title">
+                <span>🌡️ Softmax Probability, Temperature & Nucleus Sampler</span>
+                <span id="eduSamplerWinnerBadge" style="font-size: 0.68rem; color: #4ade80; font-family: 'JetBrains Mono';">Ready</span>
+              </div>
+              <div class="edu-split">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <div class="edu-control-group">
+                    <div class="edu-control-label">
+                      <span>Temperature (T):</span>
+                      <span id="eduTempVal">0.70</span>
+                    </div>
+                    <input type="range" id="eduTempSlider" min="0.05" max="2.0" step="0.05" value="0.70" style="width: 100%; cursor: pointer;" />
+                  </div>
+                  <div class="edu-control-group">
+                    <div class="edu-control-label">
+                      <span>Top-P (Nucleus Cutoff):</span>
+                      <span id="eduTopPVal">0.90</span>
+                    </div>
+                    <input type="range" id="eduTopPSlider" min="0.10" max="1.0" step="0.05" value="0.90" style="width: 100%; cursor: pointer;" />
+                  </div>
+                  <div class="edu-control-group">
+                    <div class="edu-control-label">
+                      <span>Repetition Penalty:</span>
+                      <span id="eduRepVal">1.15</span>
+                    </div>
+                    <input type="range" id="eduRepSlider" min="1.0" max="2.0" step="0.05" value="1.15" style="width: 100%; cursor: pointer;" />
+                  </div>
+
+                  <div style="display: flex; gap: 6px; margin-top: 4px;">
+                    <button class="btn btn-play" onclick="rollEduSampler()" style="flex: 1; font-size: 0.74rem;">
+                      🎲 Sample 1 Token (Roll Die)
+                    </button>
+                    <button class="btn" onclick="resetEduSampler()" style="font-size: 0.72rem;">↺ Reset</button>
+                  </div>
+                </div>
+
+                <!-- Live Distribution Bars -->
+                <div style="display: flex; flex-direction: column; gap: 5px; background: rgba(0,0,0,0.5); border-radius: 8px; padding: 10px; border: 1px solid rgba(255,255,255,0.06);" id="eduSamplerBarsMount">
+                  <!-- Injected via JavaScript -->
+                </div>
+              </div>
+              <div style="font-size: 0.74rem; color: var(--text-muted); line-height: 1.4; background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px;">
+                💡 <b>MNN Fast Quickselect:</b> Rather than running an expensive $O(V \\log V)$ full sort across 151,936 vocabulary logits on CPU, MNN's C++ sampler uses partial quickselect to extract only the top candidates accumulating up to Top-P mass!
+              </div>
+            </div>
+
+            <!-- Module 3: UTF-8 Wire Sentry -->
+            <div id="eduView3" class="edu-card" style="display: none; flex-direction: column; gap: 10px;">
+              <div class="edu-card-title">
+                <span>🛡️ C++ Zero-Copy Wire Sentry (danglingUtf8 & Modified-UTF8)</span>
+                <span style="font-size: 0.68rem; color: var(--accent-cyan); font-family: 'JetBrains Mono';">Byte-Level Inspection</span>
+              </div>
+              <div class="edu-split">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700;">TEST WIRE SCENARIOS:</span>
+                  <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                    <button class="btn active" id="btnUtf0" onclick="setWireTest(0)">1. Emoji Split ("😀 🤖")</button>
+                    <button class="btn" id="btnUtf1" onclick="setWireTest(1)">2. CJK / Hexagram ("六十四卦 ䷀")</button>
+                    <button class="btn" id="btnUtf2" onclick="setWireTest(2)">3. Reasoning Tag ("&lt;think&gt;...")</button>
+                  </div>
+
+                  <div style="display: flex; gap: 6px; margin-top: 6px;">
+                    <button class="btn" onclick="stepWireByte()" style="flex: 1; font-size: 0.74rem; background: linear-gradient(135deg, #0284c7, #2563eb); color: #fff;">
+                      ▶ Inject Next Byte into TokenStream
+                    </button>
+                    <button class="btn" onclick="resetWireTest()" style="font-size: 0.72rem;">↺ Reset Stream</button>
+                  </div>
+
+                  <div class="edu-formula" id="wireStateBox">
+                    Buffer Status: Ready to inject.
+                  </div>
+                </div>
+
+                <!-- Wire Inspector Card -->
+                <div style="display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.5); border-radius: 8px; padding: 10px; border: 1px solid rgba(255,255,255,0.06);">
+                  <div style="font-size: 0.72rem; font-weight: 700; color: #fff;">C++ std::streambuf Wire State:</div>
+                  <div style="font-size: 0.68rem; color: var(--text-muted);">Incoming Byte Stream:</div>
+                  <div id="wireBytesMount" style="display: flex; flex-wrap: wrap; gap: 3px; min-height: 28px;"></div>
+                  <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 4px;">Emitted Clean Speech Characters to Godot:</div>
+                  <div id="wireOutputMount" style="font-family: 'JetBrains Mono'; font-size: 0.82rem; color: #4ade80; background: rgba(0,0,0,0.4); padding: 6px; border-radius: 4px; min-height: 26px;"></div>
+                </div>
+              </div>
+              <div style="font-size: 0.74rem; color: var(--text-muted); line-height: 1.4; background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px;">
+                💡 <b>Why jbyteArray instead of jstring?</b> Android ART's <code>NewStringUTF</code> implements Modified-UTF8, which encodes 4-byte Unicode code points (&ge; U+10000, like emojis 😀) into 6-byte surrogate pairs. Passing raw standard UTF-8 crashes ART with an assertion failure! Passing raw <code>jbyteArray</code> is 100% crash-proof.
+              </div>
+            </div>
+
+            <!-- Module 4: Knowledge Certification Quiz -->
+            <div id="eduView4" class="edu-card" style="display: none; flex-direction: column; gap: 10px;">
+              <div class="edu-card-title">
+                <span>📝 MNN C++ Engine Architecture Mastery Quiz</span>
+                <span id="quizScoreBadge" style="font-size: 0.74rem; color: #fbbf24; font-family: 'JetBrains Mono'; font-weight: 700;">Score: 0 / 4</span>
+              </div>
+              <div id="quizContainer" style="display: flex; flex-direction: column; gap: 10px;">
+                <!-- Dynamically populated questions -->
+              </div>
+            </div>
+
+          </div>
+        </div>
+      `;
+    }
+
+    function switchEduTab(idx) {
+      eduActiveTab = idx;
+      for (let i = 0; i < 5; i++) {
+        const tab = document.getElementById(`eduTab${i}`);
+        const view = document.getElementById(`eduView${i}`);
+        if (tab && view) {
+          if (i === idx) {
+            tab.classList.add('active');
+            view.style.display = 'flex';
+          } else {
+            tab.classList.remove('active');
+            view.style.display = 'none';
+          }
+        }
+      }
+      if (idx === 0) updateRopeGeometry();
+      else if (idx === 1) updateKvCalculator();
+      else if (idx === 2) updateEduSamplerBars();
+      else if (idx === 3) renderWireBytes();
+      else if (idx === 4) renderQuizQuestions();
+    }
+
+    function initEduLab() {
+      switchEduTab(eduActiveTab);
+
+      // RoPE Sliders
+      const mSlider = document.getElementById('ropeMSlider');
+      const nSlider = document.getElementById('ropeNSlider');
+      const iSlider = document.getElementById('ropeISlider');
+      if (mSlider) mSlider.oninput = updateRopeGeometry;
+      if (nSlider) nSlider.oninput = updateRopeGeometry;
+      if (iSlider) iSlider.oninput = updateRopeGeometry;
+
+      // KV Sliders
+      const kvSlider = document.getElementById('kvCtxSlider');
+      if (kvSlider) kvSlider.oninput = updateKvCalculator;
+
+      // Sampler Sliders
+      const tSlider = document.getElementById('eduTempSlider');
+      const pSlider = document.getElementById('eduTopPSlider');
+      const rSlider = document.getElementById('eduRepSlider');
+      if (tSlider) tSlider.oninput = updateEduSamplerBars;
+      if (pSlider) pSlider.oninput = updateEduSamplerBars;
+      if (rSlider) rSlider.oninput = updateEduSamplerBars;
+    }
+
+    // =========================================================================
+    // Module 0: RoPE Geometry Logic
+    // =========================================================================
+    function updateRopeGeometry() {
+      const m = parseInt(document.getElementById('ropeMSlider').value);
+      const n = parseInt(document.getElementById('ropeNSlider').value);
+      const i = parseInt(document.getElementById('ropeISlider').value);
+
+      document.getElementById('ropeMVal').innerText = m;
+      document.getElementById('ropeNVal').innerText = n;
+      
+      const theta = Math.pow(10000, -2 * i / 128);
+      document.getElementById('ropeIVal').innerText = `${i} (θ = ${theta.toFixed(4)})`;
+
+      const angleM = m * theta;
+      const angleN = n * theta;
+
+      const r = 85;
+      const qX = Math.cos(angleM) * r;
+      const qY = -Math.sin(angleM) * r;
+      const kX = Math.cos(angleN) * r;
+      const kY = -Math.sin(angleN) * r;
+
+      const qLine = document.getElementById('ropeQLine');
+      const qDot = document.getElementById('ropeQDot');
+      const qText = document.getElementById('ropeQText');
+      if (qLine && qDot && qText) {
+        qLine.setAttribute('x2', qX);
+        qLine.setAttribute('y2', qY);
+        qDot.setAttribute('cx', qX);
+        qDot.setAttribute('cy', qY);
+        qText.setAttribute('x', qX + 8);
+        qText.setAttribute('y', qY + 4);
+      }
+
+      const kLine = document.getElementById('ropeKLine');
+      const kDot = document.getElementById('ropeKDot');
+      const kText = document.getElementById('ropeKText');
+      if (kLine && kDot && kText) {
+        kLine.setAttribute('x2', kX);
+        kLine.setAttribute('y2', kY);
+        kDot.setAttribute('cx', kX);
+        kDot.setAttribute('cy', kY);
+        kText.setAttribute('x', kX + 8);
+        kText.setAttribute('y', kY + 4);
+      }
+
+      const diff = n - m;
+      const dotProd = Math.cos(diff * theta);
+      const scoreBox = document.getElementById('ropeScoreVal');
+      if (scoreBox) {
+        scoreBox.innerText = `Relative Offset (m - n): ${diff} | Dot Product: ${dotProd >= 0 ? '+' : ''}${dotProd.toFixed(4)}`;
+      }
+    }
+
+    // =========================================================================
+    // Module 1: KV-Cache Calculator Logic
+    // =========================================================================
+    let kvArch = 'gqa';
+    let kvDtype = 'int4';
+    let kvTokensCount = 2048;
+
+    function setKvArch(arch) {
+      kvArch = arch;
+      document.getElementById('btnMha').className = arch === 'mha' ? 'btn active' : 'btn';
+      document.getElementById('btnGqa').className = arch === 'gqa' ? 'btn active' : 'btn';
+      updateKvCalculator();
+    }
+
+    function setKvDtype(dt) {
+      kvDtype = dt;
+      document.getElementById('btnFp16').className = dt === 'fp16' ? 'btn active' : 'btn';
+      document.getElementById('btnInt8').className = dt === 'int8' ? 'btn active' : 'btn';
+      document.getElementById('btnInt4').className = dt === 'int4' ? 'btn active' : 'btn';
+      updateKvCalculator();
+    }
+
+    function stepKvToken(count) {
+      const slider = document.getElementById('kvCtxSlider');
+      slider.value = Math.min(parseInt(slider.value) + count, 8192);
+      updateKvCalculator();
+    }
+
+    function simulateTrimHistory(keep) {
+      const slider = document.getElementById('kvCtxSlider');
+      slider.value = keep;
+      updateKvCalculator();
+      const savings = document.getElementById('kvSavingsLabel');
+      savings.innerHTML = `✂ Context Trimmed to ${keep} tokens! Oldest slots evicted in-place.`;
+    }
+
+    function updateKvCalculator() {
+      const tokens = parseInt(document.getElementById('kvCtxSlider').value);
+      document.getElementById('kvCtxVal').innerText = tokens;
+
+      const layers = 24;
+      const headDim = 128;
+      
+      // MHA Baseline (14 KV heads, FP16 = 2 bytes)
+      const mhaBytes = 2 * layers * 14 * headDim * 2 * tokens;
+      const mhaMb = (mhaBytes / (1024 * 1024)).toFixed(1);
+      document.getElementById('mhaRamVal').innerText = `${mhaMb} MB`;
+
+      // Active Config
+      const kvHeads = kvArch === 'gqa' ? 2 : 14;
+      const dtypeBytes = kvDtype === 'fp16' ? 2.0 : (kvDtype === 'int8' ? 1.0 : 0.5);
+      const activeBytes = 2 * layers * kvHeads * headDim * dtypeBytes * tokens;
+      const activeMb = (activeBytes / (1024 * 1024)).toFixed(1);
+      document.getElementById('activeRamVal').innerText = `${activeMb} MB`;
+
+      const pctOfMha = Math.max((activeBytes / mhaBytes) * 100, 2);
+      document.getElementById('activeRamBar').style.width = `${pctOfMha}%`;
+
+      const savingsPct = (100 - (activeBytes / mhaBytes) * 100).toFixed(1);
+      document.getElementById('kvSavingsLabel').innerText = 
+        `🚀 ${savingsPct}% RAM Saved vs MHA! Total KV Buffer: ${activeMb} MB`;
+    }
+
+    // =========================================================================
+    // Module 2: Softmax & Sampler Sandbox Logic
+    // =========================================================================
+    const eduCandidates = [
+      { tok: "waiting", logit: 8.5 },
+      { tok: "counter", logit: 7.2 },
+      { tok: "table",   logit: 6.8 },
+      { tok: "door",    logit: 5.9 },
+      { tok: "robot",   logit: 4.5 },
+      { tok: "keys",    logit: 3.8 }
+    ];
+
+    function updateEduSamplerBars() {
+      const t = parseFloat(document.getElementById('eduTempSlider').value);
+      const p = parseFloat(document.getElementById('eduTopPSlider').value);
+      const rep = parseFloat(document.getElementById('eduRepSlider').value);
+
+      document.getElementById('eduTempVal').innerText = t.toFixed(2);
+      document.getElementById('eduTopPVal').innerText = p.toFixed(2);
+      document.getElementById('eduRepVal').innerText = rep.toFixed(2);
+
+      // Compute Exponentials
+      let exps = eduCandidates.map(c => {
+        const adjustedLogit = (c.logit / rep) / t;
+        return Math.exp(Math.min(Math.max(adjustedLogit, -20), 20));
+      });
+      const sumExp = exps.reduce((a, b) => a + b, 0);
+      let probs = exps.map(e => e / sumExp);
+
+      // Compute cumulative probability for Top-P
+      let cum = 0;
+      const mount = document.getElementById('eduSamplerBarsMount');
+      mount.innerHTML = "";
+
+      eduCandidates.forEach((c, idx) => {
+        const prob = probs[idx];
+        cum += prob;
+        const inTopP = cum <= p || (cum - prob < p);
+
+        const row = document.createElement('div');
+        row.className = "prob-row";
+        row.style.opacity = inTopP ? "1" : "0.35";
+
+        const tokSpan = document.createElement('span');
+        tokSpan.className = inTopP && idx === 0 ? "prob-tok winner" : "prob-tok";
+        tokSpan.style.width = "75px";
+        tokSpan.innerText = `"${c.tok}"`;
+
+        const barBg = document.createElement('div');
+        barBg.className = "prob-bar-bg";
+        const barFill = document.createElement('div');
+        barFill.className = inTopP && idx === 0 ? "prob-bar-fill winner" : "prob-bar-fill";
+        barFill.style.width = `${Math.round(prob * 100)}%`;
+        barBg.appendChild(barFill);
+
+        const pctSpan = document.createElement('span');
+        pctSpan.className = "prob-pct";
+        pctSpan.innerText = `${(prob * 100).toFixed(1)}%`;
+
+        row.appendChild(tokSpan);
+        row.appendChild(barBg);
+        row.appendChild(pctSpan);
+        mount.appendChild(row);
+      });
+    }
+
+    function rollEduSampler() {
+      const t = parseFloat(document.getElementById('eduTempSlider').value);
+      const rep = parseFloat(document.getElementById('eduRepSlider').value);
+      const p = parseFloat(document.getElementById('eduTopPSlider').value);
+
+      let exps = eduCandidates.map(c => Math.exp(Math.min((c.logit / rep) / t, 20)));
+      const sumExp = exps.reduce((a, b) => a + b, 0);
+      let probs = exps.map(e => e / sumExp);
+
+      // Top-P filter
+      let cum = 0;
+      let validCands = [];
+      for (let i = 0; i < eduCandidates.length; i++) {
+        cum += probs[i];
+        validCands.push({ tok: eduCandidates[i].tok, p: probs[i] });
+        if (cum >= p) break;
+      }
+
+      // Roll die
+      const roll = Math.random() * validCands.reduce((a, b) => a + b.p, 0);
+      let acc = 0;
+      let winner = validCands[0].tok;
+      for (let cand of validCands) {
+        acc += cand.p;
+        if (roll <= acc) {
+          winner = cand.tok;
+          break;
+        }
+      }
+
+      const badge = document.getElementById('eduSamplerWinnerBadge');
+      badge.innerText = `Sampled: "${winner}"`;
+      badge.style.color = "#4ade80";
+      badge.style.fontWeight = "700";
+    }
+
+    function resetEduSampler() {
+      document.getElementById('eduTempSlider').value = 0.70;
+      document.getElementById('eduTopPSlider').value = 0.90;
+      document.getElementById('eduRepSlider').value = 1.15;
+      document.getElementById('eduSamplerWinnerBadge').innerText = "Ready";
+      updateEduSamplerBars();
+    }
+
+    // =========================================================================
+    // Module 3: UTF-8 Wire Sentry Logic
+    // =========================================================================
+    const wireScenarios = [
+      { name: "Emoji Split", text: "😀 🤖" },
+      { name: "CJK Hexagram", text: "六十四卦 ䷀" },
+      { name: "Reasoning Tag", text: "<think>Planning</think>Hello" }
+    ];
+
+    let currentWireScenarioIdx = 0;
+    let wireBytes = [];
+    let wireInjectedIdx = 0;
+    let wireBuffer = [];
+
+    function setWireTest(idx) {
+      currentWireScenarioIdx = idx;
+      for (let i = 0; i < 3; i++) {
+        document.getElementById(`btnUtf${i}`).className = i === idx ? "btn active" : "btn";
+      }
+      resetWireTest();
+    }
+
+    function resetWireTest() {
+      const enc = new TextEncoder();
+      wireBytes = Array.from(enc.encode(wireScenarios[currentWireScenarioIdx].text));
+      wireInjectedIdx = 0;
+      wireBuffer = [];
+      document.getElementById('wireOutputMount').innerText = "";
+      document.getElementById('wireStateBox').innerText = "Buffer Status: Ready to inject.";
+      renderWireBytes();
+    }
+
+    function renderWireBytes() {
+      const mount = document.getElementById('wireBytesMount');
+      mount.innerHTML = "";
+      wireBytes.forEach((b, i) => {
+        const tag = document.createElement('span');
+        let cls = "byte-tag";
+        if ((b & 0xC0) === 0xC0) cls += " byte-lead";
+        else if ((b & 0xC0) === 0x80) cls += " byte-continuation";
+        else cls += " byte-ascii";
+
+        if (i < wireInjectedIdx) {
+          tag.style.opacity = "0.4";
+          tag.style.textDecoration = "line-through";
+        }
+        tag.className = cls;
+        tag.innerText = `0x${b.toString(16).toUpperCase().padStart(2, '0')}`;
+        mount.appendChild(tag);
+      });
+    }
+
+    function stepWireByte() {
+      if (wireInjectedIdx >= wireBytes.length) {
+        document.getElementById('wireStateBox').innerHTML = `<span style="color: #4ade80;">✓ All bytes injected and flushed safely!</span>`;
+        return;
+      }
+
+      const byte = wireBytes[wireInjectedIdx];
+      wireInjectedIdx++;
+      wireBuffer.push(byte);
+
+      const dang = danglingUtf8(wireBuffer);
+      let statusHtml = "";
+      if (dang > 0) {
+        statusHtml = `<span style="color: #fb923c;">⚠ danglingUtf8 = ${dang}: Incomplete UTF-8 sequence! Holding ${dang} byte(s) in C++ memory.</span>`;
+      } else {
+        const dec = new TextDecoder('utf-8');
+        const text = dec.decode(new Uint8Array(wireBuffer));
+        wireBuffer = [];
+        document.getElementById('wireOutputMount').innerText += text;
+        statusHtml = `<span style="color: #4ade80;">✓ Clean boundary (danglingUtf8 = 0). Dispatched "${text}" as jbyteArray!</span>`;
+      }
+      document.getElementById('wireStateBox').innerHTML = statusHtml;
+      renderWireBytes();
+    }
+
+    // =========================================================================
+    // Module 4: Architecture Quiz Logic
+    // =========================================================================
+    const quizQuestions = [
+      {
+        q: "1. Why does Alibaba MNN split execution into Prefill and Decode phases?",
+        opts: [
+          { text: "Prefill is compute-bound (GEMM) populating initial KV-Cache; Decode is memory-bandwidth bound (GEMV) generating 1 token at a time.", correct: true, exp: "Correct! Prefill processes all N prompt tokens in parallel to initialize the KV cache. Decode reuses that cache to generate 1 token per step without re-evaluating the prompt." },
+          { text: "Prefill runs only on GPU, while Decode runs only on CPU.", correct: false, exp: "Incorrect. Both phases run on the same device execution backend (ARM CPU or OpenCL GPU)." },
+          { text: "Prefill does not compute neural weights, it only looks up dictionary words.", correct: false, exp: "Incorrect. Prefill runs full matrix multiplications across all transformer layers." }
+        ]
+      },
+      {
+        q: "2. Why does ixmnn_jni.cpp pass jbyteArray rather than jstring to Kotlin?",
+        opts: [
+          { text: "Because Android ART Modified-UTF8 crashes with an assertion failure when emojis (4-byte code points) are passed to NewStringUTF.", correct: true, exp: "Correct! ART's NewStringUTF requires surrogate-pair Modified-UTF8. Raw standard UTF-8 emojis cause SIGABRT crashes. Passing jbyteArray is 100% crash-proof." },
+          { text: "Because Java cannot read strings over JNI.", correct: false, exp: "Incorrect. Java supports JNI strings, but ART's modified UTF-8 specification conflicts with standard Unicode." },
+          { text: "Because jbyteArray uses half as much memory.", correct: false, exp: "Incorrect. The issue is UTF-8 encoding compatibility and crash safety, not memory size." }
+        ]
+      },
+      {
+        q: "3. How does Grouped-Query Attention (GQA) reduce KV-Cache RAM on mobile devices?",
+        opts: [
+          { text: "By sharing a small number of Key/Value heads (e.g. 2) across many Query heads (e.g. 14).", correct: true, exp: "Correct! A 7:1 ratio allows storing only 2 KV heads per layer instead of 14, slashing KV RAM by 85.7%!" },
+          { text: "By rounding all float weights to zero.", correct: false, exp: "Incorrect. Weights are quantized, not zeroed out." },
+          { text: "By deleting the prompt as soon as the first word is generated.", correct: false, exp: "Incorrect. The prompt tokens remain in the KV cache so the model maintains conversational context." }
+        ]
+      },
+      {
+        q: "4. What prevents Godot 4 from freezing during streaming token generation?",
+        opts: [
+          { text: "Inference runs on a dedicated Kotlin background worker thread, dispatching signals (chat_token) asynchronously to GDScript.", correct: true, exp: "Correct! Decoupling compute from rendering ensures Godot's main thread renders at a silky-smooth 60 FPS." },
+          { text: "Godot pauses rendering until the entire paragraph is generated.", correct: false, exp: "Incorrect. That would freeze gameplay and drop framerate to 0." },
+          { text: "The tokens are generated on a remote cloud server instead of on-device.", correct: false, exp: "Incorrect. Alibaba MNN runs 100% locally on the device hardware." }
+        ]
+      }
+    ];
+
+    let quizAnswers = {};
+
+    function renderQuizQuestions() {
+      const container = document.getElementById('quizContainer');
+      container.innerHTML = "";
+
+      let score = 0;
+      quizQuestions.forEach((item, qIdx) => {
+        const card = document.createElement('div');
+        card.style.background = "rgba(0,0,0,0.4)";
+        card.style.padding = "10px 12px";
+        card.style.borderRadius = "6px";
+        card.style.border = "1px solid rgba(255,255,255,0.06)";
+        card.style.display = "flex";
+        card.style.flexDirection = "column";
+        card.style.gap = "6px";
+
+        const title = document.createElement('div');
+        title.style.fontSize = "0.76rem";
+        title.style.fontWeight = "700";
+        title.style.color = "#fff";
+        title.innerText = item.q;
+        card.appendChild(title);
+
+        const optsDiv = document.createElement('div');
+        optsDiv.style.display = "flex";
+        optsDiv.style.flexDirection = "column";
+        optsDiv.style.gap = "4px";
+
+        item.opts.forEach((opt, oIdx) => {
+          const btn = document.createElement('button');
+          btn.className = "quiz-opt";
+          btn.innerText = opt.text;
+
+          const chosen = quizAnswers[qIdx] === oIdx;
+          if (chosen) {
+            if (opt.correct) {
+              btn.className += " correct";
+              score++;
+            } else {
+              btn.className += " incorrect";
+            }
+          }
+
+          btn.onclick = () => {
+            quizAnswers[qIdx] = oIdx;
+            renderQuizQuestions();
+          };
+          optsDiv.appendChild(btn);
+        });
+
+        card.appendChild(optsDiv);
+
+        if (quizAnswers[qIdx] !== undefined) {
+          const selectedOpt = item.opts[quizAnswers[qIdx]];
+          const expDiv = document.createElement('div');
+          expDiv.style.fontSize = "0.7rem";
+          expDiv.style.lineHeight = "1.35";
+          expDiv.style.padding = "6px 8px";
+          expDiv.style.borderRadius = "4px";
+          expDiv.style.background = selectedOpt.correct ? "rgba(74, 222, 128, 0.15)" : "rgba(248, 113, 113, 0.15)";
+          expDiv.style.color = selectedOpt.correct ? "#4ade80" : "#f87171";
+          expDiv.innerText = selectedOpt.exp;
+          card.appendChild(expDiv);
+        }
+
+        container.appendChild(card);
+      });
+
+      const badge = document.getElementById('quizScoreBadge');
+      badge.innerText = `Score: ${score} / ${quizQuestions.length}`;
+      if (score === quizQuestions.length) {
+        badge.innerText += " 🏆 Certified MNN Architect!";
+        badge.style.color = "#4ade80";
+      }
+    }
+
+    // Initialize View
+    buildTokenQueue();
+    switchTab(0);
+  
+    /* =========================================================================
+       TAB 7: Pure vs Enhanced Benchmark & Cybernetic Studio
+       ========================================================================= */
+
+    function renderBenchmarkDualModeHtml() {
+      return `
+        <div class="bm-container">
+          <!-- Top Benchmark Subnav -->
+          <div class="edu-subnav" style="border-bottom: 1px solid rgba(56, 189, 248, 0.2);">
+            <span style="font-size: 0.74rem; font-weight: 700; color: #38bdf8; margin-right: 4px;">BENCHMARK LAB:</span>
+            <button class="edu-tab-btn active" id="bmTab0" onclick="switchBmTab(0)">1. ⚡ Live Dual-Mode Simulator</button>
+            <button class="edu-tab-btn" id="bmTab1" onclick="switchBmTab(1)">2. 📊 Hardware Metrics (Galaxy A22)</button>
+            <button class="edu-tab-btn" id="bmTab2" onclick="switchBmTab(2)">3. 🧮 6-Bit Mutation & Math Engine</button>
+            <button class="edu-tab-btn" id="bmTab3" onclick="switchBmTab(3)">4. 🌿 Two-Branch Architecture</button>
+          </div>
+
+          <!-- SUB-TAB 0: Live Dual-Mode Simulator -->
+          <div class="edu-module active" id="bmMod0">
+            <div class="edu-card" style="border-color: rgba(56, 189, 248, 0.3);">
+              <div class="edu-card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #38bdf8;">Interactive Dual-Mode Controller & Kinematic Stage</span>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <span style="font-size: 0.72rem; color: var(--text-muted);">Current Mode:</span>
+                  <button id="simModeToggleBtn" onclick="toggleSimMode()" class="btn" style="padding: 4px 16px; border-radius: 9999px; font-weight: 700; font-size: 0.8rem; background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #38bdf8; cursor: pointer; transition: all 0.2s;">
+                    ⚡ ENHANCED
+                  </button>
+                </div>
+              </div>
+
+              <!-- Simulator Stage -->
+              <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin-top: 10px;">
+                <!-- Visual Stage Canvas -->
+                <div style="background: radial-gradient(circle at 50% 50%, #0d1829 0%, #060913 90%); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; min-height: 380px;">
+                  <canvas id="simTensegrityCanvas" width="360" height="280" style="width: 360px; height: 280px;"></canvas>
+                  
+                  <!-- Hexagram Badge Overlay -->
+                  <div style="position: absolute; top: 12px; left: 12px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                    <div id="simHexTitle" style="font-size: 0.88rem; font-weight: 700; color: #fbbf24;">#1 乾 The Creative</div>
+                    <div id="simHexBinary" style="font-size: 0.72rem; font-family: 'JetBrains Mono'; color: #38bdf8;">Binary: 0b111111 (Lines: 111 111)</div>
+                    <div id="simHexMoving" style="font-size: 0.7rem; color: #f472b6;">Moving Line: Line 4 -> Mutating Strut</div>
+                  </div>
+
+                  <!-- Controls below canvas -->
+                  <div style="display: flex; gap: 8px; margin-top: 10px; width: 100%; justify-content: center;">
+                    <button class="btn" onclick="simCastRandomHex()" style="background: rgba(251, 191, 36, 0.15); border: 1px solid #fbbf24; color: #fbbf24; font-size: 0.75rem; font-weight: 600;">🪙 Cast Random Oracle</button>
+                    <button class="btn" onclick="simAskMnn()" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #38bdf8; font-size: 0.75rem; font-weight: 600;">🧠 Ask MNN Qwen</button>
+                    <button class="btn" onclick="simNextMovingLine()" style="background: rgba(244, 114, 182, 0.15); border: 1px solid #f472b6; color: #f472b6; font-size: 0.75rem; font-weight: 600;">⚡ Mutate Line (1-6)</button>
+                  </div>
+                </div>
+
+                <!-- Comparison Output Card -->
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <!-- Prompt Card -->
+                  <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px;">
+                    <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px;">Dispatched Prompt Payload</div>
+                    <div id="simPromptText" style="font-size: 0.75rem; font-family: 'JetBrains Mono'; color: #e2e8f0; line-height: 1.4; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; border-left: 3px solid #38bdf8;">
+                      Explain I-Ching Hexagram #1 (乾, The Creative): Binary 0b111111. Moving line 4 mutating structure. Analyze polarity balance and structural guidance.
+                    </div>
+                  </div>
+
+                  <!-- Qwen Output Card -->
+                  <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px; flex: 1; display: flex; flex-direction: column;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                      <span id="simQwenHeader" style="font-size: 0.7rem; font-weight: 700; color: #4ade80; text-transform: uppercase;">💬 Qwen MNN (Enhanced Mode):</span>
+                      <span id="simLatencyBadge" style="font-size: 0.68rem; font-family: 'JetBrains Mono'; color: var(--text-muted);">Latency: 632 ms</span>
+                    </div>
+                    <div id="simQwenReply" style="font-size: 0.78rem; color: #f8fafc; line-height: 1.5; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; flex: 1; border-left: 3px solid #4ade80;">
+                      The ancient Book of Changes whispers: Change is constant. When the rigid yields to the flexible, harmony and progress endure. The mutating fourth strut indicates active adaptation to external environmental forces.
+                    </div>
+                  </div>
+
+                  <!-- Quick Telemetry Strip -->
+                  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                    <div style="background: rgba(0,0,0,0.35); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); text-align: center;">
+                      <div style="font-size: 0.65rem; color: var(--text-muted);">Frame Rate</div>
+                      <div id="simFpsVal" style="font-size: 0.85rem; font-weight: 700; color: #4ade80;">75 FPS</div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.35); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); text-align: center;">
+                      <div style="font-size: 0.65rem; color: var(--text-muted);">Graphics VRAM</div>
+                      <div id="simVramVal" style="font-size: 0.85rem; font-weight: 700; color: #38bdf8;">157.6 MB</div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.35); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); text-align: center;">
+                      <div style="font-size: 0.65rem; color: var(--text-muted);">Process PSS</div>
+                      <div id="simPssVal" style="font-size: 0.85rem; font-weight: 700; color: #c084fc;">1067 MB</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-TAB 1: Hardware Metrics (Galaxy A22) -->
+          <div class="edu-module" id="bmMod1" style="display: none;">
+            <div class="edu-card">
+              <div class="edu-card-title" style="color: #4ade80;">
+                Physical Device Hardware Benchmark (Samsung Galaxy A22 - SM-A226B)
+              </div>
+              <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;">
+                Direct hardware benchmarks captured via <code style="color: #38bdf8;">dumpsys gfxinfo</code> and <code style="color: #38bdf8;">dumpsys meminfo</code> on ARM Mali-G57 MC2 GPU (Vulkan 1.1 Mobile Forward) and MediaTek Dimensity 700.
+              </div>
+
+              <!-- Metric Comparison Grid -->
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;">
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px;">
+                  <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Sustained FPS</div>
+                  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;">
+                    <span style="font-size: 1.25rem; font-weight: 800; color: #fbbf24;">76 FPS</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Pure</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px;">
+                    <span style="font-size: 1.25rem; font-weight: 800; color: #38bdf8;">74-75 FPS</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Enhanced</span>
+                  </div>
+                  <div style="font-size: 0.68rem; color: #4ade80; margin-top: 6px;">Delta: ~1-2 FPS (3D geometry load)</div>
+                </div>
+
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px;">
+                  <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Graphics VRAM</div>
+                  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;">
+                    <span style="font-size: 1.25rem; font-weight: 800; color: #fbbf24;">132.9 MB</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Pure</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px;">
+                    <span style="font-size: 1.25rem; font-weight: 800; color: #38bdf8;">157.6 MB</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Enhanced</span>
+                  </div>
+                  <div style="font-size: 0.68rem; color: #fb923c; margin-top: 6px;">Delta: +24.6 MB for 6 struts & 24 cords</div>
+                </div>
+
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px;">
+                  <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Process Total PSS</div>
+                  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;">
+                    <span style="font-size: 1.25rem; font-weight: 800; color: #fbbf24;">1046 MB</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Pure</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px;">
+                    <span style="font-size: 1.25rem; font-weight: 800; color: #38bdf8;">1067 MB</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Enhanced</span>
+                  </div>
+                  <div style="font-size: 0.68rem; color: #c084fc; margin-top: 6px;">Delta: +20.9 MB total footprint</div>
+                </div>
+
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px;">
+                  <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">State Calc Speed</div>
+                  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;">
+                    <span style="font-size: 1.25rem; font-weight: 800; color: #fbbf24;">4.28 µs</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Pure</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px;">
+                    <span style="font-size: 1.25rem; font-weight: 800; color: #38bdf8;">0.48 µs</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Enhanced</span>
+                  </div>
+                  <div style="font-size: 0.68rem; color: #4ade80; margin-top: 6px;">Bitwise XOR is 8.9x faster than string formatting</div>
+                </div>
+              </div>
+
+              <!-- Real Screenshots Proof Gallery -->
+              <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 14px; border: 1px solid rgba(255,255,255,0.06);">
+                <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">
+                  Physical Galaxy A22 Screen Proofs (Captured via ADB at 1080 x 2408)
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                  <div style="text-align: center;">
+                    <div style="font-size: 0.75rem; font-weight: 600; color: #38bdf8; margin-bottom: 6px;">⚡ ENHANCED MODE (75 FPS)</div>
+                    <img src="./a22_enhanced_live_reply.png" style="max-width: 100%; height: 320px; object-fit: contain; border-radius: 8px; border: 1px solid rgba(56,189,248,0.3);" onerror="this.src='https://placehold.co/360x640/090d16/38bdf8?text=Enhanced+Mode+75+FPS';">
+                    <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Active 3D Tensegrity Ball + Line 4 Mutating yellow glow</p>
+                  </div>
+                  <div style="text-align: center;">
+                    <div style="font-size: 0.75rem; font-weight: 600; color: #fbbf24; margin-bottom: 6px;">☯ PURE MODE (76 FPS)</div>
+                    <img src="./a22_pure_live_reply.png" style="max-width: 100%; height: 320px; object-fit: contain; border-radius: 8px; border: 1px solid rgba(251,191,36,0.3);" onerror="this.src='https://placehold.co/360x640/090d16/fbbf24?text=Pure+Mode+76+FPS';">
+                    <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">3D Creature Dormant, Pure Book of Changes Persona</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-TAB 2: 6-Bit Mutation & Math Engine -->
+          <div class="edu-module" id="bmMod2" style="display: none;">
+            <div class="edu-card">
+              <div class="edu-card-title" style="color: #c084fc;">
+                6-Bit Binary State Algebra & GTE Semantic Vector Space
+              </div>
+              <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;">
+                Demonstrating the mathematical difference between classical symbolic lookup and active 6-bit cybernetic mutation.
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <!-- Left: 6-Bit State Machine -->
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 14px;">
+                  <div style="font-size: 0.82rem; font-weight: 700; color: #38bdf8; margin-bottom: 10px;">
+                    6-Bit Hexagram Discrete State Machine
+                  </div>
+                  <div style="font-family: 'JetBrains Mono'; font-size: 0.76rem; color: #e2e8f0; line-height: 1.6;">
+                    <div>• State Space: <span style="color: #4ade80;">2⁶ = 64 Discrete Geometric Attractors</span></div>
+                    <div>• Lower Trigram: <code id="mathLower" style="color: #fbbf24;">bits & 0x07 (3 bits)</code></div>
+                    <div>• Upper Trigram: <code id="mathUpper" style="color: #fbbf24;">(bits >> 3) & 0x07 (3 bits)</code></div>
+                    <div>• Moving Line Mutation: <code id="mathMutation" style="color: #f472b6;">bits ^ (1 << moving_line)</code></div>
+                    <div>• Inversion Symmetry: <code id="mathInverse" style="color: #38bdf8;">(~bits) & 0x3F</code></div>
+                  </div>
+                  <div style="margin-top: 14px; padding: 10px; background: rgba(0,0,0,0.4); border-radius: 6px; border-left: 3px solid #c084fc;">
+                    <div style="font-size: 0.72rem; color: #c084fc; font-weight: 700;">Mathematical Advantage:</div>
+                    <p style="font-size: 0.73rem; color: #94a3b8; margin-top: 4px;">
+                      Rather than relying on fuzzy token prompts, the Enhanced model uses precise bitwise XOR operators, executing in <strong>0.475 microseconds</strong> per mutation.
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Right: Semantic Vector Orthogonality -->
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 14px;">
+                  <div style="font-size: 0.82rem; font-weight: 700; color: #4ade80; margin-bottom: 10px;">
+                    GTE Vector Space Domain Orthogonality
+                  </div>
+                  <div style="font-family: 'JetBrains Mono'; font-size: 0.76rem; color: #e2e8f0; line-height: 1.6;">
+                    <div>• Pure Persona Cohesion: <span style="color: #fbbf24;">-0.0902</span></div>
+                    <div>• Enhanced Structural Cohesion: <span style="color: #38bdf8;">0.0365</span></div>
+                    <div>• Cross-Domain Orthogonality: <span style="color: #4ade80;">-0.0042 (Near 0.0)</span></div>
+                    <div>• Semantic Domain Separation: <span style="color: #c084fc; font-weight: 700;">1.0042</span></div>
+                  </div>
+                  <div style="margin-top: 14px; padding: 10px; background: rgba(0,0,0,0.4); border-radius: 6px; border-left: 3px solid #4ade80;">
+                    <div style="font-size: 0.72rem; color: #4ade80; font-weight: 700;">GTE Separation Proof:</div>
+                    <p style="font-size: 0.73rem; color: #94a3b8; margin-top: 4px;">
+                      With cross-similarity near zero (-0.0042), the neural embedding space proves that the Book of Changes persona and the tensegrity cybernetic mechanics form completely orthogonal conceptual subspaces.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-TAB 3: Two-Branch Architecture -->
+          <div class="edu-module" id="bmMod3" style="display: none;">
+            <div class="edu-card">
+              <div class="edu-card-title" style="color: #38bdf8;">
+                Isolated Git Branch Architecture & Clean Repository Scope
+              </div>
+              <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;">
+                The codebase is strictly scoped to <strong>MNN + Qwen + I-Ching</strong>, with all extraneous legacy code eliminated.
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 14px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 0.85rem; font-weight: 700; color: #38bdf8;">Branch: feat/enhanced-iching</span>
+                    <span style="font-size: 0.68rem; background: rgba(56,189,248,0.2); color: #38bdf8; padding: 2px 8px; border-radius: 9999px;">Active Enhancement</span>
+                  </div>
+                  <ul style="font-size: 0.74rem; color: var(--text-muted); line-height: 1.6; padding-left: 18px;">
+                    <li><strong style="color: #f8fafc;">scenes/main.tscn</strong>: Full 3D WorldEnvironment + Camera3D + CreatureBall3D.</li>
+                    <li><strong style="color: #f8fafc;">scripts/creature_ball_3d.gd</strong>: 6 struts, 24 cords, icosahedral kinematic tension solver.</li>
+                    <li><strong style="color: #f8fafc;">scripts/mobile_hud.gd</strong>: Dual-mode toggle button with active cybernetic prompt generation.</li>
+                    <li><strong style="color: #f8fafc;">APK Deliverable</strong>: <code style="color: #38bdf8;">hexy-a22-enhanced.apk</code> (181 MB).</li>
+                  </ul>
+                </div>
+
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 8px; padding: 14px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 0.85rem; font-weight: 700; color: #fbbf24;">Branch: feat/pure-iching-character</span>
+                    <span style="font-size: 0.68rem; background: rgba(251,191,36,0.2); color: #fbbf24; padding: 2px 8px; border-radius: 9999px;">Pure Baseline</span>
+                  </div>
+                  <ul style="font-size: 0.74rem; color: var(--text-muted); line-height: 1.6; padding-left: 18px;">
+                    <li><strong style="color: #f8fafc;">Default Mode</strong>: Boots in Pure Mode (<code style="color: #fbbf24;">is_enhanced_mode = false</code>).</li>
+                    <li><strong style="color: #f8fafc;">Minimal Overhead</strong>: 3D creature is dormant; zero draw calls for struts/cords.</li>
+                    <li><strong style="color: #f8fafc;">Prompt Specialization</strong>: Ancient Book of Changes oracle persona prompt only.</li>
+                    <li><strong style="color: #f8fafc;">APK Deliverable</strong>: <code style="color: #fbbf24;">hexy-a22-pure.apk</code> (181 MB).</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Benchmark sub-navigation switch
+    function switchBmTab(idx) {
+      for (let i = 0; i < 4; i++) {
+        const btn = document.getElementById(`bmTab${i}`);
+        const mod = document.getElementById(`bmMod${i}`);
+        if (btn && mod) {
+          if (i === idx) {
+            btn.classList.add('active');
+            mod.style.display = 'block';
+          } else {
+            btn.classList.remove('active');
+            mod.style.display = 'none';
+          }
+        }
+      }
+    }
+
+    // Benchmark Interactive Simulator State
+    let simIsEnhanced = true;
+    let simCurrentWen = 1;
+    let simCurrentMoving = 4;
+    let simAnimId = null;
+    let simAngleX = 0.4;
+    let simAngleY = 0.5;
+
+    const SIM_HEX_DATA = [
+      { wen: 1, zh: "乾", name: "The Creative", bits: 0b111111 },
+      { wen: 2, zh: "坤", name: "The Receptive", bits: 0b000000 },
+      { wen: 8, zh: "比", name: "Holding Together", bits: 0b000111 },
+      { wen: 11, zh: "泰", name: "Peace", bits: 0b000111 },
+      { wen: 23, zh: "剝", name: "Splitting Apart", bits: 0b100000 },
+      { wen: 24, zh: "復", name: "Return", bits: 0b000001 },
+      { wen: 29, zh: "坎", name: "The Abysmal Water", bits: 0b010010 },
+      { wen: 30, zh: "離", name: "The Clinging Fire", bits: 0b101101 },
+      { wen: 64, zh: "未濟", name: "Before Completion", bits: 0b101010 }
+    ];
+
+    function initBenchmarkStudio() {
+      simIsEnhanced = true;
+      updateSimUI();
+      startSimAnimation();
+    }
+
+    function toggleSimMode() {
+      simIsEnhanced = !simIsEnhanced;
+      updateSimUI();
+    }
+
+    function updateSimUI() {
+      const btn = document.getElementById('simModeToggleBtn');
+      const qwenHeader = document.getElementById('simQwenHeader');
+      const fps = document.getElementById('simFpsVal');
+      const vram = document.getElementById('simVramVal');
+      const pss = document.getElementById('simPssVal');
+      const lat = document.getElementById('simLatencyBadge');
+
+      const cur = SIM_HEX_DATA.find(h => h.wen === simCurrentWen) || SIM_HEX_DATA[0];
+
+      if (simIsEnhanced) {
+        if (btn) {
+          btn.innerHTML = "⚡ ENHANCED";
+          btn.style.borderColor = "#38bdf8";
+          btn.style.color = "#38bdf8";
+          btn.style.background = "rgba(56, 189, 248, 0.15)";
+        }
+        if (qwenHeader) {
+          qwenHeader.innerHTML = "💬 Qwen MNN (Enhanced Mode - Structural):";
+          qwenHeader.style.color = "#38bdf8";
+        }
+        if (fps) fps.innerHTML = "74-75 FPS";
+        if (vram) vram.innerHTML = "157.6 MB";
+        if (pss) pss.innerHTML = "1067 MB";
+        if (lat) lat.innerHTML = "Latency: 632 ms";
+
+        document.getElementById('simHexBinary').style.display = "block";
+        document.getElementById('simHexMoving').style.display = "block";
+        document.getElementById('simPromptText').innerHTML = 
+          `Explain I-Ching Hexagram #${cur.wen} (${cur.zh}, ${cur.name}): Binary 0b${cur.bits.toString(2).padStart(6, '0')}. Moving line ${simCurrentMoving} mutating structure. Analyze polarity balance and structural guidance.`;
+        document.getElementById('simQwenReply').innerHTML = 
+          `The ancient Book of Changes whispers: Change is constant. When the rigid yields to the flexible, harmony and progress endure. Strut ${simCurrentMoving} actively absorbs compression stress, rotating equilibrium toward hexagram attractor #${((cur.wen + 5) % 64) + 1}.`;
+      } else {
+        if (btn) {
+          btn.innerHTML = "☯ PURE";
+          btn.style.borderColor = "#fbbf24";
+          btn.style.color = "#fbbf24";
+          btn.style.background = "rgba(251, 191, 36, 0.15)";
+        }
+        if (qwenHeader) {
+          qwenHeader.innerHTML = "💬 Qwen MNN (Pure Mode - Ancient Oracle):";
+          qwenHeader.style.color = "#fbbf24";
+        }
+        if (fps) fps.innerHTML = "76 FPS";
+        if (vram) vram.innerHTML = "132.9 MB";
+        if (pss) pss.innerHTML = "1046 MB";
+        if (lat) lat.innerHTML = "Latency: 621 ms";
+
+        document.getElementById('simHexBinary').style.display = "none";
+        document.getElementById('simHexMoving').style.display = "none";
+        document.getElementById('simPromptText').innerHTML = 
+          `You are the ancient I-Ching oracle. In character as the Book of Changes, speak poetically and provide concise wisdom on Hexagram #${cur.wen} ${cur.name} (${cur.zh}).`;
+        document.getElementById('simQwenReply').innerHTML = 
+          `The dragon rests within the abyss, biding its season. Persevere with sincerity; no blame shall follow. In simplicity, truth reflects without turbulence.`;
+      }
+    }
+
+    function simCastRandomHex() {
+      const idx = Math.floor(Math.random() * SIM_HEX_DATA.length);
+      const cur = SIM_HEX_DATA[idx];
+      simCurrentWen = cur.wen;
+      simCurrentMoving = Math.floor(Math.random() * 6) + 1;
+      document.getElementById('simHexTitle').innerHTML = `#${cur.wen} ${cur.zh} ${cur.name}`;
+      document.getElementById('simHexBinary').innerHTML = `Binary: 0b${cur.bits.toString(2).padStart(6, '0')} (Lower: ${cur.bits & 7}, Upper: ${(cur.bits >> 3) & 7})`;
+      document.getElementById('simHexMoving').innerHTML = `Moving Line: Line ${simCurrentMoving} -> Mutating Strut`;
+      updateSimUI();
+    }
+
+    function simNextMovingLine() {
+      simCurrentMoving = (simCurrentMoving % 6) + 1;
+      document.getElementById('simHexMoving').innerHTML = `Moving Line: Line ${simCurrentMoving} -> Mutating Strut`;
+      updateSimUI();
+    }
+
+    function simAskMnn() {
+      const reply = document.getElementById('simQwenReply');
+      reply.style.opacity = '0.5';
+      reply.innerHTML = "🧠 Consulting on-device Qwen on Samsung Galaxy A22...";
+      setTimeout(() => {
+        reply.style.opacity = '1';
+        updateSimUI();
+      }, 350);
+    }
+
+    function startSimAnimation() {
+      if (simAnimId) cancelAnimationFrame(simAnimId);
+
+      const canvas = document.getElementById('simTensegrityCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      // Tensegrity 6-strut vertices (12 vertices of icosahedron)
+      const phi = (1 + Math.sqrt(5)) / 2;
+      const scale = 75;
+      
+      const rawVertices = [
+        [-1, phi, 0], [1, phi, 0], [-1, -phi, 0], [1, -phi, 0],
+        [0, -1, phi], [0, 1, phi], [0, -1, -phi], [0, 1, -phi],
+        [phi, 0, -1], [phi, 0, 1], [-phi, 0, -1], [-phi, 0, 1]
+      ].map(v => [v[0] * scale / 2, v[1] * scale / 2, v[2] * scale / 2]);
+
+      const strutIndices = [
+        [0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, 11]
+      ];
+
+      function renderFrame() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+
+        if (!simIsEnhanced) {
+          // PURE MODE: Classical 2D Hexagram Yin/Yang Calligraphy
+          ctx.save();
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#fbbf24';
+          ctx.font = 'bold 48px "Outfit", sans-serif';
+          const cur = SIM_HEX_DATA.find(h => h.wen === simCurrentWen) || SIM_HEX_DATA[0];
+          ctx.fillText(cur.zh, cx, cy - 20);
+
+          ctx.font = '500 16px "Outfit", sans-serif';
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillText(`Classical Oracle Persona`, cx, cy + 25);
+          ctx.fillText(`(3D Kinematics Dormant)`, cx, cy + 45);
+
+          // Draw classical 6 lines
+          const bits = cur.bits;
+          for (let l = 0; l < 6; l++) {
+            const isYang = ((bits >> (5 - l)) & 1) === 1;
+            const ly = cy + 65 + (l * 10);
+            ctx.strokeStyle = isYang ? '#fbbf24' : '#60a5fa';
+            ctx.lineWidth = 3;
+            if (isYang) {
+              ctx.beginPath();
+              ctx.moveTo(cx - 35, ly);
+              ctx.lineTo(cx + 35, ly);
+              ctx.stroke();
+            } else {
+              ctx.beginPath();
+              ctx.moveTo(cx - 35, ly);
+              ctx.lineTo(cx - 8, ly);
+              ctx.stroke();
+              ctx.beginPath();
+              ctx.moveTo(cx + 8, ly);
+              ctx.lineTo(cx + 35, ly);
+              ctx.stroke();
+            }
+          }
+          ctx.restore();
+          simAnimId = requestAnimationFrame(renderFrame);
+          return;
+        }
+
+        // ENHANCED MODE: 3D Tensegrity Ball with glowing mutating strut
+        simAngleX += 0.012;
+        simAngleY += 0.018;
+
+        const cosX = Math.cos(simAngleX), sinX = Math.sin(simAngleX);
+        const cosY = Math.cos(simAngleY), sinY = Math.sin(simAngleY);
+
+        const rotated = rawVertices.map(v => {
+          let y = v[1] * cosX - v[2] * sinX;
+          let z = v[1] * sinX + v[2] * cosX;
+          let x = v[0] * cosY + z * sinY;
+          z = -v[0] * sinY + z * cosY;
+          return [x, y, z];
+        });
+
+        // Elastic cords (24 cords)
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 12; i++) {
+          for (let j = i + 1; j < 12; j++) {
+            const dx = rawVertices[i][0] - rawVertices[j][0];
+            const dy = rawVertices[i][1] - rawVertices[j][1];
+            const dz = rawVertices[i][2] - rawVertices[j][2];
+            const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+            if (dist < scale * 1.05 && dist > 10) {
+              ctx.beginPath();
+              ctx.moveTo(cx + rotated[i][0], cy + rotated[i][1]);
+              ctx.lineTo(cx + rotated[j][0], cy + rotated[j][1]);
+              ctx.stroke();
+            }
+          }
+        }
+
+        // 6 Struts
+        strutIndices.forEach((pair, sIdx) => {
+          const p1 = rotated[pair[0]];
+          const p2 = rotated[pair[1]];
+          const isMutating = (sIdx + 1) === simCurrentMoving;
+
+          ctx.save();
+          if (isMutating) {
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 7;
+            ctx.shadowColor = '#facc15';
+            ctx.shadowBlur = 16;
+          } else {
+            ctx.strokeStyle = '#f97316';
+            ctx.lineWidth = 5;
+            ctx.shadowBlur = 0;
+          }
+
+          ctx.beginPath();
+          ctx.moveTo(cx + p1[0], cy + p1[1]);
+          ctx.lineTo(cx + p2[0], cy + p2[1]);
+          ctx.stroke();
+          ctx.restore();
+
+          // End caps
+          [p1, p2].forEach(p => {
+            ctx.fillStyle = '#22d3ee';
+            ctx.beginPath();
+            ctx.arc(cx + p[0], cy + p[1], isMutating ? 7 : 5, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        });
+
+        simAnimId = requestAnimationFrame(renderFrame);
+      }
+
+      renderFrame();
+    }
+
+    </script>
+</body>
+</html>
