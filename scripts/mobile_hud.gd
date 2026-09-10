@@ -3,10 +3,12 @@ extends Control
 const MnnRuntime = preload("res://scripts/brain/mnn_runtime.gd")
 const MandalaDial2D = preload("res://scripts/mandala_dial_2d.gd")
 const CreatureBall3D = preload("res://scripts/creature_ball_3d.gd")
+const SensorOracle = preload("res://scripts/sensor_oracle.gd")
 
 @onready var top_bar: PanelContainer = $TopBar
 @onready var lbl_title: Label = $TopBar/Margin/HBox/Title
 @onready var btn_geo_toggle: Button = $TopBar/Margin/HBox/BtnGeoToggle
+@onready var btn_cast_mode: Button = $TopBar/Margin/HBox/BtnCastMode
 @onready var btn_mode_toggle: Button = $TopBar/Margin/HBox/BtnModeToggle
 @onready var lbl_fps: Label = $TopBar/Margin/HBox/FPS
 
@@ -37,6 +39,8 @@ var mnn: MnnRuntime
 var creature_node: Node3D
 var active_mode: String = "companion"
 var is_enhanced_mode: bool = true
+var is_sensor_mode: bool = false
+var sensor_oracle: SensorOracle
 
 func _ready() -> void:
 	mnn = MnnRuntime.new()
@@ -45,7 +49,14 @@ func _ready() -> void:
 	if mandala_dial.has_signal("hexagram_changed"):
 		mandala_dial.connect("hexagram_changed", Callable(self, "_on_hexagram_changed"))
 	
+	sensor_oracle = SensorOracle.new()
+	add_child(sensor_oracle)
+	sensor_oracle.shake_started.connect(_on_shake_started)
+	sensor_oracle.shake_progress.connect(_on_shake_progress)
+	sensor_oracle.shake_cast_completed.connect(_on_shake_cast_completed)
+	
 	btn_geo_toggle.pressed.connect(_on_geo_toggle_pressed)
+	btn_cast_mode.pressed.connect(_on_cast_mode_toggle_pressed)
 	btn_mode_toggle.pressed.connect(_on_mode_toggle_pressed)
 	btn_cast.pressed.connect(_on_cast_pressed)
 	btn_ask.pressed.connect(_on_ask_pressed)
@@ -62,8 +73,11 @@ func _ready() -> void:
 
 func setup_creature(creature: Node3D) -> void:
 	creature_node = creature
-	if creature_node and creature_node.has_method("get_current_geometry_name"):
-		btn_geo_toggle.text = creature_node.get_current_geometry_name()
+	if creature_node:
+		if "sensor_mode_enabled" in creature_node:
+			creature_node.sensor_mode_enabled = is_sensor_mode
+		if creature_node.has_method("get_current_geometry_name"):
+			btn_geo_toggle.text = creature_node.get_current_geometry_name()
 	if mandala_dial:
 		var cur_data: Dictionary = mandala_dial.KING_WEN_DATA[mandala_dial.current_hex_index]
 		if creature_node.has_method("set_hexagram"):
@@ -71,6 +85,51 @@ func setup_creature(creature: Node3D) -> void:
 
 func _process(_delta: float) -> void:
 	lbl_fps.text = "%d FPS" % Engine.get_frames_per_second()
+
+func _on_cast_mode_toggle_pressed() -> void:
+	is_sensor_mode = !is_sensor_mode
+	_update_cast_mode_ui()
+	Input.vibrate_handheld(30)
+
+func _update_cast_mode_ui() -> void:
+	if sensor_oracle:
+		sensor_oracle.set_enabled(is_sensor_mode)
+	if creature_node and "sensor_mode_enabled" in creature_node:
+		creature_node.sensor_mode_enabled = is_sensor_mode
+		
+	if is_sensor_mode:
+		btn_cast_mode.text = "🌊 SENSORS"
+		btn_cast_mode.modulate = Color(0.3, 1.0, 0.7)
+		btn_cast.text = "🌊 Shake to Cast"
+		lbl_thought.text = "🌊 SENSORS ACTIVE: Shake phone to cast hexagram. Tilt device to physically flex tensegrity structure."
+	else:
+		btn_cast_mode.text = "🖐️ MANUAL"
+		btn_cast_mode.modulate = Color(0.9, 0.9, 1.0)
+		btn_cast.text = "🪙 Cast Oracle"
+		lbl_thought.text = "🖐️ MANUAL ACTIVE: Drag mandala dial to select hexagram. Tap 'Cast Oracle' for classical divination."
+
+func _on_shake_started() -> void:
+	lbl_thought.text = "🪙 Divination vessel shaking... Rattling coins in sacred motion..."
+
+func _on_shake_progress(p: float) -> void:
+	var pct := int(p * 100.0)
+	var filled := int(p * 10.0)
+	var bar := "█".repeat(filled) + "░".repeat(10 - filled)
+	lbl_thought.text = "🪙 Casting Energy: [%s] %d%%. Keep shaking to cast!" % [bar, pct]
+
+func _on_shake_cast_completed(_wen: int, moving_line: int, hex_bits: int) -> void:
+	var dial_idx: int = mandala_dial.find_index_by_bits(hex_bits)
+	mandala_dial.select_by_index(dial_idx)
+	var cur: Dictionary = mandala_dial.KING_WEN_DATA[dial_idx]
+	if creature_node and creature_node.has_method("set_hexagram"):
+		creature_node.set_hexagram(hex_bits, moving_line)
+		
+	var move_desc := ("Line %d Mutating" % (moving_line + 1)) if moving_line >= 0 else "Stable Structure"
+	lbl_thought.text = "🪙 Sensor Oracle Cast: #%d %s '%s' (0b%06s). %s!" % [
+		cur["wen"], cur["zh"], cur["name"],
+		String.num_int64(hex_bits, 2).pad_zeros(6),
+		move_desc
+	]
 
 func _on_geo_toggle_pressed() -> void:
 	if creature_node and creature_node.has_method("cycle_geometry_mode"):
@@ -121,6 +180,9 @@ func _on_hexagram_changed(wen: int, bits: int, hex_name: String, zh: String) -> 
 		lbl_moving_line.text = "Classical Reading (Persona Only)"
 
 func _on_cast_pressed() -> void:
+	if is_sensor_mode:
+		sensor_oracle._execute_coin_toss_cast()
+		return
 	Input.vibrate_handheld(25)
 	var rand_idx: int = randi() % mandala_dial.KING_WEN_DATA.size()
 	mandala_dial.current_hex_index = rand_idx

@@ -163,3 +163,23 @@ func select_prev() -> void:
 	_snap_to_closest()
 	_emit_current()
 	Input.vibrate_handheld(15)
+func find_index_by_bits(bits: int) -> int:
+	for i in range(KING_WEN_DATA.size()):
+		if KING_WEN_DATA[i]["bits"] == bits:
+			return i
+	var best_idx: int = 0
+	var min_diff: int = 7
+	for i in range(KING_WEN_DATA.size()):
+		var xor_bits: int = KING_WEN_DATA[i]["bits"] ^ bits
+		var diff: int = 0
+		for b in range(6):
+			diff += (xor_bits >> b) & 1
+		if diff < min_diff:
+			min_diff = diff
+			best_idx = i
+	return best_idx
+
+func select_by_index(idx: int) -> void:
+	current_hex_index = clamp(idx, 0, KING_WEN_DATA.size() - 1)
+	_snap_to_closest()
+	_emit_current()

@@ -17,6 +17,8 @@ enum GeometryMode {
 @export var moving_line: int = -1 # 0..5 or -1 if none
 @export var fold_factor: float = 0.0
 @export var extension: float = 0.15
+@export var sensor_mode_enabled: bool = false
+var gravity_strain: Vector3 = Vector3.ZERO
 
 const PHI: float = 1.61803398875 # Golden Ratio
 # Scaled down from 0.85 to 0.58 so all geometries fit within the screen without touching UI
@@ -443,6 +445,13 @@ func _update_geometry(anim_time: float) -> void:
 	
 	var tips: Array[Vector3] = _compute_base_vertices(hexagram_bits, current_ext, current_fold)
 	
+	# Organic gravity strain deformation
+	if gravity_strain.length_squared() > 0.00001:
+		for i in range(tips.size()):
+			var norm_tip := tips[i].normalized()
+			var dot_weight: float = 1.0 + norm_tip.dot(gravity_strain.normalized()) * 0.4
+			tips[i] += gravity_strain * dot_weight
+			
 	# Update Tip nodes
 	for i in range(tip_nodes.size()):
 		if i < tips.size():
@@ -578,9 +587,30 @@ func _update_geometry(anim_time: float) -> void:
 func _process(delta: float) -> void:
 	var t: float = Time.get_ticks_msec() * 0.001
 	
-	if not is_dragging:
-		current_rot += rot_velocity
-		rot_velocity = rot_velocity.lerp(Vector2(0.006, 0.003), delta * 2.0)
+	if sensor_mode_enabled:
+		var gyro: Vector3 = Input.get_gyroscope()
+		if gyro.length_squared() > 0.002:
+			current_rot.x += gyro.y * delta * 1.8
+			current_rot.y += gyro.x * delta * 1.8
+		else:
+			current_rot += rot_velocity
+			rot_velocity = rot_velocity.lerp(Vector2(0.004, 0.002), delta * 1.5)
+			
+		var raw_grav: Vector3 = Input.get_gravity()
+		if raw_grav.length_squared() > 1.0:
+			var target_strain: Vector3 = Vector3(
+				-raw_grav.x * 0.015,
+				(-raw_grav.y + 9.8) * 0.015,
+				raw_grav.z * 0.015
+			)
+			gravity_strain = gravity_strain.lerp(target_strain, delta * 6.0)
+		else:
+			gravity_strain = gravity_strain.lerp(Vector3.ZERO, delta * 3.0)
+	else:
+		if not is_dragging:
+			current_rot += rot_velocity
+			rot_velocity = rot_velocity.lerp(Vector2(0.006, 0.003), delta * 2.0)
+		gravity_strain = gravity_strain.lerp(Vector3.ZERO, delta * 3.0)
 	
 	transform.basis = Basis()
 	rotate_y(current_rot.x)

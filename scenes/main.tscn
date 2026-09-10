@@ -110,6 +110,11 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 11
 text = "⬡ ICOSA"
 
+[node name="BtnCastMode" type="Button" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "🖐️ MANUAL"
+
 [node name="BtnModeToggle" type="Button" parent="HUD/MobileHUD/TopBar/Margin/HBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
