@@ -632,17 +632,18 @@ func _process(delta: float) -> void:
 			rot_velocity = rot_velocity.lerp(Vector2(0.006, 0.003), delta * 2.0)
 		gravity_strain = gravity_strain.lerp(Vector3.ZERO, delta * 3.0)
 	
+	# Canonical Front Presentation Orientation with gentle organic breath (No touch tumbling)
 	transform.basis = Basis()
-	rotate_y(current_rot.x)
-	rotate_x(current_rot.y)
+	rotate_y(0.24 + sin(t * 0.4) * 0.08)
+	rotate_x(0.18 + cos(t * 0.3) * 0.05)
 	
 	_update_geometry(t)
 
 func _unhandled_input(event: InputEvent) -> void:
+	# 3D touch rotation disabled to eliminate touch conflicts with Body/Head dials and nodes
 	var pos: Vector2 = Vector2.ZERO
 	var is_press: bool = false
 	var is_release: bool = false
-	var is_move: bool = false
 	
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		pos = event.position
@@ -652,21 +653,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		pos = event.position
 		is_press = event.pressed
 		is_release = !event.pressed
-	elif event is InputEventMouseMotion or event is InputEventScreenDrag:
-		pos = event.position
-		is_move = true
 
 	if is_press:
-		is_dragging = true
-		drag_last_pos = pos
 		touch_press_pos = pos
 		touch_press_time = int(Time.get_ticks_msec())
 	elif is_release:
-		is_dragging = false
 		var dist: float = (pos - touch_press_pos).length()
 		var dur: int = int(Time.get_ticks_msec()) - touch_press_time
-		if dist < 22.0 and dur < 380:
-			# Tap on 3D Body Creature sphere!
+		if dist < 24.0 and dur < 400:
+			# Tap on 3D Body Creature sphere / Machine Substrate nodes!
 			var vp_size: Vector2 = get_viewport().get_visible_rect().size
 			var center := Vector2(vp_size.x * 0.5, vp_size.y * 0.40)
 			var v := pos - center
@@ -679,9 +674,3 @@ func _unhandled_input(event: InputEvent) -> void:
 				var mach_tri: int = MACHINE_STATION_TRIGRAMS[st_idx]
 				Input.vibrate_handheld(20)
 				machine_node_clicked.emit(mach_tri)
-	elif is_move and is_dragging:
-		var delta_pos: Vector2 = pos - drag_last_pos
-		drag_last_pos = pos
-		rot_velocity = delta_pos * 0.008
-		current_rot.x += rot_velocity.x
-		current_rot.y += rot_velocity.y

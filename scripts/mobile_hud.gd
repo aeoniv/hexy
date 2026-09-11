@@ -40,7 +40,11 @@ var creature_node: Node3D
 var mandala_3d_node: Node3D
 var active_mode: String = "companion"
 var is_enhanced_mode: bool = true
-var is_sensor_mode: bool = false
+# Single Unified Huohoutu Architecture:
+# HEAD (Manual Casting, RAVE_WHEEL_64, changes the very hexagram)
+# BODY (Automatic Casting, BODY_64, changes the tensegrity structure)
+var head_hex_id: int = 41
+var body_hex_id: int = 1
 var sensor_oracle: SensorOracle
 
 func _ready() -> void:
@@ -57,6 +61,7 @@ func _ready() -> void:
 		mandala_dial.center_hub_clicked.connect(_on_center_hub_clicked)
 	
 	sensor_oracle = SensorOracle.new()
+	sensor_oracle.enabled = true
 	add_child(sensor_oracle)
 	sensor_oracle.shake_started.connect(_on_shake_started)
 	sensor_oracle.shake_progress.connect(_on_shake_progress)
@@ -70,8 +75,8 @@ func _ready() -> void:
 	btn_mode_toggle.pressed.connect(_on_mode_toggle_pressed)
 	btn_cast.pressed.connect(_on_cast_pressed)
 	btn_ask.pressed.connect(_on_ask_pressed)
-	btn_prev.pressed.connect(mandala_dial.select_prev)
-	btn_next.pressed.connect(mandala_dial.select_next)
+	btn_prev.pressed.connect(_on_prev_pressed)
+	btn_next.pressed.connect(_on_next_pressed)
 	
 	tab_companion.pressed.connect(func(): _switch_mode("companion"))
 	tab_oracle.pressed.connect(func(): _switch_mode("oracle"))
@@ -79,7 +84,10 @@ func _ready() -> void:
 	tab_telemetry.pressed.connect(func(): _switch_mode("telemetry"))
 	
 	_update_mode_ui()
-	_update_cast_mode_ui()
+	btn_cast_mode.text = "🔥 HUOHOUTU"
+	btn_cast_mode.modulate = Color(1.0, 0.75, 0.2)
+	btn_cast.text = "🪙 CAST HEAD"
+	btn_cast.modulate = Color(0.5, 0.9, 1.0)
 	_switch_mode("companion")
 
 func setup_creature(creature: Node3D, mandala: Node3D = null) -> void:
@@ -87,45 +95,32 @@ func setup_creature(creature: Node3D, mandala: Node3D = null) -> void:
 	mandala_3d_node = mandala
 	if creature_node:
 		if "sensor_mode_enabled" in creature_node:
-			creature_node.sensor_mode_enabled = is_sensor_mode
+			creature_node.sensor_mode_enabled = true
 		if creature_node.has_method("get_current_geometry_name"):
 			btn_geo_toggle.text = creature_node.get_current_geometry_name()
 		if creature_node.has_signal("machine_node_clicked"):
 			creature_node.machine_node_clicked.connect(_on_machine_node_clicked)
-	if mandala_dial:
-		var cur_data: Dictionary = mandala_dial.KING_WEN_DATA[mandala_dial.current_hex_index]
+		# Set initial Body Tensegrity Structure
+		var body_data: Dictionary = HuohoutuData.get_hex(body_hex_id)
 		if creature_node.has_method("set_hexagram"):
-			creature_node.set_hexagram(cur_data["bits"], 3)
+			creature_node.set_hexagram(body_data["bits"], 3)
+	if mandala_3d_node and mandala_3d_node.has_method("set_body_hexagram"):
+		mandala_3d_node.set_body_hexagram(body_hex_id, 0)
+	if mandala_dial:
+		mandala_dial.select_by_id(head_hex_id)
+	_update_huohoutu_ui()
 
 func _process(_delta: float) -> void:
 	lbl_fps.text = "%d FPS" % Engine.get_frames_per_second()
 
 func _on_cast_mode_toggle_pressed() -> void:
-	is_sensor_mode = !is_sensor_mode
-	_update_cast_mode_ui()
-	Input.vibrate_handheld(35)
-
-func _update_cast_mode_ui() -> void:
-	if is_sensor_mode:
-		btn_cast_mode.text = "🔥 HUOHOUTU"
-		btn_cast_mode.modulate = Color(1.0, 0.7, 0.2)
-		btn_cast.text = "🎲 MARTIAL SHAKE"
-		btn_cast.modulate = Color(1.0, 0.75, 0.2)
-		if creature_node and "sensor_mode_enabled" in creature_node:
-			creature_node.sensor_mode_enabled = true
-		var moon: Dictionary = sensor_oracle.get_moon_phase() if sensor_oracle else {}
-		var sun: Dictionary = sensor_oracle.get_sun_cycle() if sensor_oracle else {}
-		lbl_thought.text = "🔥 Huohoutu Mode: Head (%s) tracks human habits; Body (%s) tracks machine. Hold still 2.5s for Civil Fire, or shake for Martial Fire." % [
-			moon.get("emoji", "🌙"), sun.get("period", "☀️")
-		]
-	else:
-		btn_cast_mode.text = "🖐️ MANUAL"
-		btn_cast_mode.modulate = Color(0.7, 0.8, 1.0)
-		btn_cast.text = "🎲 RANDOM CAST"
-		btn_cast.modulate = Color(0.5, 0.9, 1.0)
-		if creature_node and "sensor_mode_enabled" in creature_node:
-			creature_node.sensor_mode_enabled = false
-		lbl_thought.text = "🖐️ Manual Dial Mode: Tap Head stations (Moon) or Body nodes (Sun) to inspect, or rotate the wheel to browse all 64 King Wen archetypes."
+	# Single Unified Huohoutu Mode - Tap indicates alchemical resonance
+	Input.vibrate_handheld(25)
+	var moon: Dictionary = sensor_oracle.get_moon_phase() if sensor_oracle else {}
+	var sun: Dictionary = sensor_oracle.get_sun_cycle() if sensor_oracle else {}
+	lbl_thought.text = "🔥 Unified Huohoutu Mode:\n• 🌙 HEAD (Bottom Dial): Manual Oracle Casting (Changes Hexagram)\n• ☀️ BODY (3D Creature): Automatic Sensor Casting (Changes Tensegrity)\n• Moon: %s %s · Sun: %s" % [
+		moon.get("emoji", "🌙"), moon.get("name", "Moon"), sun.get("period", "Sun")
+	]
 
 func _on_shake_started() -> void:
 	lbl_thought.text = "🪙 Divination vessel shaking... Rattling coins in sacred motion..."
@@ -137,38 +132,30 @@ func _on_shake_progress(p: float) -> void:
 	lbl_thought.text = "🪙 Casting Energy: [%s] %d%%. Keep shaking to cast!" % [bar, pct]
 
 func _on_shake_cast_completed(_wen: int, moving_line: int, hex_bits: int) -> void:
-	var dial_idx: int = mandala_dial.find_index_by_bits(hex_bits)
-	mandala_dial.select_by_index(dial_idx)
-	var cur: Dictionary = mandala_dial.KING_WEN_DATA[dial_idx]
+	# Martial Fire shake cast directly updates the Body Tensegrity structure!
+	var body_data: Dictionary = HuohoutuData.get_by_bits(hex_bits)
+	body_hex_id = body_data["id"]
+	var body_idx: int = HuohoutuData.find_body_index_by_id(body_hex_id)
 	if creature_node and creature_node.has_method("set_hexagram"):
 		creature_node.set_hexagram(hex_bits, moving_line)
-		
-	var move_desc := ("Line %d Mutating" % (moving_line + 1)) if moving_line >= 0 else "Stable Structure"
-	lbl_thought.text = "🪙 Sensor Oracle Cast: #%d %s '%s' (0b%06s). %s!" % [
-		cur["wen"], cur["zh"], cur["name"],
-		String.num_int64(hex_bits, 2).pad_zeros(6),
-		move_desc
-	]
+	if mandala_3d_node and mandala_3d_node.has_method("set_body_hexagram"):
+		mandala_3d_node.set_body_hexagram(body_hex_id, body_idx)
+	_update_huohoutu_ui("Martial Fire Shake: Body Tensegrity Transmuted")
 
 func _on_autonomous_mutation_stepped(new_bits: int, moving_line: int, reason: String) -> void:
-	var dial_idx: int = mandala_dial.find_index_by_bits(new_bits)
-	mandala_dial.select_by_index(dial_idx)
-	var cur: Dictionary = mandala_dial.KING_WEN_DATA[dial_idx]
+	# SensorOracle autonomous mutation drives the BODY: updates tensegrity structure & 3D body dial!
+	var body_data: Dictionary = HuohoutuData.get_by_bits(new_bits)
+	body_hex_id = body_data["id"]
+	var body_idx: int = HuohoutuData.find_body_index_by_id(body_hex_id)
+	
+	# 1. Morph the 3D Tensegrity Structure!
 	if creature_node and creature_node.has_method("set_hexagram"):
 		creature_node.set_hexagram(new_bits, moving_line)
+	# 2. Rotate the 3D Body Dial Pointer!
+	if mandala_3d_node and mandala_3d_node.has_method("set_body_hexagram"):
+		mandala_3d_node.set_body_hexagram(body_hex_id, body_idx)
 	
-	var moon: Dictionary = sensor_oracle.get_moon_phase() if sensor_oracle else {}
-	var sun: Dictionary = sensor_oracle.get_sun_cycle() if sensor_oracle else {}
-	var hum_name: String = SensorOracle.HUMAN_NAMES[(new_bits >> 3) & 0x07]
-	var mach_name: String = SensorOracle.MACHINE_NAMES[new_bits & 0x07]
-	
-	lbl_thought.text = "🔥 HUOHOUTU (火候圖) ALCHEMY:\n• HEAD [神 %s]: %s\n• BODY [精 %s]: %s\n• Manifested: #%d %s '%s' (0b%06s)\n• %s" % [
-		moon.get("emoji", "🌙"), hum_name,
-		sun.get("period", "☀️"), mach_name,
-		cur["wen"], cur["zh"], cur["name"],
-		String.num_int64(new_bits, 2).pad_zeros(6),
-		reason
-	]
+	_update_huohoutu_ui(reason)
 
 func _on_human_station_clicked(tri_idx: int) -> void:
 	if not sensor_oracle:
@@ -316,44 +303,60 @@ func _update_mode_ui() -> void:
 			creature_node.visible = false
 		lbl_thought.text = "☯ Mode: PURE (I-Ching Character Persona). Qwen acts strictly as the Book of Changes oracle persona without structural tensegrity math."
 
-func _on_hexagram_changed(wen: int, bits: int, hex_name: String, zh: String) -> void:
-	lbl_hex_char.text = zh
-	lbl_hex_title.text = "#%d %s %s" % [wen, zh, hex_name]
-	
+func _on_hexagram_changed(wen: int, bits: int, _hex_name: String, _zh: String) -> void:
+	# Manual Head Dial casting changes the very hexagram (Oracle reading & card)
+	head_hex_id = wen
 	if sensor_oracle:
 		sensor_oracle.inject_manual_state(bits, (wen % 6))
+	_update_huohoutu_ui()
+	# Tensegrity structure is NOT touched here; it is driven by BODY automatic casting!
+
+func _update_huohoutu_ui(mutation_reason: String = "") -> void:
+	var head_data: Dictionary = HuohoutuData.get_hex(head_hex_id)
+	var body_data: Dictionary = HuohoutuData.get_hex(body_hex_id)
 	
-	if is_enhanced_mode:
-		lbl_hex_subtitle.text = "Binary: 0b%06s  (Lower: %d, Upper: %d)" % [
-			String.num_int64(bits, 2).pad_zeros(6),
-			bits & 7,
-			(bits >> 3) & 7
+	lbl_hex_char.text = head_data.get("zh", "乾")
+	lbl_hex_title.text = "🌙 HEAD #%d %s · ☀️ BODY #%d %s" % [
+		head_data["id"], head_data["name"], body_data["id"], body_data["name"]
+	]
+	lbl_hex_subtitle.text = "Oracle Bits: 0b%06s · Tensegrity Bits: 0b%06s" % [
+		head_data["bin"], body_data["bin"]
+	]
+	lbl_moving_line.text = "Huohoutu Pacing: 文火 Civil Dwell (2.5s) · 武火 Martial Shake"
+	
+	var moon: Dictionary = sensor_oracle.get_moon_phase() if sensor_oracle else {}
+	var sun: Dictionary = sensor_oracle.get_sun_cycle() if sensor_oracle else {}
+	
+	if mutation_reason != "":
+		lbl_thought.text = "🔥 HUOHOUTU (火候圖) ALCHEMY MUTATION:\n• 🌙 HEAD [Oracle]: #%d %s '%s'\n• ☀️ BODY [Tensegrity]: #%d %s '%s'\n• %s" % [
+			head_data["id"], head_data.get("zh", ""), head_data["name"],
+			body_data["id"], body_data.get("zh", ""), body_data["name"],
+			mutation_reason
 		]
-		var moving: int = (wen % 6)
-		lbl_moving_line.text = "Moving Line: Line %d -> Mutating Structure" % (moving + 1)
-		if creature_node and creature_node.has_method("set_hexagram"):
-			creature_node.set_hexagram(bits, moving)
 	else:
-		lbl_hex_subtitle.text = "Traditional I-Ching Hexagram"
-		lbl_moving_line.text = "Classical Reading (Persona Only)"
+		lbl_thought.text = "🔥 HUOHOUTU (火候圖) REAL-TIME RESONANCE:\n• 🌙 HEAD (Manual Oracle): #%d %s '%s' (Moon %s)\n• ☀️ BODY (Auto Tensegrity): #%d %s '%s' (Sun %s)\n• Spin bottom dial to cast Head; hold still 2.5s for Civil Fire." % [
+			head_data["id"], head_data.get("zh", ""), head_data["name"], moon.get("emoji", "🌙"),
+			body_data["id"], body_data.get("zh", ""), body_data["name"], sun.get("period", "☀️")
+		]
+
+
+func _on_prev_pressed() -> void:
+	if mandala_dial and mandala_dial.has_method("select_prev"):
+		mandala_dial.select_prev()
+
+func _on_next_pressed() -> void:
+	if mandala_dial and mandala_dial.has_method("select_next"):
+		mandala_dial.select_next()
 
 func _on_cast_pressed() -> void:
-	if is_sensor_mode:
-		sensor_oracle._execute_coin_toss_cast()
-		return
+	# Manual Head Cast: Randomly steps through Head sequence using oracle coin toss
 	Input.vibrate_handheld(25)
-	var rand_idx: int = randi() % mandala_dial.KING_WEN_DATA.size()
+	var rand_idx: int = randi() % HuohoutuData.HEAD_SEQUENCE.size()
 	mandala_dial.current_hex_index = rand_idx
 	mandala_dial._snap_to_closest()
 	mandala_dial._emit_current()
-	
-	var cur: Dictionary = mandala_dial.KING_WEN_DATA[rand_idx]
-	if sensor_oracle:
-		sensor_oracle.inject_manual_state(cur["bits"], (cur["wen"] % 6))
-	if is_enhanced_mode:
-		lbl_thought.text = "🪙 Cast Hexagram #%d %s: '%s'. Sovereign equilibrium anchored." % [cur["wen"], cur["zh"], cur["name"]]
-	else:
-		lbl_thought.text = "🪙 Cast Hexagram #%d %s: '%s'. Pure I-Ching persona consultation ready." % [cur["wen"], cur["zh"], cur["name"]]
+	var head_data: Dictionary = HuohoutuData.get_head_hex(rand_idx)
+	lbl_thought.text = "🪙 Cast Head Hexagram: #%d %s '%s'. Manual oracle cast anchored." % [head_data["id"], head_data.get("zh", ""), head_data["name"]]
 
 func _on_ask_pressed() -> void:
 	Input.vibrate_handheld(20)

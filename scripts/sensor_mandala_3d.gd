@@ -35,6 +35,15 @@ var dwell_progress: float = 0.0
 # 8x8 Trigram States
 var lower_tri: int = 7 # Machine (Default: Heaven)
 var upper_tri: int = 7 # Human   (Default: Heaven)
+var body_hex_index: int = 0
+var body_hex_id: int = 1
+
+func set_body_hexagram(wen_id: int, hex_index: int = -1) -> void:
+	body_hex_id = wen_id
+	if hex_index >= 0:
+		body_hex_index = hex_index
+	else:
+		body_hex_index = HuohoutuData.find_body_index_by_id(wen_id)
 
 var gyro_orbit_angle: float = 0.0
 var celestial_rot: float = 0.0
@@ -172,6 +181,16 @@ func _render_mandala(t: float) -> void:
 	var north_col := Color(0.2, 1.0, 0.8, 0.9)
 	_add_line(north_left, north_tip, north_col)
 	_add_line(north_tip, north_right, north_col)
+
+	# Body Dial Pointer (Cyan triangle indicating active Body hexagram in BODY_64 sequence)
+	var body_rad: float = -PI * 0.5 + (float(body_hex_index) / 64.0) * TAU
+	var body_tip := Vector3(cos(body_rad) * (r_human + 0.055), sin(body_rad) * (r_human + 0.055), 0.0)
+	var body_l := Vector3(cos(body_rad - 0.08) * (r_human - 0.015), sin(body_rad - 0.08) * (r_human - 0.015), 0.0)
+	var body_r := Vector3(cos(body_rad + 0.08) * (r_human - 0.015), sin(body_rad + 0.08) * (r_human - 0.015), 0.0)
+	var body_pointer_col := Color(0.15, 0.95, 1.0, 0.95)
+	_add_line(body_l, body_tip, body_pointer_col)
+	_add_line(body_tip, body_r, body_pointer_col)
+	_add_line(body_r, body_l, body_pointer_col)
 
 	# -------------------------------------------------------------
 	# 2. 8 INNER MACHINE SUBSTRATE NODES & 8 OUTER HUMAN NODES

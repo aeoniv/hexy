@@ -13,43 +13,10 @@ var has_moved_significantly: bool = false
 
 const HUMAN_STATION_TRIGRAMS: Array[int] = [7, 3, 5, 1, 0, 4, 2, 6] # Clockwise from top: 7=Heaven, 3=Lake, 5=Fire, 1=Thunder, 0=Earth, 4=Mountain, 2=Water, 6=Wind
 
-# King Wen Hexagrams Lookup (Bits: lower 3 bits = lower trigram, upper 3 bits = upper trigram)
-# Trigram mapping: 0=Earth (坤), 1=Thunder (震), 2=Water (坎), 3=Lake (兌), 4=Mountain (艮), 5=Fire (離), 6=Wind (巽), 7=Heaven (乾)
-const KING_WEN_DATA: Array = [
-	{"wen": 1, "bits": 0b111111, "zh": "乾", "name": "The Creative", "py": "qián"},
-	{"wen": 2, "bits": 0b000000, "zh": "坤", "name": "The Receptive", "py": "kūn"},
-	{"wen": 3, "bits": 0b010001, "zh": "屯", "name": "Difficulty at the Beginning", "py": "zhūn"},
-	{"wen": 4, "bits": 0b100010, "zh": "蒙", "name": "Youthful Folly", "py": "méng"},
-	{"wen": 5, "bits": 0b111010, "zh": "需", "name": "Waiting", "py": "xū"},
-	{"wen": 6, "bits": 0b010111, "zh": "訟", "name": "Conflict", "py": "sòng"},
-	{"wen": 7, "bits": 0b000010, "zh": "師", "name": "The Army", "py": "shī"},
-	{"wen": 8, "bits": 0b010000, "zh": "比", "name": "Holding Together", "py": "bǐ"},
-	{"wen": 9, "bits": 0b111110, "zh": "小畜", "name": "Small Taming", "py": "xiǎo chù"},
-	{"wen": 10, "bits": 0b011111, "zh": "履", "name": "Treading", "py": "lǚ"},
-	{"wen": 11, "bits": 0b111000, "zh": "泰", "name": "Peace", "py": "tài"},
-	{"wen": 12, "bits": 0b000111, "zh": "否", "name": "Standstill", "py": "pǐ"},
-	{"wen": 13, "bits": 0b111101, "zh": "同人", "name": "Fellowship", "py": "tóng rén"},
-	{"wen": 14, "bits": 0b101111, "zh": "大有", "name": "Great Possession", "py": "dà yǒu"},
-	{"wen": 15, "bits": 0b000100, "zh": "謙", "name": "Modesty", "py": "qiān"},
-	{"wen": 16, "bits": 0b001000, "zh": "豫", "name": "Enthusiasm", "py": "yù"},
-	{"wen": 17, "bits": 0b011001, "zh": "隨", "name": "Following", "py": "suí"},
-	{"wen": 18, "bits": 0b100110, "zh": "蠱", "name": "Work on Corruption", "py": "gǔ"},
-	{"wen": 19, "bits": 0b110000, "zh": "臨", "name": "Approach", "py": "lín"},
-	{"wen": 20, "bits": 0b000011, "zh": "觀", "name": "Contemplation", "py": "guān"},
-	{"wen": 21, "bits": 0b101001, "zh": "噬嗑", "name": "Biting Through", "py": "shì kè"},
-	{"wen": 22, "bits": 0b100101, "zh": "賁", "name": "Grace", "py": "bì"},
-	{"wen": 23, "bits": 0b000001, "zh": "剝", "name": "Splitting Apart", "py": "bō"},
-	{"wen": 24, "bits": 0b100000, "zh": "復", "name": "Return", "py": "fù"},
-	{"wen": 25, "bits": 0b111001, "zh": "無妄", "name": "Innocence", "py": "wú wàng"},
-	{"wen": 26, "bits": 0b100111, "zh": "大畜", "name": "Great Taming", "py": "dà chù"},
-	{"wen": 27, "bits": 0b100001, "zh": "頤", "name": "Nourishment", "py": "yí"},
-	{"wen": 28, "bits": 0b011110, "zh": "大過", "name": "Preponderance of Great", "py": "dà guò"},
-	{"wen": 29, "bits": 0b010010, "zh": "坎", "name": "The Abysmal Water", "py": "kǎn"},
-	{"wen": 30, "bits": 0b101101, "zh": "離", "name": "The Clinging Fire", "py": "lí"},
-	{"wen": 53, "bits": 0b110100, "zh": "漸", "name": "Development", "py": "jiàn"},
-	{"wen": 63, "bits": 0b101010, "zh": "既濟", "name": "After Completion", "py": "jì jì"},
-	{"wen": 64, "bits": 0b010101, "zh": "未濟", "name": "Before Completion", "py": "wèi jì"}
-]
+# Huohoutu Head Sequence: RAVE_WHEEL_64 (All 64 Hexagrams Canonical Oracle Wheel)
+var KING_WEN_DATA: Array:
+	get:
+		return HuohoutuData.HEXAGRAMS.values()
 
 var current_hex_index: int = 0
 var dial_angle: float = 0.0
@@ -108,7 +75,7 @@ func _draw() -> void:
 	draw_arc(dial_center, hub_r, 0, TAU, 32, Color(0.2, 0.7, 0.9, 0.8), 2.0, true)
 	
 	# Draw Hexagram Lines inside Center Hub (Head=Gold over Body=Cyan)
-	var cur_data: Dictionary = KING_WEN_DATA[current_hex_index]
+	var cur_data: Dictionary = HuohoutuData.get_head_hex(current_hex_index)
 	var bits: int = cur_data["bits"]
 	var line_w: float = hub_r * 1.1
 	var line_h: float = 4.0
@@ -188,51 +155,44 @@ func _gui_input(event: InputEvent) -> void:
 		queue_redraw()
 		
 		# Step hexagram when rotated enough
-		var step_rad := TAU / 32.0
-		var new_idx = posmod(int(round(-dial_angle / step_rad)), KING_WEN_DATA.size())
+		var step_rad := TAU / 64.0
+		var new_idx = posmod(int(round(-dial_angle / step_rad)), HuohoutuData.HEAD_SEQUENCE.size())
 		if new_idx != current_hex_index:
 			current_hex_index = new_idx
 			_emit_current()
 			Input.vibrate_handheld(12)
 
 func _snap_to_closest() -> void:
-	var step_rad := TAU / 32.0
+	var step_rad := TAU / 64.0
 	target_dial_angle = -float(current_hex_index) * step_rad
 	dial_angle = target_dial_angle
 	queue_redraw()
 
 func _emit_current() -> void:
-	var data: Dictionary = KING_WEN_DATA[current_hex_index]
-	hexagram_changed.emit(data["wen"], data["bits"], data["name"], data["zh"])
+	var data: Dictionary = HuohoutuData.get_head_hex(current_hex_index)
+	hexagram_changed.emit(data["id"], data["bits"], data["name"], data["zh"])
 
 func select_next() -> void:
-	current_hex_index = (current_hex_index + 1) % KING_WEN_DATA.size()
+	current_hex_index = (current_hex_index + 1) % HuohoutuData.HEAD_SEQUENCE.size()
 	_snap_to_closest()
 	_emit_current()
 	Input.vibrate_handheld(15)
 
 func select_prev() -> void:
-	current_hex_index = (current_hex_index - 1 + KING_WEN_DATA.size()) % KING_WEN_DATA.size()
+	current_hex_index = (current_hex_index - 1 + HuohoutuData.HEAD_SEQUENCE.size()) % HuohoutuData.HEAD_SEQUENCE.size()
 	_snap_to_closest()
 	_emit_current()
 	Input.vibrate_handheld(15)
-func find_index_by_bits(bits: int) -> int:
-	for i in range(KING_WEN_DATA.size()):
-		if KING_WEN_DATA[i]["bits"] == bits:
-			return i
-	var best_idx: int = 0
-	var min_diff: int = 7
-	for i in range(KING_WEN_DATA.size()):
-		var xor_bits: int = KING_WEN_DATA[i]["bits"] ^ bits
-		var diff: int = 0
-		for b in range(6):
-			diff += (xor_bits >> b) & 1
-		if diff < min_diff:
-			min_diff = diff
-			best_idx = i
-	return best_idx
+
+func find_index_by_id(id: int) -> int:
+	return HuohoutuData.find_head_index_by_id(id)
+
+func select_by_id(id: int) -> void:
+	current_hex_index = find_index_by_id(id)
+	_snap_to_closest()
+	_emit_current()
 
 func select_by_index(idx: int) -> void:
-	current_hex_index = clamp(idx, 0, KING_WEN_DATA.size() - 1)
+	current_hex_index = clamp(idx, 0, HuohoutuData.HEAD_SEQUENCE.size() - 1)
 	_snap_to_closest()
 	_emit_current()
