@@ -175,6 +175,10 @@ func _on_autonomous_thought_requested(prompt: String) -> void:
 
 var last_telemetry_data: Dictionary = {}
 func _on_sensor_telemetry_updated(g: Vector3, heading: float, jerk: float, lower_tri: int, upper_tri: int) -> void:
+	if sensor_oracle:
+		var snap: Dictionary = sensor_oracle.get_telemetry_snapshot()
+		if mandala_3d_node and mandala_3d_node.has_method("update_telemetry"):
+			mandala_3d_node.update_telemetry(snap)
 	last_telemetry_data = {
 		"g": g, "heading": heading, "jerk": jerk,
 		"lower": lower_tri, "upper": upper_tri
@@ -195,26 +199,33 @@ func _update_telemetry_view() -> void:
 	var exc_val: float = telem.get("kinetic_excitation", 0.0)
 	var strains: Array = telem.get("line_strains", [0, 0, 0, 0, 0, 0])
 	
-	var low_idx: int = telem.get("lower_trigram", 7)
-	var up_idx: int = telem.get("upper_trigram", 7)
-	var lower_name: String = SensorOracle.TRIGRAM_NAMES[low_idx]
-	var upper_name: String = SensorOracle.TRIGRAM_NAMES[up_idx]
+	var mach_idx: int = telem.get("machine_trigram", 0)
+	var hum_idx: int = telem.get("human_trigram", 0)
+	var mach_name: String = telem.get("machine_name", "Sanctuary")
+	var hum_name: String = telem.get("human_name", "Stillness")
+	var mach_tri_name: String = SensorOracle.TRIGRAM_NAMES[mach_idx]
+	var hum_tri_name: String = SensorOracle.TRIGRAM_NAMES[hum_idx]
 	
-	lbl_thought.text = """☸ MULTI-MODAL SENSOR MANDALA TELEMETRY:
-• Light: %.1f lux | Proximity: %.1f cm | Battery: %.0f%%
-• Gravity: (%.1f, %.1f, %.1f) m/s² | Heading: %.1f°
-• Solar Time: %02d:%02d | Jerk: %.1f m/s²
-• Lower Trigram: %s | Upper: %s
-• Kinetic Excitation: %.0f%% (Homeostatic Stillness)
-• Physical Strains: [L1:%.0f%%, L2:%.0f%%, L3:%.0f%%, L4:%.0f%%, L5:%.0f%%, L6:%.0f%%]
-• 8 Orbital Sensor Nodes: Active on 3D Mandala HUD""" % [
-		lux_val, prox_val, bat_val,
-		g.x, g.y, g.z, heading,
-		int(hr_val), int(fmod(hr_val * 60.0, 60.0)), telem.get("jerk", 0.0),
-		lower_name, upper_name,
-		exc_val * 100.0,
+	var hex_bits: int = (hum_idx << 3) | mach_idx
+	var hex_idx: int = mandala_dial.find_index_by_bits(hex_bits) if mandala_dial else 0
+	var hex_info: Dictionary = mandala_dial.KING_WEN_DATA[hex_idx] if mandala_dial and hex_idx < mandala_dial.KING_WEN_DATA.size() else {}
+	var wen_num: int = hex_info.get("wen", 1)
+	var hex_label: String = "#%d %s '%s'" % [wen_num, hex_info.get("zh", ""), hex_info.get("name", "")]
+	
+	lbl_thought.text = """☸ 8x8 SENSOR-HABIT SYNERGY TELEMETRY:
+• MACHINE SUBSTRATE (Inner Trigram): %s
+  ➔ Modality: %s (Lux: %.0f | Bat: %.0f%% | Hour: %02d:%02d)
+• HUMAN DISCIPLINE (Outer Trigram): %s
+  ➔ Habit: %s (G: (%.1f,%.1f,%.1f) | Jerk: %.1f)
+• RESULTING KING WEN STATE: %s (0b%06s)
+• Habit Strains: [Body:%.0f%%, Food:%.0f%%, Breath:%.0f%%, Rest:%.0f%%, Focus:%.0f%%, Conn:%.0f%%]
+• Excitation: %.0f%% | Heading: %.1f° | Dual Orbit Mandala Active""" % [
+		mach_tri_name, mach_name, lux_val, bat_val, int(hr_val), int(fmod(hr_val * 60.0, 60.0)),
+		hum_tri_name, hum_name, g.x, g.y, g.z, telem.get("jerk", 0.0),
+		hex_label, String.num_int64(hex_bits, 2).pad_zeros(6),
 		strains[0] * 100.0, strains[1] * 100.0, strains[2] * 100.0,
-		strains[3] * 100.0, strains[4] * 100.0, strains[5] * 100.0
+		strains[3] * 100.0, strains[4] * 100.0, strains[5] * 100.0,
+		exc_val * 100.0, heading
 	]
 
 func _on_geo_toggle_pressed() -> void:
@@ -295,13 +306,17 @@ func _on_ask_pressed() -> void:
 	
 	var prompt: String
 	if is_enhanced_mode:
+		var telem: Dictionary = sensor_oracle.get_telemetry_snapshot() if sensor_oracle else {}
+		var mach_desc: String = telem.get("machine_name", "Sanctuary Rest")
+		var hum_desc: String = telem.get("human_name", "Calm Posture")
 		lbl_thought.text = "🧠 Consulting Qwen %s [%s Tier]...\nHexagram #%d %s (0b%06s) • Moving Line %d (%s)" % [
 			mnn.short_name(), mnn.tier_name(),
 			cur["wen"], cur["name"],
 			String.num_int64(cur["bits"], 2).pad_zeros(6),
 			moving, changing_need
 		]
-		prompt = "You are Hexy, a worn cybernetic companion building discipline by sensing the body. Current King Wen Hexagram is #%d (%s '%s', bits 0b%06s). Changing line is Line %d (%s need). Give a concise 2-sentence reflection grounding discipline and embodied balance in this hexagram's archetype." % [
+		prompt = "You are Hexy, a worn cybernetic companion building discipline by sensing body and machine. Environment context: %s. Human habit discipline: %s. Current King Wen Hexagram is #%d (%s '%s', bits 0b%06s). Changing line is Line %d (%s need). Give a concise 2-sentence reflection grounding discipline, habit motivation, and embodied balance in this moment." % [
+			mach_desc, hum_desc,
 			cur["wen"], cur["zh"], cur["name"],
 			String.num_int64(cur["bits"], 2).pad_zeros(6),
 			moving, changing_need
@@ -363,11 +378,4 @@ func _switch_mode(mode: String) -> void:
 	elif mode == "telemetry":
 		mandala_container.visible = false
 		thought_bubble.visible = true
-		if sensor_oracle:
-			var g: Vector3 = Input.get_gravity()
-			var mag: Vector3 = Input.get_magnetometer()
-			var heading: float = posmod(rad_to_deg(atan2(-mag.x, -mag.y)), 360.0) if mag.length_squared() > 0.01 else 0.0
-			var low: int = sensor_oracle._classify_lower_trigram_from_gravity(g)
-			var up: int = sensor_oracle._classify_upper_trigram_from_heading(heading)
-			last_telemetry_data = {"g": g, "heading": heading, "jerk": 0.0, "lower": low, "upper": up}
 		_update_telemetry_view()
