@@ -18,7 +18,7 @@ extends Node3D
 ## 5. MNN Neural Resonance Breathing Rays during asynchronous token streaming
 
 @export var enabled: bool = true
-@export var radius: float = 0.78
+@export var radius: float = 0.54
 @export var is_thinking: bool = false
 @export var thought_pulse: float = 0.0
 
@@ -139,8 +139,8 @@ func _render_mandala(t: float) -> void:
 	mandala_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
 	
 	var r_outer: float = radius
-	var r_nodes: float = radius * 1.06
-	var r_inner_tether: float = 0.42
+	var r_nodes: float = radius * 1.08
+	var r_inner_tether: float = 0.25
 	
 	# -------------------------------------------------------------
 	# 1. CELESTIAL OUTER RING & 64 HEXAGRAM GRADUATION TICKS
@@ -158,16 +158,16 @@ func _render_mandala(t: float) -> void:
 		_add_line(p1, p2, base_ring_col)
 		
 		var is_major_tick: bool = (i % 8 == 0)
-		var tick_len: float = 0.045 if is_major_tick else 0.02
+		var tick_len: float = 0.030 if is_major_tick else 0.014
 		var tick_col: Color = Color(0.35, 0.8, 1.0, 0.65) if is_major_tick else Color(0.15, 0.45, 0.7, 0.2)
 		var p_tick_in := Vector3(cos(th1) * (r_outer - tick_len), sin(th1) * (r_outer - tick_len), 0.0)
 		_add_line(p1, p_tick_in, tick_col)
 		
 	# Compass North Pointer on Outer Rim
 	var north_rad: float = deg_to_rad(heading_deg - 90.0)
-	var north_tip := Vector3(cos(north_rad) * (r_outer + 0.08), sin(north_rad) * (r_outer + 0.08), 0.0)
-	var north_left := Vector3(cos(north_rad - 0.08) * (r_outer - 0.02), sin(north_rad - 0.08) * (r_outer - 0.02), 0.0)
-	var north_right := Vector3(cos(north_rad + 0.08) * (r_outer - 0.02), sin(north_rad + 0.08) * (r_outer - 0.02), 0.0)
+	var north_tip := Vector3(cos(north_rad) * (r_outer + 0.055), sin(north_rad) * (r_outer + 0.055), 0.0)
+	var north_left := Vector3(cos(north_rad - 0.08) * (r_outer - 0.015), sin(north_rad - 0.08) * (r_outer - 0.015), 0.0)
+	var north_right := Vector3(cos(north_rad + 0.08) * (r_outer - 0.015), sin(north_rad + 0.08) * (r_outer - 0.015), 0.0)
 	var north_col := Color(0.2, 1.0, 0.8, 0.9)
 	_add_line(north_left, north_tip, north_col)
 	_add_line(north_tip, north_right, north_col)
@@ -243,7 +243,7 @@ func _render_mandala(t: float) -> void:
 	# -------------------------------------------------------------
 	# 3. BA-GUA 8 TRIGRAM HUBS (Solid/Broken Line Manifestations)
 	# -------------------------------------------------------------
-	var r_bagua: float = radius * 0.86
+	var r_bagua: float = radius * 0.84
 	for station in BAGUA_STATIONS:
 		var tri_id: int = station["trigram"]
 		var ang: float = station["angle"]
@@ -262,7 +262,7 @@ func _render_mandala(t: float) -> void:
 		else:
 			hub_col = Color(0.25, 0.5, 0.75, 0.28)
 			
-		var d_sz: float = 0.022 if (is_lower or is_upper) else 0.014
+		var d_sz: float = 0.015 if (is_lower or is_upper) else 0.010
 		var d_top := center + Vector3(0.0, d_sz, 0.0)
 		var d_bot := center - Vector3(0.0, d_sz, 0.0)
 		var d_left := center - Vector3(d_sz, 0.0, 0.0)
@@ -274,9 +274,9 @@ func _render_mandala(t: float) -> void:
 		
 		# Trigram lines
 		var tri_bits: int = TRIGRAM_BITS[tri_id]
-		var glyph_w: float = 0.04
-		var line_spacing: float = 0.013
-		var glyph_center := center - center.normalized() * 0.05
+		var glyph_w: float = 0.026
+		var line_spacing: float = 0.009
+		var glyph_center := center - center.normalized() * 0.036
 		var v_rad: Vector3 = center.normalized()
 		var v_tan: Vector3 = Vector3(-v_rad.y, v_rad.x, 0.0)
 		
@@ -329,13 +329,13 @@ func _render_mandala(t: float) -> void:
 # -----------------------------------------------------------------
 
 func _render_node_light(c: Vector3, lux_val: float, t: float, strain: float) -> void:
-	var r_base: float = 0.042
+	var r_base: float = 0.030
 	var col_gold := Color(1.0, 0.88, 0.25, 0.95)
 	_add_circle(c, r_base, 16, col_gold * Color(1.0, 1.0, 1.0, 0.5))
 	
 	# Radiant Solar Rays scaled by Illuminance
 	var num_rays: int = 12
-	var ray_mag: float = 0.02 + clamp(lux_val / 400.0, 0.0, 1.0) * 0.05 + sin(t * 5.0) * 0.008
+	var ray_mag: float = 0.014 + clamp(lux_val / 400.0, 0.0, 1.0) * 0.035 + sin(t * 5.0) * 0.005
 	for i in range(num_rays):
 		var a: float = (float(i) / float(num_rays)) * TAU + t * 0.2
 		var p_start := c + Vector3(cos(a) * r_base, sin(a) * r_base, 0.0)
@@ -343,40 +343,40 @@ func _render_node_light(c: Vector3, lux_val: float, t: float, strain: float) -> 
 		_add_line(p_start, p_end, col_gold)
 		
 	# Core Diamond
-	var cd: float = 0.015
+	var cd: float = 0.011
 	_add_line(c + Vector3(0.0, cd, 0.0), c + Vector3(cd, 0.0, 0.0), col_gold)
 	_add_line(c + Vector3(cd, 0.0, 0.0), c - Vector3(0.0, cd, 0.0), col_gold)
 	_add_line(c - Vector3(0.0, cd, 0.0), c - Vector3(cd, 0.0, 0.0), col_gold)
 	_add_line(c - Vector3(cd, 0.0, 0.0), c + Vector3(0.0, cd, 0.0), col_gold)
 	
 	if strain > 0.15:
-		_add_circle(c, r_base + 0.02, 16, Color(1.0, 0.5, 0.1, strain * 0.8))
+		_add_circle(c, r_base + 0.014, 16, Color(1.0, 0.5, 0.1, strain * 0.8))
 
 func _render_node_shake(c: Vector3, jerk_val: float, shake_prog: float, t: float, _strain: float) -> void:
-	var r_base: float = 0.042
+	var r_base: float = 0.030
 	var col_amber := Color(1.0, 0.65, 0.15, 0.95)
 	_add_circle(c, r_base, 16, col_amber * Color(1.0, 1.0, 1.0, 0.4))
 	
 	# Circular shake reservoir charge arc
 	if shake_prog > 0.01:
-		_add_arc(c, r_base + 0.015, -PI * 0.5, -PI * 0.5 + shake_prog * TAU, 18, Color(1.0, 0.9, 0.2, 0.95))
+		_add_arc(c, r_base + 0.010, -PI * 0.5, -PI * 0.5 + shake_prog * TAU, 18, Color(1.0, 0.9, 0.2, 0.95))
 		
 	# 3 Orbiting Divination Coin Discs
-	var coin_orbit_r: float = 0.035
+	var coin_orbit_r: float = 0.024
 	var coin_spin: float = t * 3.0 + shake_prog * 10.0
 	for i in range(3):
 		var a: float = (float(i) / 3.0) * TAU + coin_spin
 		var c_coin := c + Vector3(cos(a) * coin_orbit_r, sin(a) * coin_orbit_r, 0.0)
-		_add_circle(c_coin, 0.01, 8, col_amber)
+		_add_circle(c_coin, 0.007, 8, col_amber)
 		
 	# High jerk lightning sparks
 	if jerk_val > 10.0:
-		var spark_a := c + Vector3(randf_range(-0.04, 0.04), randf_range(-0.04, 0.04), 0.0)
-		var spark_b := c + Vector3(randf_range(-0.04, 0.04), randf_range(-0.04, 0.04), 0.0)
+		var spark_a := c + Vector3(randf_range(-0.025, 0.025), randf_range(-0.025, 0.025), 0.0)
+		var spark_b := c + Vector3(randf_range(-0.025, 0.025), randf_range(-0.025, 0.025), 0.0)
 		_add_line(spark_a, spark_b, Color(1.0, 1.0, 0.7, 0.95))
 
 func _render_node_gyro(c: Vector3, gyro_vec: Vector3, t: float, _excitation: float) -> void:
-	var r_base: float = 0.042
+	var r_base: float = 0.030
 	var col_gyro := Color(0.2, 0.65, 1.0, 0.95)
 	_add_circle(c, r_base, 16, col_gyro * Color(1.0, 1.0, 1.0, 0.35))
 	
@@ -389,38 +389,38 @@ func _render_node_gyro(c: Vector3, gyro_vec: Vector3, t: float, _excitation: flo
 	for i in range(12):
 		var a1: float = (float(i) / 12.0) * TAU + rot1
 		var a2: float = (float(i + 1) / 12.0) * TAU + rot1
-		var p1 := c + Vector3(cos(a1) * 0.04, sin(a1) * 0.02, 0.0)
-		var p2 := c + Vector3(cos(a2) * 0.04, sin(a2) * 0.02, 0.0)
+		var p1 := c + Vector3(cos(a1) * 0.028, sin(a1) * 0.014, 0.0)
+		var p2 := c + Vector3(cos(a2) * 0.028, sin(a2) * 0.014, 0.0)
 		_add_line(p1, p2, col_gyro)
 		
 	# Ring 2 (Vertical squashed ellipse)
 	for i in range(12):
 		var a1: float = (float(i) / 12.0) * TAU + rot2
 		var a2: float = (float(i + 1) / 12.0) * TAU + rot2
-		var p1 := c + Vector3(cos(a1) * 0.02, sin(a1) * 0.04, 0.0)
-		var p2 := c + Vector3(cos(a2) * 0.02, sin(a2) * 0.04, 0.0)
+		var p1 := c + Vector3(cos(a1) * 0.014, sin(a1) * 0.028, 0.0)
+		var p2 := c + Vector3(cos(a2) * 0.014, sin(a2) * 0.028, 0.0)
 		_add_line(p1, p2, col_gyro * Color(1.0, 1.0, 1.0, 0.7))
 
 func _render_node_chronos(c: Vector3, hr: float, _t: float) -> void:
-	var r_base: float = 0.042
+	var r_base: float = 0.030
 	var col_chr := Color(0.85, 0.9, 1.0, 0.85)
 	_add_circle(c, r_base, 16, col_chr * Color(1.0, 1.0, 1.0, 0.35))
 	
 	# 12-Hour Astrolabe Dial Ticks
 	for i in range(12):
 		var a: float = (float(i) / 12.0) * TAU - PI * 0.5
-		var p_in := c + Vector3(cos(a) * (r_base - 0.012), sin(a) * (r_base - 0.012), 0.0)
+		var p_in := c + Vector3(cos(a) * (r_base - 0.008), sin(a) * (r_base - 0.008), 0.0)
 		var p_out := c + Vector3(cos(a) * r_base, sin(a) * r_base, 0.0)
 		_add_line(p_in, p_out, col_chr * Color(1.0, 1.0, 1.0, 0.5))
 		
 	# Sun/Moon Dial Hand
 	var hr_ang: float = (hr / 24.0) * TAU - PI * 0.5
-	var hand_tip := c + Vector3(cos(hr_ang) * 0.038, sin(hr_ang) * 0.038, 0.0)
+	var hand_tip := c + Vector3(cos(hr_ang) * 0.026, sin(hr_ang) * 0.026, 0.0)
 	_add_line(c, hand_tip, Color(1.0, 0.9, 0.5, 0.95))
-	_add_circle(hand_tip, 0.006, 6, Color(1.0, 0.9, 0.5, 0.95))
+	_add_circle(hand_tip, 0.0045, 6, Color(1.0, 0.9, 0.5, 0.95))
 
 func _render_node_proximity(c: Vector3, prox_dist: float, t: float, _strain: float) -> void:
-	var r_base: float = 0.042
+	var r_base: float = 0.030
 	var is_near: bool = (prox_dist >= 0.0 and prox_dist < 3.5)
 	
 	if is_near:
@@ -428,25 +428,25 @@ func _render_node_proximity(c: Vector3, prox_dist: float, t: float, _strain: flo
 		var col_eclipse := Color(0.9, 0.35, 1.0, 0.95)
 		_add_circle(c, r_base, 16, col_eclipse)
 		for ring in range(3):
-			var r_echo: float = r_base + fmod(t * 0.15 + float(ring) * 0.025, 0.065)
-			var a_fade: float = clamp(1.0 - (r_echo - r_base) / 0.065, 0.0, 1.0)
+			var r_echo: float = r_base + fmod(t * 0.15 + float(ring) * 0.018, 0.045)
+			var a_fade: float = clamp(1.0 - (r_echo - r_base) / 0.045, 0.0, 1.0)
 			_add_circle(c, r_echo, 16, col_eclipse * Color(1.0, 1.0, 1.0, a_fade * 0.7))
 		# Dilated pupil
-		_add_circle(c, 0.028, 12, col_eclipse)
+		_add_circle(c, 0.018, 12, col_eclipse)
 	else:
 		# Open sky calm aperture
 		var col_open := Color(0.25, 0.75, 0.95, 0.6)
 		_add_circle(c, r_base, 16, col_open * Color(1.0, 1.0, 1.0, 0.35))
-		_add_circle(c, 0.012, 8, col_open)
+		_add_circle(c, 0.009, 8, col_open)
 		# Iris aperture blades
 		for i in range(6):
 			var a: float = (float(i) / 6.0) * TAU
-			var p1 := c + Vector3(cos(a) * 0.015, sin(a) * 0.015, 0.0)
+			var p1 := c + Vector3(cos(a) * 0.010, sin(a) * 0.010, 0.0)
 			var p2 := c + Vector3(cos(a + 0.4) * r_base, sin(a + 0.4) * r_base, 0.0)
 			_add_line(p1, p2, col_open * Color(1.0, 1.0, 1.0, 0.4))
 
 func _render_node_battery(c: Vector3, bat_pct: float, _t: float) -> void:
-	var r_base: float = 0.042
+	var r_base: float = 0.030
 	var col_bat: Color = Color(0.25, 0.95, 0.45, 0.9)
 	if bat_pct < 20.0:
 		col_bat = Color(1.0, 0.25, 0.25, 0.95)
@@ -466,36 +466,36 @@ func _render_node_battery(c: Vector3, bat_pct: float, _t: float) -> void:
 	var total_rungs: int = 5
 	var active_rungs: int = int(round(fill_ratio * float(total_rungs)))
 	for r in range(total_rungs):
-		var y_off: float = -0.03 + (float(r) / float(total_rungs - 1)) * 0.06
-		var half_w: float = 0.024
+		var y_off: float = -0.020 + (float(r) / float(total_rungs - 1)) * 0.040
+		var half_w: float = 0.016
 		var rung_col := col_bat if r < active_rungs else col_bat * Color(1.0, 1.0, 1.0, 0.15)
 		_add_line(c + Vector3(-half_w, y_off, 0.0), c + Vector3(half_w, y_off, 0.0), rung_col)
 
 func _render_node_gravity(c: Vector3, grav_vec: Vector3, _t: float, _strain: float) -> void:
-	var r_base: float = 0.042
+	var r_base: float = 0.030
 	var col_gimbal := Color(0.3, 0.95, 0.5, 0.9)
 	_add_circle(c, r_base, 16, col_gimbal * Color(1.0, 1.0, 1.0, 0.4))
 	
 	# Crosshairs
-	_add_line(c - Vector3(0.04, 0.0, 0.0), c + Vector3(0.04, 0.0, 0.0), col_gimbal * Color(1.0, 1.0, 1.0, 0.25))
-	_add_line(c - Vector3(0.0, 0.04, 0.0), c + Vector3(0.0, 0.04, 0.0), col_gimbal * Color(1.0, 1.0, 1.0, 0.25))
+	_add_line(c - Vector3(0.028, 0.0, 0.0), c + Vector3(0.028, 0.0, 0.0), col_gimbal * Color(1.0, 1.0, 1.0, 0.25))
+	_add_line(c - Vector3(0.0, 0.028, 0.0), c + Vector3(0.0, 0.028, 0.0), col_gimbal * Color(1.0, 1.0, 1.0, 0.25))
 	
 	# Suspended plumb-bob displaced by real tilt
-	var dx: float = clamp(grav_vec.x / 9.8, -1.0, 1.0) * 0.03
-	var dy: float = clamp(grav_vec.y / 9.8, -1.0, 1.0) * 0.03
+	var dx: float = clamp(grav_vec.x / 9.8, -1.0, 1.0) * 0.020
+	var dy: float = clamp(grav_vec.y / 9.8, -1.0, 1.0) * 0.020
 	var p_bob := c + Vector3(dx, dy, 0.0)
 	# Tension string
 	_add_line(c, p_bob, col_gimbal * Color(1.0, 1.0, 1.0, 0.6))
 	# Plumb bob weight
-	_add_circle(p_bob, 0.012, 8, col_gimbal)
+	_add_circle(p_bob, 0.008, 8, col_gimbal)
 
 func _render_node_compass(c: Vector3, head_deg: float, _t: float, _strain: float) -> void:
-	var r_base: float = 0.042
+	var r_base: float = 0.030
 	var col_mag := Color(0.1, 0.95, 0.85, 0.9)
 	_add_circle(c, r_base, 16, col_mag * Color(1.0, 1.0, 1.0, 0.4))
 	
 	# 4-Pointed Lodestone Star
-	var star_r: float = 0.035
+	var star_r: float = 0.025
 	var p_n := c + Vector3(0.0, star_r, 0.0)
 	var p_s := c - Vector3(0.0, star_r, 0.0)
 	var p_e := c + Vector3(star_r, 0.0, 0.0)
@@ -505,6 +505,6 @@ func _render_node_compass(c: Vector3, head_deg: float, _t: float, _strain: float
 	
 	# Dynamic Needle pointing to live magnetic heading
 	var rad: float = deg_to_rad(head_deg - 90.0)
-	var tip := c + Vector3(cos(rad) * 0.04, sin(rad) * 0.04, 0.0)
+	var tip := c + Vector3(cos(rad) * 0.028, sin(rad) * 0.028, 0.0)
 	_add_line(c, tip, Color(1.0, 0.3, 0.3, 0.95)) # Red needle pointing North
-	_add_line(c, c - Vector3(cos(rad) * 0.025, sin(rad) * 0.025, 0.0), col_mag)
+	_add_line(c, c - Vector3(cos(rad) * 0.018, sin(rad) * 0.018, 0.0), col_mag)

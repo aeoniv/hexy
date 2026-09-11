@@ -26,7 +26,7 @@ var gravity_strain: Vector3 = Vector3.ZERO
 
 const PHI: float = 1.61803398875 # Golden Ratio
 # Scaled down from 0.85 to 0.58 so all geometries fit within the screen without touching UI
-const SCALE: float = 0.58
+const SCALE: float = 0.44
 
 # --- 1. EXACT CANONICAL TENSEGRITY ICOSAHEDRON (Commit 3215119) ---
 const STRUT_PAIRS: Array = [
@@ -291,8 +291,8 @@ func _rebuild_node_pool() -> void:
 	while tip_nodes.size() < target_tip_count:
 		var mi := MeshInstance3D.new()
 		var sp := SphereMesh.new()
-		sp.radius = 0.048
-		sp.height = 0.096
+		sp.radius = 0.034
+		sp.height = 0.068
 		sp.radial_segments = 12
 		sp.rings = 6
 		mi.mesh = sp
@@ -313,8 +313,8 @@ func _rebuild_node_pool() -> void:
 	while strut_nodes.size() < target_strut_count:
 		var mi := MeshInstance3D.new()
 		var cyl := CylinderMesh.new()
-		cyl.top_radius = 0.032
-		cyl.bottom_radius = 0.032
+		cyl.top_radius = 0.024
+		cyl.bottom_radius = 0.024
 		cyl.height = 1.0
 		cyl.radial_segments = 16
 		mi.mesh = cyl
@@ -338,40 +338,40 @@ func _rebuild_node_pool() -> void:
 		var mat: StandardMaterial3D = tip_nodes[i].material_override as StandardMaterial3D
 		if geometry_mode == GeometryMode.RHOMBIC_DODECAHEDRON:
 			if i < 6:
-				sp.radius = 0.06
-				sp.height = 0.12
+				sp.radius = 0.044
+				sp.height = 0.088
 				mat.albedo_color = Color(0.2, 0.85, 1.0)
 			else:
-				sp.radius = 0.038
-				sp.height = 0.076
+				sp.radius = 0.028
+				sp.height = 0.056
 				mat.albedo_color = Color(0.95, 0.72, 0.2)
 		elif geometry_mode == GeometryMode.RHOMBIC_TRIACONTAHEDRON:
 			if i < 12:
-				sp.radius = 0.038
-				sp.height = 0.076
+				sp.radius = 0.028
+				sp.height = 0.056
 				mat.albedo_color = Color(0.98, 0.85, 0.3)
 			else:
-				sp.radius = 0.026
-				sp.height = 0.052
+				sp.radius = 0.018
+				sp.height = 0.036
 				mat.albedo_color = Color(0.2, 0.9, 1.0)
 		else:
 			# EXACT 3215119 Icosahedron
-			sp.radius = 0.048
-			sp.height = 0.096
+			sp.radius = 0.034
+			sp.height = 0.068
 			mat.albedo_color = Color(0.2, 0.9, 1.0)
 
 	for s in range(strut_nodes.size()):
 		var cyl: CylinderMesh = strut_nodes[s].mesh as CylinderMesh
 		if geometry_mode == GeometryMode.RHOMBIC_TRIACONTAHEDRON:
-			cyl.top_radius = 0.015
-			cyl.bottom_radius = 0.015
+			cyl.top_radius = 0.011
+			cyl.bottom_radius = 0.011
 		elif geometry_mode == GeometryMode.RHOMBIC_DODECAHEDRON:
-			cyl.top_radius = 0.036
-			cyl.bottom_radius = 0.036
+			cyl.top_radius = 0.026
+			cyl.bottom_radius = 0.026
 		else:
 			# EXACT 3215119 Icosahedron
-			cyl.top_radius = 0.032
-			cyl.bottom_radius = 0.032
+			cyl.top_radius = 0.024
+			cyl.bottom_radius = 0.024
 
 func _compute_base_vertices(bits: int, ext: float, fold: float) -> Array[Vector3]:
 	var tips: Array[Vector3] = []
@@ -449,12 +449,24 @@ func _update_geometry(anim_time: float) -> void:
 	
 	var tips: Array[Vector3] = _compute_base_vertices(hexagram_bits, current_ext, current_fold)
 	
-	# Organic gravity strain deformation
+	# Organic gravity strain deformation (symmetric elastic squash and bulge)
 	if gravity_strain.length_squared() > 0.00001:
+		var g_dir := gravity_strain.normalized()
+		var g_mag := gravity_strain.length()
 		for i in range(tips.size()):
-			var norm_tip := tips[i].normalized()
-			var dot_weight: float = 1.0 + norm_tip.dot(gravity_strain.normalized()) * 0.4
-			tips[i] += gravity_strain * dot_weight
+			var proj: float = tips[i].dot(g_dir)
+			var squash: Vector3 = -g_dir * (proj * g_mag * 0.25)
+			var bulge: Vector3 = (tips[i] - g_dir * proj) * (g_mag * 0.12)
+			tips[i] += squash + bulge
+
+	# Exact Mass Center Centering: guarantee centroid is identically (0, 0, 0)
+	var centroid: Vector3 = Vector3.ZERO
+	for pt in tips:
+		centroid += pt
+	if tips.size() > 0:
+		centroid /= float(tips.size())
+		for i in range(tips.size()):
+			tips[i] -= centroid
 			
 	# Update Tip nodes
 	for i in range(tip_nodes.size()):
@@ -481,13 +493,13 @@ func _update_geometry(anim_time: float) -> void:
 		
 		var node: MeshInstance3D = strut_nodes[s]
 		node.position = mid
-		node.scale = Vector3(1.0, strut_len, 1.0)
 		
-		# Align cylinder Y-axis to strut direction
+		# Align cylinder Y-axis to strut direction, then scale local height to exact strut length
 		if abs(dir.y) < 0.999:
 			node.basis = Basis().looking_at(dir.cross(Vector3.UP).normalized(), dir)
 		else:
 			node.basis = Basis().looking_at(Vector3.RIGHT, dir)
+		node.scale = Vector3(1.0, strut_len, 1.0)
 			
 		# Colors & Moving Line Pulse
 		var line_idx: int = s if geometry_mode != GeometryMode.RHOMBIC_DODECAHEDRON else s * 2
@@ -604,11 +616,8 @@ func _process(delta: float) -> void:
 			
 		var raw_grav: Vector3 = Input.get_gravity()
 		if raw_grav.length_squared() > 1.0:
-			var target_strain: Vector3 = Vector3(
-				-raw_grav.x * 0.015,
-				(-raw_grav.y + 9.8) * 0.015,
-				raw_grav.z * 0.015
-			)
+			var g_local: Vector3 = transform.basis.inverse() * raw_grav.normalized()
+			var target_strain: Vector3 = g_local * 0.20
 			gravity_strain = gravity_strain.lerp(target_strain, delta * 6.0)
 		else:
 			gravity_strain = gravity_strain.lerp(Vector3.ZERO, delta * 3.0)

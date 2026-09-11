@@ -58,7 +58,7 @@ light_energy = 0.6
 environment = SubResource("Environment_1")
 
 [node name="HexyCreature3D" type="Node3D" parent="SubViewportContainer/SubViewport"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.28, 0)
 script = ExtResource("2_creature")
 
 [node name="HUD" type="CanvasLayer" parent="."]
