@@ -73,6 +73,11 @@ var kinetic_excitation: float = 0.0
 var line_strains: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 var last_mutation_time: float = 0.0
 const MUTATION_COOLDOWN: float = 3.5
+
+# Alchemical Huohoutu Fire Pacing (火候)
+var civil_fire_dwell: float = 0.0
+const CIVIL_FIRE_THRESHOLD: float = 2.5 # 1 complete resting breath
+var last_target_bits: int = -1
 var step_mutation_count: int = 0
 
 # Coin Toss Divination State
@@ -181,12 +186,53 @@ func _process(delta: float) -> void:
 	_update_habit_line_strains(delta)
 	sensor_telemetry_updated.emit(filtered_grav, current_heading_deg, filtered_jerk, current_machine_tri, current_human_tri)
 
-	# Mutate towards the classified 8x8 state when excitation peaks
-	if kinetic_excitation >= 0.90 and (now - last_mutation_time >= MUTATION_COOLDOWN):
-		var target_bits: int = (current_human_tri << 3) | current_machine_tri
+	var target_bits: int = (current_human_tri << 3) | current_machine_tri
+	
+	# --- ALCHEMICAL FIRE PACING (HUOHOUTU 火候圖) ---
+	# Branch 1: Civil Fire (文火 Stillness Dwell - 1 Resting Breath)
+	if target_bits != current_hex_bits:
+		if target_bits == last_target_bits:
+			var stillness: float = clamp(1.0 - (filtered_jerk / 1.6 + filtered_gyro.length() / 1.2), 0.0, 1.0)
+			if stillness > 0.4:
+				civil_fire_dwell += delta * stillness * 1.15
+				if civil_fire_dwell >= CIVIL_FIRE_THRESHOLD and (now - last_mutation_time >= 2.0):
+					var diff: int = current_hex_bits ^ target_bits
+					var bit_to_flip: int = 0
+					for b in range(6):
+						if ((diff >> b) & 1) == 1:
+							bit_to_flip = b
+							break
+					
+					current_hex_bits ^= (1 << bit_to_flip)
+					anchor_hex_bits = current_hex_bits
+					anchor_grav = filtered_grav
+					anchor_heading = current_heading_deg
+					anchor_lux = current_lux
+					civil_fire_dwell = 0.0
+					last_mutation_time = now
+					step_mutation_count += 1
+					
+					var is_yang: bool = ((current_hex_bits >> bit_to_flip) & 1) == 1
+					var line_names: Array[String] = ["Body", "Food", "Breath", "Rest", "Focus", "Connection"]
+					var reason: String = "Civil Fire (文火): 1 Breath Stillness Anchor ➔ Line %d (%s) %s" % [
+						bit_to_flip + 1,
+						line_names[bit_to_flip],
+						"Ignited into Yang ⚊" if is_yang else "Yielded into Yin ⚋"
+					]
+					Input.vibrate_handheld(25)
+					autonomous_mutation_stepped.emit(current_hex_bits, bit_to_flip, reason)
+			else:
+				civil_fire_dwell = max(0.0, civil_fire_dwell - delta * 0.5)
+		else:
+			last_target_bits = target_bits
+			civil_fire_dwell = 0.0
+	else:
+		civil_fire_dwell = 0.0
+
+	# Branch 2: Martial Fire (武火 Kinetic Excitation Shaking)
+	if kinetic_excitation >= 0.85 and (now - last_mutation_time >= MUTATION_COOLDOWN):
 		if target_bits != current_hex_bits:
 			var diff: int = current_hex_bits ^ target_bits
-			# Flip lowest differing bit (Hamming d=1 step)
 			var bit_to_flip: int = 0
 			for b in range(6):
 				if ((diff >> b) & 1) == 1:
@@ -199,17 +245,18 @@ func _process(delta: float) -> void:
 			anchor_heading = current_heading_deg
 			anchor_lux = current_lux
 			kinetic_excitation = 0.0
+			civil_fire_dwell = 0.0
 			last_mutation_time = now
 			step_mutation_count += 1
 			
 			var is_yang: bool = ((current_hex_bits >> bit_to_flip) & 1) == 1
 			var line_names: Array[String] = ["Body", "Food", "Breath", "Rest", "Focus", "Connection"]
-			var reason: String = "8x8 Synergy: Line %d (%s) ➔ %s" % [
+			var reason: String = "Martial Fire (武火): Kinetic Surge ➔ Line %d (%s) %s" % [
 				bit_to_flip + 1,
 				line_names[bit_to_flip],
 				"Ignited into Yang ⚊" if is_yang else "Yielded into Yin ⚋"
 			]
-			Input.vibrate_handheld(20)
+			Input.vibrate_handheld(25)
 			autonomous_mutation_stepped.emit(current_hex_bits, bit_to_flip, reason)
 
 
@@ -358,6 +405,85 @@ func _execute_coin_toss_cast() -> void:
 	shake_cast_completed.emit(-1, primary_moving, bits)
 
 
+func get_moon_phase() -> Dictionary:
+	var now_unix: int = int(Time.get_unix_time_from_system())
+	var synodic_month: float = 29.53058867 * 86400.0
+	var diff: float = float(now_unix - 1704974220)
+	var ratio: float = fposmod(diff, synodic_month) / synodic_month
+	var p_name: String = ""
+	var p_emoji: String = ""
+	if ratio < 0.06 or ratio >= 0.94:
+		p_name = "New Moon"
+		p_emoji = "🌑"
+	elif ratio < 0.22:
+		p_name = "Waxing Crescent"
+		p_emoji = "🌒"
+	elif ratio < 0.28:
+		p_name = "First Quarter"
+		p_emoji = "🌓"
+	elif ratio < 0.44:
+		p_name = "Waxing Gibbous"
+		p_emoji = "🌔"
+	elif ratio < 0.56:
+		p_name = "Full Moon"
+		p_emoji = "🌕"
+	elif ratio < 0.72:
+		p_name = "Waning Gibbous"
+		p_emoji = "🌖"
+	elif ratio < 0.78:
+		p_name = "Last Quarter"
+		p_emoji = "🌗"
+	else:
+		p_name = "Waning Crescent"
+		p_emoji = "🌘"
+	return {"ratio": ratio, "name": p_name, "emoji": p_emoji}
+
+
+func get_sun_cycle() -> Dictionary:
+	var period: String = ""
+	if solar_hour >= 11.0 and solar_hour <= 14.0:
+		period = "Solar Noon ☀️"
+	elif solar_hour > 14.0 and solar_hour <= 18.0:
+		period = "Afternoon Light 🌤️"
+	elif solar_hour > 18.0 and solar_hour <= 20.5:
+		period = "Dusk / Sunset 🌅"
+	elif solar_hour > 20.5 or solar_hour < 5.5:
+		period = "Night Sanctuary 🌌"
+	elif solar_hour >= 5.5 and solar_hour < 8.0:
+		period = "Dawn / Sunrise 🌄"
+	else:
+		period = "Morning Radiance ☀️"
+	return {"hour": solar_hour, "period": period}
+
+
+const HUMAN_INFO: Array[Dictionary] = [
+	{"trigram": 0, "name": "Sleep Hygiene", "zh": "坤 Earth", "icon": "🌙", "cue": "Melatonin Sanctuary & Nocturnal Stillness", "action": "Body resting horizontally in quiet darkness. Melatonin surge & cellular recovery active."},
+	{"trigram": 1, "name": "Locomotion Cadence", "zh": "震 Thunder", "icon": "⚡", "cue": "Walking Steps & Bipedal Agitation", "action": "Kinetic vitality & walking steps detected. Dynamic movement awakening spinal energy."},
+	{"trigram": 2, "name": "Metabolic Pacing", "zh": "坎 Water", "icon": "💧", "cue": "Hydration & Nutritional Window", "action": "Fluid balance and digestive pacing. Sustaining physiological depth without spikes."},
+	{"trigram": 3, "name": "Tactile Grip", "zh": "兌 Lake", "icon": "🤲", "cue": "Mindful Touch & Device Holding", "action": "Conscious tactile contact with vessel. Micro-kinetic gestures reflecting present awareness."},
+	{"trigram": 4, "name": "Deep Work Focus", "zh": "艮 Mountain", "icon": "🏔️", "cue": "Screen-Down Occlusion & Cognitive Stillness", "action": "Phone turned face-down. Digital distractions muted, sensory inputs drawn inward."},
+	{"trigram": 5, "name": "Active Screen Gaze", "zh": "離 Fire", "icon": "👁️", "cue": "Lucid Visual Engagement", "action": "Visual awareness focused on the luminous screen. Intentional cognition and lucid consultation."},
+	{"trigram": 6, "name": "Breath Equanimity", "zh": "巽 Wind", "icon": "🌬️", "cue": "Smooth Respiration & Gentle Handling", "action": "Low gyroscope jitter and steady posture. Parasympathetic nervous system coherence active."},
+	{"trigram": 7, "name": "Upright Spine", "zh": "乾 Heaven", "icon": "🏛️", "cue": "Alert Vertical Posture & Dignity", "action": "Spine aligned vertically against gravitational axis. Chest open, dignified alertness established."}
+]
+
+const MACHINE_INFO: Array[Dictionary] = [
+	{"trigram": 0, "name": "Night Sanctuary", "zh": "坤 Earth", "icon": "🌌", "hardware": "Circadian Darkness & Location Stillness", "status": "Ambient photons minimal (<20 lux). Physical location stationary and sheltered."},
+	{"trigram": 1, "name": "Power Surge", "zh": "震 Thunder", "icon": "⚡", "hardware": "Electrical Current & Thermal Surge", "status": "Charging current flowing into lithium cell or thermal excitation elevated."},
+	{"trigram": 2, "name": "Battery Energy Depth", "zh": "坎 Water", "icon": "🔋", "hardware": "Chemical Energy Depletion", "status": "Battery reserves below 25%. Electrochemical potential entering deep conservation."},
+	{"trigram": 3, "name": "Ambient Atmosphere", "zh": "兌 Lake", "icon": "🌤️", "hardware": "Barometric & Photon Environment", "status": "Balanced daylight/indoor lux (>150 lux). Pleasant atmospheric equilibrium."},
+	{"trigram": 4, "name": "Surface / Desk Rest", "zh": "艮 Mountain", "icon": "🧱", "hardware": "Horizontal Planar Ground Contact", "status": "Phone resting flat on table/desk (Gz = -9.8 m/s²). Substrate completely immobilized."},
+	{"trigram": 5, "name": "Solar Photosphere", "zh": "離 Fire", "icon": "☀️", "hardware": "Direct High-Illuminance Sunlight", "status": "Lux sensor reading > 3500 lux. Immersed in full solar spectrum photosphere."},
+	{"trigram": 6, "name": "Geomagnetic Flux", "zh": "巽 Wind", "icon": "🧭", "hardware": "Magnetic Meridian Azimuth Corridor", "status": "Magnetometer aligned with Earth's North-South magnetic corridor."},
+	{"trigram": 7, "name": "Solar Noon Apex", "zh": "乾 Heaven", "icon": "☀️", "hardware": "Circadian Solar Zenith", "status": "Local solar hour between 11:00 and 14:30. Diurnal solar cycle at maximum elevation."}
+]
+
+func get_human_info(trigram_idx: int) -> Dictionary:
+	return HUMAN_INFO[clamp(trigram_idx, 0, 7)]
+
+func get_machine_info(trigram_idx: int) -> Dictionary:
+	return MACHINE_INFO[clamp(trigram_idx, 0, 7)]
+
 func get_telemetry_snapshot() -> Dictionary:
 	return {
 		"gravity": filtered_grav,
@@ -382,5 +508,9 @@ func get_telemetry_snapshot() -> Dictionary:
 		"candidate_trigram": current_machine_tri,
 		"current_bits": current_hex_bits,
 		"candidate_bits": current_hex_bits,
-		"is_shaking": is_shaking
+		"is_shaking": is_shaking,
+		"civil_fire_dwell": civil_fire_dwell,
+		"civil_fire_ratio": clamp(civil_fire_dwell / CIVIL_FIRE_THRESHOLD, 0.0, 1.0),
+		"moon": get_moon_phase(),
+		"sun": get_sun_cycle()
 	}

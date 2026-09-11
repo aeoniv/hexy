@@ -2,6 +2,16 @@ class_name MandalaDial2D
 extends Control
 
 signal hexagram_changed(wen_index: int, hex_bits: int, hex_name: String, hex_char: String)
+signal human_station_clicked(trigram_idx: int)
+signal center_hub_clicked()
+
+# Head Mandala (Moon & Human Habit Consciousness)
+var active_human_trigram: int = 0
+var touch_down_pos: Vector2 = Vector2.ZERO
+var touch_down_time: int = 0
+var has_moved_significantly: bool = false
+
+const HUMAN_STATION_TRIGRAMS: Array[int] = [7, 3, 5, 1, 0, 4, 2, 6] # Clockwise from top: 7=Heaven, 3=Lake, 5=Fire, 1=Thunder, 0=Earth, 4=Mountain, 2=Water, 6=Wind
 
 # King Wen Hexagrams Lookup (Bits: lower 3 bits = lower trigram, upper 3 bits = upper trigram)
 # Trigram mapping: 0=Earth (坤), 1=Thunder (震), 2=Water (坎), 3=Lake (兌), 4=Mountain (艮), 5=Fire (離), 6=Wind (巽), 7=Heaven (乾)
@@ -80,12 +90,24 @@ func _draw() -> void:
 	var arrow_p2 := top_pt + Vector2(8, -12)
 	draw_colored_polygon(PackedVector2Array([top_pt, arrow_p1, arrow_p2]), Color(0.95, 0.75, 0.2, 0.95))
 	
+	# 8 Human Habit Stations on the dial perimeter
+	for s in range(8):
+		var st_tri: int = HUMAN_STATION_TRIGRAMS[s]
+		var st_ang: float = -TAU * 0.25 + float(s) * (TAU / 8.0)
+		var st_pos := dial_center + Vector2(cos(st_ang), sin(st_ang)) * (dial_radius * 0.72)
+		var is_active: bool = (st_tri == active_human_trigram)
+		var node_r: float = 8.0 if is_active else 5.0
+		var node_col: Color = Color(1.0, 0.85, 0.25, 0.95) if is_active else Color(0.3, 0.6, 0.8, 0.6)
+		if is_active:
+			draw_circle(st_pos, node_r + 4.0, Color(1.0, 0.85, 0.25, 0.35))
+		draw_circle(st_pos, node_r, node_col)
+	
 	# Center Hub (Circle)
 	var hub_r := dial_radius * 0.48
 	draw_circle(dial_center, hub_r, Color(0.06, 0.09, 0.14, 0.92))
 	draw_arc(dial_center, hub_r, 0, TAU, 32, Color(0.2, 0.7, 0.9, 0.8), 2.0, true)
 	
-	# Draw Hexagram Lines inside Center Hub
+	# Draw Hexagram Lines inside Center Hub (Head=Gold over Body=Cyan)
 	var cur_data: Dictionary = KING_WEN_DATA[current_hex_index]
 	var bits: int = cur_data["bits"]
 	var line_w: float = hub_r * 1.1
@@ -96,7 +118,8 @@ func _draw() -> void:
 	for line_idx in range(6):
 		var y: float = start_y - float(line_idx) * (line_h + line_gap)
 		var is_yang: bool = ((bits >> line_idx) & 1) == 1
-		var col := Color(0.95, 0.75, 0.2) if is_yang else Color(0.25, 0.75, 0.95)
+		var is_upper: bool = line_idx >= 3
+		var col: Color = (Color(1.0, 0.82, 0.25) if is_yang else Color(0.75, 0.58, 0.2)) if is_upper else (Color(0.25, 0.85, 1.0) if is_yang else Color(0.18, 0.55, 0.85))
 		
 		if is_yang:
 			# Solid Line
@@ -109,38 +132,68 @@ func _draw() -> void:
 			draw_line(Vector2(dial_center.x + gap * 0.5, y), Vector2(dial_center.x + half_span, y), col, line_h)
 
 func _gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			if event.pressed:
-				is_dragging_dial = true
-				var dir: Vector2 = event.position - dial_center
-				drag_start_angle = dir.angle() - dial_angle
-			else:
-				is_dragging_dial = false
-				_snap_to_closest()
+	var is_press: bool = false
+	var is_release: bool = false
+	var is_move: bool = false
+	var ev_pos: Vector2 = Vector2.ZERO
+
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		ev_pos = event.position
+		is_press = event.pressed
+		is_release = not event.pressed
 	elif event is InputEventScreenTouch:
-		if event.pressed:
-			is_dragging_dial = true
-			var dir: Vector2 = event.position - dial_center
-			drag_start_angle = dir.angle() - dial_angle
-		else:
-			is_dragging_dial = false
-			_snap_to_closest()
+		ev_pos = event.position
+		is_press = event.pressed
+		is_release = not event.pressed
 	elif event is InputEventMouseMotion or event is InputEventScreenDrag:
-		if is_dragging_dial:
-			var dir: Vector2 = event.position - dial_center
-			var new_ang: float = dir.angle() - drag_start_angle
-			var delta_a: float = new_ang - dial_angle
-			dial_angle = new_ang
-			queue_redraw()
-			
-			# Step hexagram when rotated enough
-			var step_rad := TAU / 32.0
-			var new_idx = posmod(int(round(-dial_angle / step_rad)), KING_WEN_DATA.size())
-			if new_idx != current_hex_index:
-				current_hex_index = new_idx
-				_emit_current()
-				Input.vibrate_handheld(12)
+		ev_pos = event.position
+		is_move = true
+
+	if is_press:
+		is_dragging_dial = true
+		touch_down_pos = ev_pos
+		touch_down_time = int(Time.get_ticks_msec())
+		has_moved_significantly = false
+		var dir: Vector2 = ev_pos - dial_center
+		drag_start_angle = dir.angle() - dial_angle
+	elif is_release:
+		is_dragging_dial = false
+		var move_dist: float = (ev_pos - touch_down_pos).length()
+		var tap_duration: int = int(Time.get_ticks_msec()) - touch_down_time
+		if move_dist < 18.0 and tap_duration < 380:
+			# Detected a tap!
+			var v: Vector2 = ev_pos - dial_center
+			var dist: float = v.length()
+			var hub_r: float = dial_radius * 0.48
+			if dist < hub_r:
+				center_hub_clicked.emit()
+				Input.vibrate_handheld(25)
+			elif dist <= dial_radius * 1.25:
+				# Map tap angle to one of the 8 Human Habit Stations
+				var ang: float = fposmod(v.angle() + (TAU * 0.25) + (TAU / 16.0), TAU)
+				var st_idx: int = int(ang / (TAU / 8.0)) % 8
+				var tri_idx: int = HUMAN_STATION_TRIGRAMS[st_idx]
+				active_human_trigram = tri_idx
+				queue_redraw()
+				human_station_clicked.emit(tri_idx)
+				Input.vibrate_handheld(20)
+		else:
+			_snap_to_closest()
+	elif is_move and is_dragging_dial:
+		if (ev_pos - touch_down_pos).length() > 18.0:
+			has_moved_significantly = true
+		var dir: Vector2 = ev_pos - dial_center
+		var new_ang: float = dir.angle() - drag_start_angle
+		dial_angle = new_ang
+		queue_redraw()
+		
+		# Step hexagram when rotated enough
+		var step_rad := TAU / 32.0
+		var new_idx = posmod(int(round(-dial_angle / step_rad)), KING_WEN_DATA.size())
+		if new_idx != current_hex_index:
+			current_hex_index = new_idx
+			_emit_current()
+			Input.vibrate_handheld(12)
 
 func _snap_to_closest() -> void:
 	var step_rad := TAU / 32.0

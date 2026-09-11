@@ -51,6 +51,10 @@ func _ready() -> void:
 	
 	if mandala_dial.has_signal("hexagram_changed"):
 		mandala_dial.connect("hexagram_changed", Callable(self, "_on_hexagram_changed"))
+	if mandala_dial.has_signal("human_station_clicked"):
+		mandala_dial.human_station_clicked.connect(_on_human_station_clicked)
+	if mandala_dial.has_signal("center_hub_clicked"):
+		mandala_dial.center_hub_clicked.connect(_on_center_hub_clicked)
 	
 	sensor_oracle = SensorOracle.new()
 	add_child(sensor_oracle)
@@ -86,6 +90,8 @@ func setup_creature(creature: Node3D, mandala: Node3D = null) -> void:
 			creature_node.sensor_mode_enabled = is_sensor_mode
 		if creature_node.has_method("get_current_geometry_name"):
 			btn_geo_toggle.text = creature_node.get_current_geometry_name()
+		if creature_node.has_signal("machine_node_clicked"):
+			creature_node.machine_node_clicked.connect(_on_machine_node_clicked)
 	if mandala_dial:
 		var cur_data: Dictionary = mandala_dial.KING_WEN_DATA[mandala_dial.current_hex_index]
 		if creature_node.has_method("set_hexagram"):
@@ -101,13 +107,17 @@ func _on_cast_mode_toggle_pressed() -> void:
 
 func _update_cast_mode_ui() -> void:
 	if is_sensor_mode:
-		btn_cast_mode.text = "🪙 SENSOR CAST"
+		btn_cast_mode.text = "🔥 HUOHOUTU"
 		btn_cast_mode.modulate = Color(1.0, 0.7, 0.2)
-		btn_cast.text = "🎲 SHAKE / TOSS"
+		btn_cast.text = "🎲 MARTIAL SHAKE"
 		btn_cast.modulate = Color(1.0, 0.75, 0.2)
 		if creature_node and "sensor_mode_enabled" in creature_node:
 			creature_node.sensor_mode_enabled = true
-		lbl_thought.text = "🪙 Real-World Sensor Casting Active! Shake phone, tilt gravity vector, or orient heading to mutate 64 hexagrams."
+		var moon: Dictionary = sensor_oracle.get_moon_phase() if sensor_oracle else {}
+		var sun: Dictionary = sensor_oracle.get_sun_cycle() if sensor_oracle else {}
+		lbl_thought.text = "🔥 Huohoutu Mode: Head (%s) tracks human habits; Body (%s) tracks machine. Hold still 2.5s for Civil Fire, or shake for Martial Fire." % [
+			moon.get("emoji", "🌙"), sun.get("period", "☀️")
+		]
 	else:
 		btn_cast_mode.text = "🖐️ MANUAL"
 		btn_cast_mode.modulate = Color(0.7, 0.8, 1.0)
@@ -115,7 +125,7 @@ func _update_cast_mode_ui() -> void:
 		btn_cast.modulate = Color(0.5, 0.9, 1.0)
 		if creature_node and "sensor_mode_enabled" in creature_node:
 			creature_node.sensor_mode_enabled = false
-		lbl_thought.text = "🖐️ Manual Dial Mode. Rotate bottom wheel or tap Prev/Next to inspect all 64 King Wen archetypes."
+		lbl_thought.text = "🖐️ Manual Dial Mode: Tap Head stations (Moon) or Body nodes (Sun) to inspect, or rotate the wheel to browse all 64 King Wen archetypes."
 
 func _on_shake_started() -> void:
 	lbl_thought.text = "🪙 Divination vessel shaking... Rattling coins in sacred motion..."
@@ -146,9 +156,54 @@ func _on_autonomous_mutation_stepped(new_bits: int, moving_line: int, reason: St
 	var cur: Dictionary = mandala_dial.KING_WEN_DATA[dial_idx]
 	if creature_node and creature_node.has_method("set_hexagram"):
 		creature_node.set_hexagram(new_bits, moving_line)
-	lbl_thought.text = "🌊 Autonomous Mutation: #%d %s '%s'\n%s" % [
-		cur["wen"], cur["zh"], cur["name"], reason
+	
+	var moon: Dictionary = sensor_oracle.get_moon_phase() if sensor_oracle else {}
+	var sun: Dictionary = sensor_oracle.get_sun_cycle() if sensor_oracle else {}
+	var hum_name: String = SensorOracle.HUMAN_NAMES[(new_bits >> 3) & 0x07]
+	var mach_name: String = SensorOracle.MACHINE_NAMES[new_bits & 0x07]
+	
+	lbl_thought.text = "🔥 HUOHOUTU (火候圖) ALCHEMY:\n• HEAD [神 %s]: %s\n• BODY [精 %s]: %s\n• Manifested: #%d %s '%s' (0b%06s)\n• %s" % [
+		moon.get("emoji", "🌙"), hum_name,
+		sun.get("period", "☀️"), mach_name,
+		cur["wen"], cur["zh"], cur["name"],
+		String.num_int64(new_bits, 2).pad_zeros(6),
+		reason
 	]
+
+func _on_human_station_clicked(tri_idx: int) -> void:
+	if not sensor_oracle:
+		return
+	var info: Dictionary = sensor_oracle.get_human_info(tri_idx)
+	var name_str: String = info.get("name", "Habit")
+	var zh_str: String = info.get("zh", "")
+	var cue_str: String = info.get("cue", "")
+	var act_str: String = info.get("action", "")
+	var moon: Dictionary = sensor_oracle.get_moon_phase()
+	var moon_str: String = "%s %s" % [moon.get("emoji", "🌙"), moon.get("name", "Moon")]
+	
+	lbl_thought.text = "🌙 HEAD · 神 SHEN (%s · Upper Trigram):\n• %s %s: %s\n• Guidance: %s" % [
+		moon_str, zh_str, name_str, cue_str, act_str
+	]
+
+func _on_machine_node_clicked(tri_idx: int) -> void:
+	if not sensor_oracle:
+		return
+	var info: Dictionary = sensor_oracle.get_machine_info(tri_idx)
+	var name_str: String = info.get("name", "Substrate")
+	var zh_str: String = info.get("zh", "")
+	var hw_str: String = info.get("hardware", "")
+	var stat_str: String = info.get("status", "")
+	var sun: Dictionary = sensor_oracle.get_sun_cycle()
+	var sun_str: String = sun.get("period", "Sun")
+	var telem: Dictionary = sensor_oracle.get_telemetry_snapshot()
+	
+	lbl_thought.text = "☀️ BODY · 精 JING (%s · Lower Trigram):\n• %s %s: %s\n• Telemetry: %s (Lux: %.0f, Bat: %.0f%%)" % [
+		sun_str, zh_str, name_str, hw_str, stat_str,
+		telem.get("lux", 0.0), telem.get("battery", 100.0)
+	]
+
+func _on_center_hub_clicked() -> void:
+	_on_ask_pressed()
 
 func _on_mnn_chat_token(token: String) -> void:
 	thought_bubble.visible = true
@@ -175,6 +230,9 @@ func _on_autonomous_thought_requested(prompt: String) -> void:
 
 var last_telemetry_data: Dictionary = {}
 func _on_sensor_telemetry_updated(g: Vector3, heading: float, jerk: float, lower_tri: int, upper_tri: int) -> void:
+	if mandala_dial:
+		mandala_dial.active_human_trigram = upper_tri
+		mandala_dial.queue_redraw()
 	if sensor_oracle:
 		var snap: Dictionary = sensor_oracle.get_telemetry_snapshot()
 		if mandala_3d_node and mandala_3d_node.has_method("update_telemetry"):

@@ -1,5 +1,10 @@
-class_name CreatureBall3D
+﻿class_name CreatureBall3D
 extends Node3D
+
+signal machine_node_clicked(node_idx: int)
+
+var touch_press_pos: Vector2 = Vector2.ZERO
+var touch_press_time: int = 0
 
 ## Tensegrity Cybernetics Visualizer:
 ## 1. Icosahedron: Exact canonical 6-strut 24-cord tensegrity from commit 3215119
@@ -634,15 +639,49 @@ func _process(delta: float) -> void:
 	_update_geometry(t)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventScreenTouch:
-		if event.pressed:
-			is_dragging = true
-			drag_last_pos = event.position
-		else:
-			is_dragging = false
-	elif event is InputEventScreenDrag and is_dragging:
-		var delta_pos: Vector2 = event.position - drag_last_pos
-		drag_last_pos = event.position
+	var pos: Vector2 = Vector2.ZERO
+	var is_press: bool = false
+	var is_release: bool = false
+	var is_move: bool = false
+	
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		pos = event.position
+		is_press = event.pressed
+		is_release = !event.pressed
+	elif event is InputEventScreenTouch:
+		pos = event.position
+		is_press = event.pressed
+		is_release = !event.pressed
+	elif event is InputEventMouseMotion or event is InputEventScreenDrag:
+		pos = event.position
+		is_move = true
+
+	if is_press:
+		is_dragging = true
+		drag_last_pos = pos
+		touch_press_pos = pos
+		touch_press_time = int(Time.get_ticks_msec())
+	elif is_release:
+		is_dragging = false
+		var dist: float = (pos - touch_press_pos).length()
+		var dur: int = int(Time.get_ticks_msec()) - touch_press_time
+		if dist < 22.0 and dur < 380:
+			# Tap on 3D Body Creature sphere!
+			var vp_size: Vector2 = get_viewport().get_visible_rect().size
+			var center := Vector2(vp_size.x * 0.5, vp_size.y * 0.40)
+			var v := pos - center
+			if v.length() < vp_size.x * 0.48:
+				# Map tap angle to one of the 8 Machine Substrates:
+				# 7=Heaven(Top/Noon), 3=Lake(NE), 5=Fire(East/Lux), 1=Thunder(SE/Surge), 0=Earth(South/Night), 4=Mountain(SW/Desk), 2=Water(West/Battery), 6=Wind(NW/Flux)
+				const MACHINE_STATION_TRIGRAMS: Array[int] = [7, 3, 5, 1, 0, 4, 2, 6]
+				var ang: float = fposmod(v.angle() + (TAU * 0.25) + (TAU / 16.0), TAU)
+				var st_idx: int = int(ang / (TAU / 8.0)) % 8
+				var mach_tri: int = MACHINE_STATION_TRIGRAMS[st_idx]
+				Input.vibrate_handheld(20)
+				machine_node_clicked.emit(mach_tri)
+	elif is_move and is_dragging:
+		var delta_pos: Vector2 = pos - drag_last_pos
+		drag_last_pos = pos
 		rot_velocity = delta_pos * 0.008
 		current_rot.x += rot_velocity.x
 		current_rot.y += rot_velocity.y
