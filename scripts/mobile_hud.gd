@@ -93,30 +93,29 @@ func setup_creature(creature: Node3D, mandala: Node3D = null) -> void:
 
 func _process(_delta: float) -> void:
 	lbl_fps.text = "%d FPS" % Engine.get_frames_per_second()
-	if sensor_oracle and mandala_3d_node and mandala_3d_node.has_method("update_telemetry"):
-		mandala_3d_node.update_telemetry(sensor_oracle.get_telemetry_snapshot())
 
 func _on_cast_mode_toggle_pressed() -> void:
 	is_sensor_mode = !is_sensor_mode
 	_update_cast_mode_ui()
-	Input.vibrate_handheld(30)
+	Input.vibrate_handheld(35)
 
 func _update_cast_mode_ui() -> void:
-	if sensor_oracle:
-		sensor_oracle.set_enabled(is_sensor_mode)
-	if creature_node and "sensor_mode_enabled" in creature_node:
-		creature_node.sensor_mode_enabled = is_sensor_mode
-		
 	if is_sensor_mode:
-		btn_cast_mode.text = "🌊 SENSORS"
-		btn_cast_mode.modulate = Color(0.3, 1.0, 0.7)
-		btn_cast.text = "🌊 Shake to Cast"
-		lbl_thought.text = "🌊 SENSORS ACTIVE: Shake phone to cast hexagram. Tilt device to physically flex tensegrity structure."
+		btn_cast_mode.text = "🪙 SENSOR CAST"
+		btn_cast_mode.modulate = Color(1.0, 0.7, 0.2)
+		btn_cast.text = "🎲 SHAKE / TOSS"
+		btn_cast.modulate = Color(1.0, 0.75, 0.2)
+		if creature_node and "sensor_mode_enabled" in creature_node:
+			creature_node.sensor_mode_enabled = true
+		lbl_thought.text = "🪙 Real-World Sensor Casting Active! Shake phone, tilt gravity vector, or orient heading to mutate 64 hexagrams."
 	else:
 		btn_cast_mode.text = "🖐️ MANUAL"
-		btn_cast_mode.modulate = Color(0.9, 0.9, 1.0)
-		btn_cast.text = "🪙 Cast Oracle"
-		lbl_thought.text = "🖐️ MANUAL ACTIVE: Drag mandala dial to select hexagram. Tap 'Cast Oracle' for classical divination."
+		btn_cast_mode.modulate = Color(0.7, 0.8, 1.0)
+		btn_cast.text = "🎲 RANDOM CAST"
+		btn_cast.modulate = Color(0.5, 0.9, 1.0)
+		if creature_node and "sensor_mode_enabled" in creature_node:
+			creature_node.sensor_mode_enabled = false
+		lbl_thought.text = "🖐️ Manual Dial Mode. Rotate bottom wheel or tap Prev/Next to inspect all 64 King Wen archetypes."
 
 func _on_shake_started() -> void:
 	lbl_thought.text = "🪙 Divination vessel shaking... Rattling coins in sacred motion..."
@@ -147,8 +146,7 @@ func _on_autonomous_mutation_stepped(new_bits: int, moving_line: int, reason: St
 	var cur: Dictionary = mandala_dial.KING_WEN_DATA[dial_idx]
 	if creature_node and creature_node.has_method("set_hexagram"):
 		creature_node.set_hexagram(new_bits, moving_line)
-	lbl_thought.text = "🌊 Autonomous Mutation: #%d %s '%s'
-%s" % [
+	lbl_thought.text = "🌊 Autonomous Mutation: #%d %s '%s'\n%s" % [
 		cur["wen"], cur["zh"], cur["name"], reason
 	]
 
@@ -161,11 +159,13 @@ func _on_mnn_chat_done(full_text: String) -> void:
 		creature_node.set_thinking(false)
 	if mandala_3d_node and mandala_3d_node.has_method("set_thinking"):
 		mandala_3d_node.set_thinking(false)
-	lbl_thought.text = "💬 Qwen (%s):\n%s" % [mnn.backend_name(), full_text]
+	lbl_thought.text = "💬 Qwen %s [%s Tier - %s]:\n%s" % [
+		mnn.short_name(), mnn.tier_name(), mnn.backend_name(), full_text
+	]
 
 func _on_autonomous_thought_requested(prompt: String) -> void:
 	if mnn and mnn.chat_ready():
-		lbl_thought.text = "🧠 Autonomous Reflection:\n"
+		lbl_thought.text = "🧠 Autonomous Reflection (%s [%s Tier]):\n" % [mnn.short_name(), mnn.tier_name()]
 		thought_bubble.visible = true
 		if creature_node and creature_node.has_method("set_thinking"):
 			creature_node.set_thinking(true)
@@ -289,25 +289,30 @@ func _on_cast_pressed() -> void:
 func _on_ask_pressed() -> void:
 	Input.vibrate_handheld(20)
 	var cur: Dictionary = mandala_dial.KING_WEN_DATA[mandala_dial.current_hex_index]
+	var moving: int = (cur["wen"] % 6) + 1
+	var need_names := ["Body", "Food", "Breath", "Rest", "Focus", "Connection"]
+	var changing_need: String = need_names[moving - 1]
 	
 	var prompt: String
 	if is_enhanced_mode:
-		lbl_thought.text = "🧠 Consulting MNN Enhanced (Structural)...
-Hexagram #%d %s (0b%06s)" % [cur["wen"], cur["name"], String.num_int64(cur["bits"], 2).pad_zeros(6)]
-		prompt = "Explain I-Ching Hexagram #%d (%s, %s): Binary 0b%06s. Moving line %d mutating structure. Analyze polarity balance and structural guidance." % [
+		lbl_thought.text = "🧠 Consulting Qwen %s [%s Tier]...\nHexagram #%d %s (0b%06s) • Moving Line %d (%s)" % [
+			mnn.short_name(), mnn.tier_name(),
+			cur["wen"], cur["name"],
+			String.num_int64(cur["bits"], 2).pad_zeros(6),
+			moving, changing_need
+		]
+		prompt = "You are Hexy, a worn cybernetic companion building discipline by sensing the body. Current King Wen Hexagram is #%d (%s '%s', bits 0b%06s). Changing line is Line %d (%s need). Give a concise 2-sentence reflection grounding discipline and embodied balance in this hexagram's archetype." % [
 			cur["wen"], cur["zh"], cur["name"],
 			String.num_int64(cur["bits"], 2).pad_zeros(6),
-			(cur["wen"] % 6) + 1
+			moving, changing_need
 		]
 	else:
-		lbl_thought.text = "☯ Consulting MNN Pure (I-Ching Persona)...
-Hexagram #%d %s" % [cur["wen"], cur["name"]]
-		prompt = "You are the ancient I-Ching oracle. In character as the Book of Changes, speak poetically and provide concise wisdom on Hexagram #%d %s (%s)." % [
+		lbl_thought.text = "☯ Consulting I-Ching Persona (%s)...\nHexagram #%d %s" % [mnn.short_name(), cur["wen"], cur["name"]]
+		prompt = "You are the ancient Book of Changes oracle. Speak in brief poetic wisdom on Hexagram #%d %s (%s). Two sentences maximum." % [
 			cur["wen"], cur["zh"], cur["name"]
 		]
 	
 	thought_bubble.visible = true
-	lbl_thought.text = "🧠 Consulting Qwen (%s - %s)...\n" % [mnn.backend_name(), "ENHANCED" if is_enhanced_mode else "PURE"]
 	if creature_node and creature_node.has_method("set_thinking"):
 		creature_node.set_thinking(true)
 	if mandala_3d_node and mandala_3d_node.has_method("set_thinking"):
@@ -337,14 +342,23 @@ func _switch_mode(mode: String) -> void:
 		var v1: PackedFloat32Array = mnn.embed("hexy iching consultation")
 		var v2: PackedFloat32Array = mnn.embed("hexy iching consultation")
 		var sim: float = MnnRuntime.cosine(v1, v2)
-		lbl_thought.text = "🧠 MNN Neural Brain Space:
-Mode: %s
-Embed Dimension: %d
-Self-Cosine Similarity: %.4f
-Backend: %s
-Model: %s" % [
-			"ENHANCED" if is_enhanced_mode else "PURE",
-			mnn.embed_start(), sim, mnn.backend_name(), mnn.chat_model()
+		var lane: Dictionary = mnn.model_info()
+		var skipped_text := ""
+		if lane.has("skipped_higher") and lane["skipped_higher"].size() > 0:
+			skipped_text = "\n• RAM Gate Guard: " + ", ".join(lane["skipped_higher"])
+		lbl_thought.text = """🧠 MNN NEURAL BRAIN SPACE (RAM-GATED):
+• Model Tier: %s [%s]
+• Active Weights: %s
+• Device RAM: %.2f GB (%s)
+• Embedder: GTE Multilingual (%d-dim, cosine: %.4f)
+• Backend: %s JNI Bridge%s
+• Engine: Qwen3 / Qwen3.5 On-Device Core""" % [
+			mnn.tier_name(), mnn.short_name(),
+			mnn.chat_model(),
+			mnn.detected_ram_gb(), "Gated" if mnn.is_gated() else "Direct",
+			mnn.embed_dim(), sim,
+			mnn.backend_name().to_upper(),
+			skipped_text
 		]
 	elif mode == "telemetry":
 		mandala_container.visible = false
