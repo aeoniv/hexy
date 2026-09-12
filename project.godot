@@ -36,4 +36,4 @@ textures/vram_compression/import_etc2_astc=true
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/ixmnn/plugin.cfg")
+enabled=PackedStringArray("res://addons/ixmesh/plugin.cfg", "res://addons/ixmnn/plugin.cfg")

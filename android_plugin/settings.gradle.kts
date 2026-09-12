@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "ixhexy"
 include(":ixmnn")
+include(":ixmesh")

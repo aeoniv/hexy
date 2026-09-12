@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+	<application>
+		<!-- How Godot discovers the plugin. Without this meta-data the aar ships
+		     but GodotPluginRegistry never sees it and Engine.has_singleton("IxMesh")
+		     is false on device, so MeshPeer silently falls back to LAN.
+		     The name after the v2 prefix is the singleton name GDScript looks up
+		     (matches getPluginName()); the value is the init class. -->
+		<meta-data
+			android:name="org.godotengine.plugin.v2.IxMesh"
+			android:value="com.ix64.hexy.mesh.IxMesh" />
+	</application>
+</manifest>
