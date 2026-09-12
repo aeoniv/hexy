@@ -153,44 +153,11 @@ func _render_mandala(t: float) -> void:
 	var r_human: float = radius * 1.02    # Outer Orbit (~0.55)
 	
 	# -------------------------------------------------------------
-	# 1. DUAL CELESTIAL ORBITS (Inner Machine & Outer Human Rings)
+	# 1. 3D INTERNAL AURA (Big Dial rendered in crisp 2D on HUD)
 	# -------------------------------------------------------------
-	# Outer Ring (Human Activity Discipline Ring)
-	var human_ring_col := Color(0.95, 0.75, 0.25, 0.35)
-	_add_circle(Vector3.ZERO, r_human, 64, human_ring_col)
-	
-	# Inner Ring (Machine Substrate Environment Ring)
-	var machine_ring_col := Color(0.15, 0.85, 0.95, 0.35)
-	_add_circle(Vector3.ZERO, r_machine, 48, machine_ring_col)
-
-	# 64 Hexagram Ticks on Outer Orbit
-	for i in range(64):
-		var th1: float = (float(i) / 64.0) * TAU
-		var is_major: bool = (i % 8 == 0)
-		var tick_len: float = 0.024 if is_major else 0.012
-		var tick_col := Color(1.0, 0.85, 0.35, 0.8) if is_major else Color(0.4, 0.65, 0.8, 0.25)
-		var p1 := Vector3(cos(th1) * r_outer, sin(th1) * r_outer, 0.0)
-		var p2 := Vector3(cos(th1) * (r_outer - tick_len), sin(th1) * (r_outer - tick_len), 0.0)
-		_add_line(p1, p2, tick_col)
-
-	# Compass North Pointer
-	var north_rad: float = deg_to_rad(heading_deg - 90.0)
-	var north_tip := Vector3(cos(north_rad) * (r_human + 0.045), sin(north_rad) * (r_human + 0.045), 0.0)
-	var north_left := Vector3(cos(north_rad - 0.07) * (r_human - 0.015), sin(north_rad - 0.07) * (r_human - 0.015), 0.0)
-	var north_right := Vector3(cos(north_rad + 0.07) * (r_human - 0.015), sin(north_rad + 0.07) * (r_human - 0.015), 0.0)
-	var north_col := Color(0.2, 1.0, 0.8, 0.9)
-	_add_line(north_left, north_tip, north_col)
-	_add_line(north_tip, north_right, north_col)
-
-	# Body Dial Pointer (Cyan triangle indicating active Body hexagram in BODY_64 sequence)
-	var body_rad: float = -PI * 0.5 + (float(body_hex_index) / 64.0) * TAU
-	var body_tip := Vector3(cos(body_rad) * (r_human + 0.055), sin(body_rad) * (r_human + 0.055), 0.0)
-	var body_l := Vector3(cos(body_rad - 0.08) * (r_human - 0.015), sin(body_rad - 0.08) * (r_human - 0.015), 0.0)
-	var body_r := Vector3(cos(body_rad + 0.08) * (r_human - 0.015), sin(body_rad + 0.08) * (r_human - 0.015), 0.0)
-	var body_pointer_col := Color(0.15, 0.95, 1.0, 0.95)
-	_add_line(body_l, body_tip, body_pointer_col)
-	_add_line(body_tip, body_r, body_pointer_col)
-	_add_line(body_r, body_l, body_pointer_col)
+	# Subtle inner energy orbit framing tensegrity core
+	var machine_ring_col := Color(0.15, 0.85, 0.95, 0.20)
+	_add_circle(Vector3.ZERO, r_machine, 36, machine_ring_col)
 
 	# -------------------------------------------------------------
 	# 2. 8 INNER MACHINE SUBSTRATE NODES & 8 OUTER HUMAN NODES

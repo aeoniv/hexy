@@ -21,6 +21,8 @@ const SensorOracle = preload("res://scripts/sensor_oracle.gd")
 @onready var thought_bubble: PanelContainer = $ThoughtBubble
 @onready var lbl_thought: Label = $ThoughtBubble/Margin/ThoughtLabel
 
+@onready var body_dial_container: Control = $BodyMandalaContainer
+@onready var body_dial: Control = $BodyMandalaContainer/BodyDial
 @onready var mandala_container: Control = $MandalaContainer
 @onready var mandala_dial: Control = $MandalaContainer/Dial
 
@@ -52,6 +54,13 @@ func _ready() -> void:
 	mnn.chat_start()
 	mnn.chat_token.connect(_on_mnn_chat_token)
 	mnn.chat_done.connect(_on_mnn_chat_done)
+	
+	if has_node("BodyMandalaContainer/BodyDial"):
+		var b_dial: Control = get_node("BodyMandalaContainer/BodyDial")
+		if b_dial.has_signal("body_hexagram_changed"):
+			b_dial.connect("body_hexagram_changed", Callable(self, "_on_body_hexagram_changed"))
+		if b_dial.has_signal("machine_station_clicked"):
+			b_dial.connect("machine_station_clicked", Callable(self, "_on_machine_node_clicked"))
 	
 	if mandala_dial.has_signal("hexagram_changed"):
 		mandala_dial.connect("hexagram_changed", Callable(self, "_on_hexagram_changed"))
@@ -106,6 +115,10 @@ func setup_creature(creature: Node3D, mandala: Node3D = null) -> void:
 			creature_node.set_hexagram(body_data["bits"], 3)
 	if mandala_3d_node and mandala_3d_node.has_method("set_body_hexagram"):
 		mandala_3d_node.set_body_hexagram(body_hex_id, 0)
+	if has_node("BodyMandalaContainer/BodyDial"):
+		var b_dial: Control = get_node("BodyMandalaContainer/BodyDial")
+		if b_dial.has_method("select_by_id"):
+			b_dial.select_by_id(body_hex_id)
 	if mandala_dial:
 		mandala_dial.select_by_id(head_hex_id)
 	_update_huohoutu_ui()
@@ -140,6 +153,10 @@ func _on_shake_cast_completed(_wen: int, moving_line: int, hex_bits: int) -> voi
 		creature_node.set_hexagram(hex_bits, moving_line)
 	if mandala_3d_node and mandala_3d_node.has_method("set_body_hexagram"):
 		mandala_3d_node.set_body_hexagram(body_hex_id, body_idx)
+	if has_node("BodyMandalaContainer/BodyDial"):
+		var b_dial: Control = get_node("BodyMandalaContainer/BodyDial")
+		if b_dial.has_method("select_by_id"):
+			b_dial.select_by_id(body_hex_id)
 	_update_huohoutu_ui("Martial Fire Shake: Body Tensegrity Transmuted")
 
 func _on_autonomous_mutation_stepped(new_bits: int, moving_line: int, reason: String) -> void:
@@ -151,9 +168,13 @@ func _on_autonomous_mutation_stepped(new_bits: int, moving_line: int, reason: St
 	# 1. Morph the 3D Tensegrity Structure!
 	if creature_node and creature_node.has_method("set_hexagram"):
 		creature_node.set_hexagram(new_bits, moving_line)
-	# 2. Rotate the 3D Body Dial Pointer!
+	# 2. Rotate the 3D Body Dial Pointer & Big 2D Body Dial!
 	if mandala_3d_node and mandala_3d_node.has_method("set_body_hexagram"):
 		mandala_3d_node.set_body_hexagram(body_hex_id, body_idx)
+	if has_node("BodyMandalaContainer/BodyDial"):
+		var b_dial: Control = get_node("BodyMandalaContainer/BodyDial")
+		if b_dial.has_method("select_by_id"):
+			b_dial.select_by_id(body_hex_id)
 	
 	_update_huohoutu_ui(reason)
 
@@ -217,6 +238,10 @@ func _on_autonomous_thought_requested(prompt: String) -> void:
 
 var last_telemetry_data: Dictionary = {}
 func _on_sensor_telemetry_updated(g: Vector3, heading: float, jerk: float, lower_tri: int, upper_tri: int) -> void:
+	if has_node("BodyMandalaContainer/BodyDial"):
+		var b_dial: Control = get_node("BodyMandalaContainer/BodyDial")
+		if b_dial.has_method("set_active_machine_trigram"):
+			b_dial.set_active_machine_trigram(lower_tri)
 	if mandala_dial:
 		mandala_dial.active_human_trigram = upper_tri
 		mandala_dial.queue_redraw()
@@ -302,6 +327,16 @@ func _update_mode_ui() -> void:
 		if creature_node:
 			creature_node.visible = false
 		lbl_thought.text = "☯ Mode: PURE (I-Ching Character Persona). Qwen acts strictly as the Book of Changes oracle persona without structural tensegrity math."
+
+func _on_body_hexagram_changed(wen: int, bits: int, _hex_name: String, _zh: String) -> void:
+	body_hex_id = wen
+	var moving_line: int = (wen % 6)
+	if creature_node and creature_node.has_method("set_hexagram"):
+		creature_node.set_hexagram(bits, moving_line)
+	if mandala_3d_node and mandala_3d_node.has_method("set_body_hexagram"):
+		var b_idx: int = HuohoutuData.find_body_index_by_id(body_hex_id)
+		mandala_3d_node.set_body_hexagram(body_hex_id, b_idx)
+	_update_huohoutu_ui("Body Dial Rotated: Tensegrity Transmuted")
 
 func _on_hexagram_changed(wen: int, bits: int, _hex_name: String, _zh: String) -> void:
 	# Manual Head Dial casting changes the very hexagram (Oracle reading & card)

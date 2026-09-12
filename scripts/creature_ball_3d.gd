@@ -632,10 +632,12 @@ func _process(delta: float) -> void:
 			rot_velocity = rot_velocity.lerp(Vector2(0.006, 0.003), delta * 2.0)
 		gravity_strain = gravity_strain.lerp(Vector3.ZERO, delta * 3.0)
 	
-	# Canonical Front Presentation Orientation with gentle organic breath (No touch tumbling)
+	# Real Physical Sensor Orientation with natural organic breath (No touch tumbling)
+	current_rot.x = fmod(current_rot.x, TAU)
+	current_rot.y = clamp(current_rot.y, -PI * 0.45, PI * 0.45)
 	transform.basis = Basis()
-	rotate_y(0.24 + sin(t * 0.4) * 0.08)
-	rotate_x(0.18 + cos(t * 0.3) * 0.05)
+	rotate_y(current_rot.x + sin(t * 0.4) * 0.04)
+	rotate_x(current_rot.y + cos(t * 0.3) * 0.03)
 	
 	_update_geometry(t)
 

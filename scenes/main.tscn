@@ -1,9 +1,10 @@
-[gd_scene load_steps=7 format=3 uid="uid://c1hexymain0"]
+[gd_scene load_steps=8 format=3 uid="uid://c1hexymain0"]
 
 [ext_resource type="Script" path="res://scripts/main_app.gd" id="1_app"]
 [ext_resource type="Script" path="res://scripts/creature_ball_3d.gd" id="2_creature"]
 [ext_resource type="Script" path="res://scripts/mobile_hud.gd" id="3_hud"]
 [ext_resource type="Script" path="res://scripts/mandala_dial_2d.gd" id="4_dial"]
+[ext_resource type="Script" path="res://scripts/body_dial_2d.gd" id="5_body_dial"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -208,6 +209,30 @@ theme_override_colors/font_color = Color(0.8, 0.9, 1, 1)
 theme_override_font_sizes/font_size = 13
 text = "💬 Drag on screen to rotate creature. Spin the dial below to change hexagram."
 autowrap_mode = 2
+
+[node name="BodyMandalaContainer" type="Control" parent="HUD/MobileHUD"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -280.0
+offset_right = 280.0
+offset_bottom = 280.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="BodyDial" type="Control" parent="HUD/MobileHUD/BodyMandalaContainer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("5_body_dial")
 
 [node name="MandalaContainer" type="Control" parent="HUD/MobileHUD"]
 layout_mode = 1
