@@ -75,8 +75,18 @@ var bits: int = 0
 ## room to disagree with the lowest differing line; very large, it cannot.
 var beta: float = DEFAULT_BETA
 
-## The mass over the 64 corners. Seeded on the body and carried tick to tick.
-var mass: PackedFloat64Array = Q6Lattice.delta(0)
+## THE CUBE ITSELF -- one Q6Core, which is the native Q6 inside the ixmnn
+## plugin when there is one and the same arithmetic in GDScript when there is
+## not. The mass over the 64 corners lives in there, seeded on the body and
+## carried tick to tick, and it is the SAME state the Qwen decode loop reads as
+## a prior. Pacing is built first, so Pacing holds the native lease.
+var cube: Q6Core = Q6Core.new()
+
+## The mass over the 64 corners, read out of the cube. Kept as a property so
+## every old reader still reads the same 64 numbers.
+var mass: PackedFloat64Array:
+	get:
+		return cube.state()
 
 var _last_tick_ms: int = -1
 var _last_target_bits: int = -1
@@ -129,7 +139,7 @@ func tick(now_ms: int, target_bits: int, stillness: float, excitation: float,
 ## figure they see.
 func inject(bits_in: int, now_ms: int) -> void:
 	bits = bits_in & 63
-	mass = Q6Lattice.delta(bits)
+	cube.inject(bits)
 	_dwell = 0.0
 	_last_target_bits = -1
 	_lockout_until_s = float(now_ms) / 1000.0 + INJECT_LOCKOUT
@@ -137,7 +147,7 @@ func inject(bits_in: int, now_ms: int) -> void:
 
 func reset(bits_in: int = 0) -> void:
 	bits = bits_in & 63
-	mass = Q6Lattice.delta(bits)
+	cube.reset(bits)
 	beta = DEFAULT_BETA
 	_last_tick_ms = -1
 	_last_target_bits = -1
@@ -156,14 +166,7 @@ func dwell() -> float:
 ## hair. Lines 0..2 are the machine's (lower) trigram, lines 3..5 the human's.
 static func bias_of(target_bits: int, machine_margin: float,
 		human_margin: float) -> PackedFloat64Array:
-	var out: PackedFloat64Array = PackedFloat64Array()
-	out.resize(Q6Lattice.LINES)
-	var m: float = clampf(machine_margin, 0.0, 1.0)
-	var h: float = clampf(human_margin, 0.0, 1.0)
-	for i in range(Q6Lattice.LINES):
-		var sign: float = 1.0 if ((target_bits >> i) & 1) == 1 else -1.0
-		out[i] = sign * (m if i < 3 else h)
-	return out
+	return Q6Core.bias_of(target_bits, machine_margin, human_margin)
 
 
 ## One heat step under that bias. The time is the branch's: civil barely
@@ -174,32 +177,15 @@ func _diffuse(target: int, stillness: float, excitation: float,
 	var t: float = CIVIL_T * clampf(stillness, 0.0, 1.0)
 	if excitation >= MARTIAL_THRESHOLD:
 		t = MARTIAL_T * clampf(excitation, 0.0, 1.0)
-	mass = Q6Lattice.step(_anchored(), bias, t, beta)
-
-
-## The mass with the body's own corner put back under it.
-func _anchored() -> PackedFloat64Array:
-	var out: PackedFloat64Array = mass.duplicate()
-	for h in range(Q6Lattice.STATES):
-		out[h] = out[h] * (1.0 - ANCHOR)
-	out[bits] += ANCHOR
-	return out
+	cube.anchor(bits, ANCHOR)
+	cube.step(bias, t, beta)
 
 
 ## THE NEXT FIGURE IS A NEIGHBOUR, never a jump: of the six corners one line
 ## from the body, the one holding the most mass. Ties go to the lowest line, so
 ## the answer is the cube's and never chance's.
 func best_neighbour() -> int:
-	var top: float = 0.0
-	for i in range(Q6Lattice.LINES):
-		top = maxf(top, mass[bits ^ (1 << i)])
-	if top <= 0.0:
-		return 0
-	var floor_mass: float = top * (1.0 - TIE_EPSILON)
-	for i in range(Q6Lattice.LINES):
-		if mass[bits ^ (1 << i)] >= floor_mass:
-			return i
-	return 0
+	return cube.best_neighbour(bits)
 
 
 ## THE LOWEST DIFFERING BIT, and nothing else. A figure walks; it does not

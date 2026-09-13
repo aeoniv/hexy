@@ -25,4 +25,24 @@ internal object IxMnnNative {
 	}
 
 	external fun nativeLlmRelease(handle: Long)
+
+	// --- Q6: the six-bit cube -------------------------------------------------
+	//
+	// One state p[64] over the 64 hexagrams, living in q6/q6.cpp beside the Qwen
+	// decode loop that reads it as a prior. No handle: there is exactly one cube.
+
+	external fun nativeQ6Reset(bits: Int)
+	external fun nativeQ6Inject(bits: Int)
+	external fun nativeQ6Uniform()
+	external fun nativeQ6Anchor(bits: Int, amount: Float)
+	external fun nativeQ6Step(bias: FloatArray, t: Float, beta: Float)
+	external fun nativeQ6State(): FloatArray
+	external fun nativeQ6SetState(state: FloatArray)
+	external fun nativeQ6Argmax(): Int
+	external fun nativeQ6Tension(): Float
+	external fun nativeQ6BestNeighbour(bits: Int): Int
+	external fun nativeQ6Embed(): FloatArray
+	external fun nativeQ6SetPriorWeight(w: Float)
+	external fun nativeQ6PriorWeight(): Float
+	external fun nativeQ6SetFigureWords(words: Array<String>)
 }

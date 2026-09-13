@@ -38,6 +38,22 @@ static func vec(bits: int) -> PackedFloat32Array:
 	return out
 
 
+## THE WHOLE CLOUD AS A POINT, not just the corner it is standing on.
+##
+## `vec()` above embeds ONE figure. A Q6Core holds a distribution over all 64,
+## and `Q6Core.embed()` is the 32 low-frequency Walsh coefficients of it --
+## computed in C++ inside the ixmnn plugin on device, in q6_lattice.gd on
+## desktop, and held to the same numbers by tests/golden/q6_golden.json. This
+## is the same 32 floats wide as `vec()`, so a room or a mesh may take either.
+static func cloud(cube: Q6Core) -> PackedFloat32Array:
+	if cube == null:
+		var zero: PackedFloat32Array = PackedFloat32Array()
+		zero.resize(DIM)
+		zero.fill(0.0)
+		return zero
+	return cube.embed()
+
+
 ## Cosine DISTANCE in [0, 2]: 0 is the same point, larger is further apart.
 static func dist(a_bits: int, b_bits: int) -> float:
 	return 1.0 - cosine(vec(a_bits), vec(b_bits))

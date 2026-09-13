@@ -28,6 +28,7 @@ func _initialize() -> void:
 	_test_alchemy()
 	_test_q6_limit()
 	_test_q6_is_not_decorative()
+	_test_pacing_rides_one_cube()
 
 	if failures == 0:
 		print("--- ALL CORE PACING TESTS PASSED PERFECTLY ---\n")
@@ -356,3 +357,74 @@ func _test_q6_is_not_decorative() -> void:
 		"a yang human line pulls up by the human's margin")
 	check(Pacing.CIVIL_T < Pacing.MARTIAL_T,
 		"the held breath spreads less mass than the surge")
+
+
+## THE CUBE IS ONE CUBE. Pacing no longer carries its own 64 numbers and its own
+## copy of the anchor and neighbour rules: it holds a Q6Core, which is the native
+## C++ Q6 inside the ixmnn plugin on device and q6_lattice.gd here. This checks
+## that the move did not cost Pacing anything it used to guarantee -- the mass is
+## still readable, still normalised, still anchored on the body, still the thing
+## `best_neighbour` reads -- and that the SAME cube is the one an embedding and
+## the decode-loop prior would see.
+func _test_pacing_rides_one_cube() -> void:
+	var p: Pacing = Pacing.new()
+	p.reset(0b010101)
+	check(p.cube != null, "Pacing carries a Q6Core")
+	check(p.cube is Q6Core, "and it is the thin client, not a second arithmetic")
+	check(p.mass.size() == Q6Core.STATES, "the mass is still 64 numbers")
+	check(is_equal_approx(p.mass[0b010101], 1.0), "seeded on the body it was reset to")
+	check(is_equal_approx(_sum(p.mass), 1.0), "and summing to one")
+
+	# The mass is a READ of the cube, so the two can never disagree.
+	var from_cube: PackedFloat64Array = p.cube.state()
+	var same: bool = true
+	for h in range(Q6Core.STATES):
+		if absf(from_cube[h] - p.mass[h]) > 1e-15:
+			same = false
+	check(same, "Pacing.mass is the cube's own state, not a copy that may drift")
+
+	# A TICK MOVES THE CUBE, every tick, gate or no gate, and leaves it anchored
+	# on the body rather than piled on the target.
+	for i in range(8):
+		p.tick(i * 100, 0b101010, 1.0, 0.0, 1.0, 1.0)
+	check(is_equal_approx(_sum(p.mass), 1.0), "eight ticks later it still sums to one")
+	# THE ANCHOR KEEPS THE NEIGHBOURHOOD READABLE. It does not hold the argmax --
+	# under a strong bias the Gibbs pull carries that to the target, which is the
+	# point of the bias -- but every one of the six corners one line from the body
+	# must still hold real mass, because a neighbourhood of zeros is a tie the
+	# cube never meant to call.
+	check(p.mass[p.bits] > 0.0, "the body's own corner still holds mass")
+	var thinnest: float = INF
+	for i in range(Q6Core.LINES):
+		thinnest = minf(thinnest, p.mass[p.bits ^ (1 << i)])
+	check(thinnest > 0.0,
+		"and so does every one of its six neighbours (thinnest %s)" % thinnest)
+	check(p.best_neighbour() == p.cube.best_neighbour(p.bits),
+		"Pacing's neighbour rule IS the cube's neighbour rule")
+
+	# THE SAME STATE IS THE EMBEDDING and, on device, the decode-loop prior.
+	var e: PackedFloat32Array = p.cube.embed()
+	check(e.size() == Q6Core.EMBED_DIM, "the cube embeds to 32 floats")
+	check(absf(float(e[0]) - 1.0) < 1e-6, "whose zeroth is the total mass")
+	check(Q6Embed.cloud(p.cube).size() == Q6Embed.DIM,
+		"and Q6Embed.cloud reads the same cube at the same width")
+	check(p.cube.tension() >= 0.0 and p.cube.tension() <= 1.0, "tension is in [0, 1]")
+
+	# `inject` re-anchors the whole cloud, which is what a cast is for.
+	p.inject(0b111000, 4000)
+	check(is_equal_approx(p.mass[0b111000], 1.0), "a cast puts the whole cloud on the figure thrown")
+
+	# ON DESKTOP THERE IS NO DECODE LOOP, so the prior weight is zero and saying
+	# otherwise is the lie this check exists to catch.
+	check(is_equal_approx(Q6Core.prior_weight(), 0.0),
+		"with no plugin there is no decode loop to lean on, and the weight says so")
+	Q6Core.set_prior_weight(0.7)
+	check(is_equal_approx(Q6Core.prior_weight(), 0.0),
+		"and setting it changes nothing there is nothing to set")
+
+
+static func _sum(v: PackedFloat64Array) -> float:
+	var t: float = 0.0
+	for x in v:
+		t += x
+	return t

@@ -180,6 +180,97 @@ class IxMnn(godot: Godot) : GodotPlugin(godot), SensorEventListener {
 	@UsedByGodot
 	fun chat_streaming(): Boolean = streaming.get()
 
+	// --- Q6: the six-bit cube -------------------------------------------------
+	//
+	// ONE state p[64] over the 64 hexagrams, native, in q6/q6.cpp, sitting beside
+	// the Qwen decode loop and the MNN runtime. Godot moves it (Pacing, every
+	// tick), the decode loop reads it as a prior (every token), and embed() turns
+	// it into a point in R^32 for the room and the mesh. Three readers, one state.
+	//
+	// These are plain arithmetic over 64 doubles -- microseconds, no model, no
+	// file -- so unlike chat and embed they run on the CALLING thread rather than
+	// being posted to the worker. The native side takes a mutex, because the
+	// decode loop is reading the same cube on the worker while Godot writes it.
+	//
+	// Every one of them is a no-op returning a safe default when the native
+	// library did not load, so the GDScript client never has to branch.
+
+	@UsedByGodot
+	fun q6_reset(bits: Int) {
+		if (runtime_ready()) IxMnnNative.nativeQ6Reset(bits)
+	}
+
+	@UsedByGodot
+	fun q6_inject(bits: Int) {
+		if (runtime_ready()) IxMnnNative.nativeQ6Inject(bits)
+	}
+
+	@UsedByGodot
+	fun q6_uniform() {
+		if (runtime_ready()) IxMnnNative.nativeQ6Uniform()
+	}
+
+	@UsedByGodot
+	fun q6_anchor(bits: Int, amount: Float) {
+		if (runtime_ready()) IxMnnNative.nativeQ6Anchor(bits, amount)
+	}
+
+	@UsedByGodot
+	fun q6_step(bias: FloatArray, t: Float, beta: Float) {
+		if (runtime_ready()) IxMnnNative.nativeQ6Step(bias, t, beta)
+	}
+
+	@UsedByGodot
+	fun q6_state(): FloatArray =
+		if (runtime_ready()) IxMnnNative.nativeQ6State() else FloatArray(64)
+
+	@UsedByGodot
+	fun q6_set_state(state: FloatArray) {
+		if (runtime_ready()) IxMnnNative.nativeQ6SetState(state)
+	}
+
+	@UsedByGodot
+	fun q6_argmax(): Int = if (runtime_ready()) IxMnnNative.nativeQ6Argmax() else 0
+
+	@UsedByGodot
+	fun q6_tension(): Float = if (runtime_ready()) IxMnnNative.nativeQ6Tension() else 0f
+
+	@UsedByGodot
+	fun q6_best_neighbour(bits: Int): Int =
+		if (runtime_ready()) IxMnnNative.nativeQ6BestNeighbour(bits) else 0
+
+	@UsedByGodot
+	fun q6_embed(): FloatArray =
+		if (runtime_ready()) IxMnnNative.nativeQ6Embed() else FloatArray(32)
+
+	/**
+	 * How hard the decode loop hears the cube. 0 -- the default -- is the old
+	 * behaviour exactly: MNN's own Llm::response() runs and no logit is touched.
+	 * Above 0 the native side runs its own decode loop and adds w * p[h] * 64 to
+	 * the logit of each of the 64 figure words set by [q6_set_figure_words].
+	 */
+	@UsedByGodot
+	fun q6_set_prior_weight(w: Float) {
+		if (runtime_ready()) IxMnnNative.nativeQ6SetPriorWeight(w)
+	}
+
+	@UsedByGodot
+	fun q6_prior_weight(): Float =
+		if (runtime_ready()) IxMnnNative.nativeQ6PriorWeight() else 0f
+
+	/**
+	 * The 64 figure words the prior leans on, indexed by hexagram BITS, handed
+	 * down from scripts/core/iching/king_wen.gd so no second copy of that table
+	 * lives here to drift. Anything shorter than 64 is padded with empty strings,
+	 * and an empty word is simply never biased.
+	 */
+	@UsedByGodot
+	fun q6_set_figure_words(words: Array<String>) {
+		if (!runtime_ready()) return
+		val full = Array(64) { i -> if (i < words.size) words[i] else "" }
+		IxMnnNative.nativeQ6SetFigureWords(full)
+	}
+
 	
 	private var sensorManager: SensorManager? = null
 	private var lightSensor: Sensor? = null

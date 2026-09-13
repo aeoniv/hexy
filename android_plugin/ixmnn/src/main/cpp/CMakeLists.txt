@@ -13,6 +13,8 @@ foreach(lib MNN MNN_Express llm)
 	set_target_properties(${lib} PROPERTIES IMPORTED_LOCATION "${MNN_LIBS}/lib${lib}.so")
 endforeach()
 
-add_library(ixmnnjni SHARED ixmnn_jni.cpp)
-target_include_directories(ixmnnjni PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+# q6/q6.cpp is pure C++17 with no MNN in it, so the same file compiles into
+# tests/native/q6_test.cpp on a desktop and is checked against the GDScript.
+add_library(ixmnnjni SHARED ixmnn_jni.cpp q6/q6.cpp)
+target_include_directories(ixmnnjni PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(ixmnnjni llm MNN_Express MNN log)

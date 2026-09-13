@@ -93,8 +93,26 @@ func tier() -> String:
 	return _tier
 
 
+## The lane the runtime resolved, plus HOW HARD THE DECODE LOOP HEARS THE CUBE.
+##
+## `q6_prior_weight` is 0 everywhere the native plugin is not: on desktop there
+## is no decode loop to lean on, so there is nothing to report but zero. Above 0
+## it is the w in `logits[figure word] += w * p[h] * 64`, added once per token
+## inside ixmnn, to the 64 King Wen words and nothing else.
+##
+## Q6Core answers this statically -- the weight belongs to the one decode loop,
+## not to whichever object holds the cube -- so reading it does not take the
+## native lease away from Pacing.
 func info() -> Dictionary:
-	return _runtime.model_info()
+	var out: Dictionary = _runtime.model_info().duplicate()
+	out["q6_prior_weight"] = Q6Core.prior_weight()
+	return out
+
+
+## How hard Qwen hears the cube. 0 leaves every logit alone and runs MNN's own
+## decode path, which is the default and the old behaviour exactly.
+func set_prior_weight(w: float) -> void:
+	Q6Core.set_prior_weight(w)
 
 
 # --- loading ----------------------------------------------------------------
