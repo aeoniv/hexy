@@ -65,7 +65,7 @@ func _test_figure_net() -> void:
 	var path: String = "user://test_figure_net.json"
 	check(net.save(path), "save writes json")
 	var back: FigureNet = FigureNet.new()
-	check(back.load(path), "load reads json")
+	check(back.load_file(path), "load_file reads json")
 	check(back.samples() == net.samples(), "ring round trips")
 	var q: Dictionary = back.predict(0)
 	check(int(q["bits"]) == int(p["bits"]), "prediction survives the round trip")
@@ -83,7 +83,7 @@ func _test_mnn() -> void:
 	check(t.size() == 4, "four tiers")
 	check(String(t[0]["id"]) == "floor" and String(t[0]["params"]) == "0.6B", "floor is 0.6B")
 	check(String(t[3]["id"]) == "embed" and String(t[3]["params"]) == "gte", "embed lane is gte")
-	check(not m.load("floor"), "load reports no weights in headless")
+	check(not m.load_tier("floor"), "load_tier reports no weights in headless")
 
 	var prompt: String = "figure 1 Creative; machine: the room is still; human: the breath is slow"
 	m.generate(prompt, 40)

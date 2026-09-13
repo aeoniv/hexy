@@ -70,8 +70,8 @@ func _test_ground() -> void:
 	check(text.contains("the room is still"), "ground echoes the machine sentence")
 	check(text.contains("the breath is slow"), "ground echoes the human sentence")
 	check(text.length() < 700, "ground stays under 700 chars, got %d" % text.length())
-	check(qwen.name(63) == IChing.name_of(63), "cached name matches KingWen")
-	check(qwen.name(63) == IChing.name_of(63), "cached name is stable on the second call")
+	check(qwen.label(63) == IChing.name_of(63), "cached label matches KingWen")
+	check(qwen.label(63) == IChing.name_of(63), "cached label is stable on the second call")
 	store.queue_free()
 	parts[1].queue_free()
 	qwen.queue_free()
@@ -97,12 +97,21 @@ func _test_cooldown() -> void:
 	var parts: Array = _build()
 	var store: HexyStore = parts[0]
 	var qwen: Qwen = parts[2]
+	var answers: Array[String] = ([] as Array[String])
+	qwen.answer_ready.connect(func(t: String) -> void: answers.append(t))
 	var before: int = qwen.thoughts_fired()
 	store.set_hexagram({"bits": 5, "moving": 2})
 	store.set_hexagram({"bits": 9, "moving": 4})
-	check(qwen.thoughts_fired() - before == 1, "two changes inside 3 s make one thought")
-	var text: String = await qwen.answer_ready
-	check(text.length() > 0, "the one thought still answers")
+	check(qwen.thoughts_fired() - before == 1, "two changes inside 3 s make one thought at once")
+	# The cooldown thins the stream; it must not swallow the end of it.
+	await create_timer(3.5).timeout
+	check(qwen.thoughts_fired() - before == 2,
+		"the held-back change is spoken for once the cooldown passes (got %d)"
+			% (qwen.thoughts_fired() - before))
+	check(answers.size() == 2, "two changes, two answers in all (got %d)" % answers.size())
+	check(not answers.is_empty()
+		and answers[answers.size() - 1].begins_with(Judgements.for_bits(9)),
+		"the trailing answer is about the LAST figure, not the first")
 	store.queue_free()
 	parts[1].queue_free()
 	qwen.queue_free()

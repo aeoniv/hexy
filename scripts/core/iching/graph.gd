@@ -65,26 +65,12 @@ static func adjacency_matrix() -> PackedInt32Array:
 	return m
 
 
-## Per-line majority across peers (tie keeps the first peer's line).
-static func median(peer_bits: Array[int]) -> int:
+## Per-line majority across peers: the bits of Cast.room_cast, and tied the
+## same peer-independent way (smallest id, else lowest bits value).
+static func median(peer_bits: Array[int], ids: Array[String] = ([] as Array[String])) -> int:
 	if peer_bits.is_empty():
 		return 0
-	var first: int = peer_bits[0] & 63
-	var bits: int = 0
-	for i in range(DIM):
-		var yang: int = 0
-		for p in peer_bits:
-			if (int(p) >> i) & 1 == 1:
-				yang += 1
-		var yin: int = peer_bits.size() - yang
-		var line: int = (first >> i) & 1
-		if yang > yin:
-			line = 1
-		elif yin > yang:
-			line = 0
-		if line == 1:
-			bits |= 1 << i
-	return bits
+	return int(Cast.room_cast(peer_bits, ids)["bits"])
 
 
 static func flip_all(bits: int) -> int:

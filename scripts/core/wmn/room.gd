@@ -21,6 +21,10 @@ const EXPIRY_MS := 30_000
 const DRIFT_HOPS := 2
 
 var peers := {}
+## The name the rest of the room knows us by. Set by set_self; without it we
+## fall back to SELF_KEY, which is honest for a room of one and harmless,
+## since a tie needs two.
+var self_id := ""
 
 
 func clear() -> void:
@@ -28,9 +32,12 @@ func clear() -> void:
 
 
 ## Our own figure sits in the same map as everyone else's so that `figure()`
-## has exactly one code path. Order matters to Cast.room_cast (a tied line
-## keeps the FIRST peer's line), so self is put in first and stays first.
-func set_self(bits: int, moving: int, seen_ms: int) -> void:
+## has exactly one code path. `who` is our fabric id: the room is read in id
+## order, and a room that called itself "_self" would sort differently on
+## every phone, and so cast a different figure on every phone.
+func set_self(bits: int, moving: int, seen_ms: int, who: String = "") -> void:
+	if who != "":
+		self_id = who
 	_put(SELF_KEY, bits, moving, seen_ms)
 
 
@@ -68,19 +75,37 @@ func peer_count() -> int:
 	return names().size()
 
 
-## Everybody, us first. The order Cast.room_cast reads ties in.
+## Everybody, us included, in id order: the one order every phone in the room
+## agrees on, and the order Cast.room_cast reads ties in.
+func _rows() -> Array:
+	var rows: Array = []
+	if peers.has(SELF_KEY):
+		rows.append([self_id if self_id != "" else SELF_KEY,
+			int(peers[SELF_KEY]["bits"]) & 63])
+	for k in names():
+		rows.append([k, int(peers[k]["bits"]) & 63])
+	rows.sort_custom(func(x: Array, y: Array) -> bool: return String(x[0]) < String(y[0]))
+	return rows
+
+
+## Everybody's name, in the same order as all_bits().
+func all_ids() -> Array[String]:
+	var out: Array[String] = ([] as Array[String])
+	for r in _rows():
+		out.append(String(r[0]))
+	return out
+
+
 func all_bits() -> Array[int]:
 	var out: Array[int] = ([] as Array[int])
-	if peers.has(SELF_KEY):
-		out.append(int(peers[SELF_KEY]["bits"]) & 63)
-	for k in names():
-		out.append(int(peers[k]["bits"]) & 63)
+	for r in _rows():
+		out.append(int(r[1]))
 	return out
 
 
 ## {bits, moving, throws} — the room as one figure.
 func figure() -> Dictionary:
-	return Cast.room_cast(all_bits())
+	return Cast.room_cast(all_bits(), all_ids())
 
 
 ## The shape HexyStore.set_room takes.

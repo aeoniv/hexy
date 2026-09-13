@@ -154,7 +154,7 @@ func dump() -> Dictionary:
 	}
 
 
-func load(d: Dictionary) -> void:
+func load_dump(d: Dictionary) -> void:
 	if d.has("hexagram") and d["hexagram"] is Dictionary:
 		set_hexagram(d["hexagram"] as Dictionary)
 	if d.has("machine") and d["machine"] is Dictionary:

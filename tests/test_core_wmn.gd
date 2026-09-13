@@ -173,7 +173,7 @@ func _test_ledger() -> void:
 
 	_check(l.save(LEDGER_PATH) == OK, "the ledger saves")
 	var back := Ledger.new()
-	_check(back.load(LEDGER_PATH) == OK, "the ledger loads")
+	_check(back.load_file(LEDGER_PATH) == OK, "the ledger loads")
 	_check(back.size() == l.size(), "save and load keep every entry")
 	_check(back.get_cast(id) == l.get_cast(id), "an entry survives the round trip")
 	_check(back.witnesses_of(id) == ["bravo", "charlie"], "witnesses survive too")
@@ -224,6 +224,29 @@ func _test_room() -> void:
 	_check(gone == ["a", "b", "c", "far"], "peers unheard for 30 s expire")
 	_check(r2.has(Room.SELF_KEY), "we never expire ourselves")
 	_check(r2.expire(1000).is_empty(), "a fresh room expires nobody")
+
+	# A tie is settled by the SET, not by whoever happens to be listed first:
+	# each phone lists itself first, so "the first peer" is a different person
+	# on every device, and the room would quietly disagree with itself.
+	var alpha := Room.new()
+	alpha.set_self(0b111000, 0, 1000, "aaa")
+	alpha.set_peer("zzz", 0b000111, 0, 1000)
+	var beta := Room.new()
+	beta.set_self(0b000111, 0, 1000, "zzz")
+	beta.set_peer("aaa", 0b111000, 0, 1000)
+	_check(alpha.all_ids() == ["aaa", "zzz"] and beta.all_ids() == ["aaa", "zzz"],
+		"both phones read the room in the same id order")
+	_check(alpha.figure() == beta.figure(),
+		"two phones in one room cast ONE figure (a=%s b=%s)"
+			% [str(alpha.figure()), str(beta.figure())])
+	_check(int(alpha.figure()["bits"]) == 0b111000,
+		"a tied line is taken from the smallest who")
+
+	var solo := Room.new()
+	solo.set_self(0b101010, 0, 1000, "solo")
+	_check(int(solo.figure()["bits"]) == 0b101010, "a room of one is that one figure")
+	_check(int(solo.figure()["moving"]) == 0,
+		"one voice has nobody to be thin against, so nothing moves")
 
 
 # --- 5. presence ------------------------------------------------------------
@@ -279,17 +302,17 @@ func _test_loopback() -> void:
 	var linked: bool = a.fabric.peer_count() >= 1 and b.fabric.peer_count() >= 1
 	_check(linked, "the two nodes find each other on loopback")
 
-	# THE SAME FIGURE FROM BOTH. With two voices every differing line is a tie,
-	# and Cast.room_cast breaks a tie towards the FIRST peer -- which is a
-	# different peer on each phone. Agreement is therefore the only state in
-	# which both stores can honestly be expected to match, and it is the state
-	# worth proving: what one says, the other hears, unchanged.
+	# TWO DIFFERENT FIGURES, one line apart. With two voices that line is a
+	# tie, and a tie is now read off the id set rather than off whoever the
+	# local phone happens to list first -- so disagreement is exactly the
+	# state worth proving: both phones must still hold the SAME room.
 	var h := {"bits": 0b101101, "moving": 0b000100,
 		"throws": [7, 8, 9, 7, 8, 7], "when": 1700000000000,
 		"who": "alpha", "source": "tap", "sig": ""}
 	store_a.set_hexagram(h)
-	var hb := h.duplicate(true)
-	hb["who"] = "beta"
+	var hb := {"bits": 0b100101, "moving": 0b000001,
+		"throws": [9, 8, 7, 8, 8, 7], "when": 1700000000001,
+		"who": "beta", "source": "tap", "sig": ""}
 	store_b.set_hexagram(hb)
 
 	await _wait(6.0, func(): return not heard_a.is_empty() and not heard_b.is_empty())
@@ -306,9 +329,16 @@ func _test_loopback() -> void:
 
 	await _wait(3.0, func(): return int(store_a.room["peers"]) == 1 and int(store_b.room["peers"]) == 1)
 	_check(store_a.room == store_b.room,
-		"both stores hold the same room (a=%s b=%s)" % [str(store_a.room), str(store_b.room)])
-	_check(int(store_a.room["bits"]) == 0b101101,
-		"the room figure is the figure the room agrees on")
+		"both stores hold the IDENTICAL room (a=%s b=%s)" % [str(store_a.room), str(store_b.room)])
+	var ids: Array[String] = [a.fabric_id(), b.fabric_id()]
+	ids.sort()
+	var expect_bits: int = 0b101101 if ids[0] == a.fabric_id() else 0b100101
+	_check(int(store_a.room["bits"]) == expect_bits,
+		"the tied line is read from the smallest fabric id (want %d, got %d)"
+			% [expect_bits, int(store_a.room["bits"])])
+	_check(int(store_a.room["moving"]) == (0b101101 ^ 0b100101),
+		"the one line the two disagree on is the one that moves (got %d)"
+			% int(store_a.room["moving"]))
 	_check(a.peer_count() == 1 and b.peer_count() == 1, "each sees exactly one peer")
 	var row: Array = a.peers()
 	_check(row.size() == 1 and String(row[0]["who"]) == b.fabric_id()

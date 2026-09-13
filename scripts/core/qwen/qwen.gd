@@ -22,6 +22,10 @@ var _names: Dictionary = {}
 var _last_thought_ms: int = -COOLDOWN_MS * 2
 var _thoughts: int = 0
 var _busy: bool = false
+## A change that arrived inside the cooldown and has not been spoken for yet.
+var _owed: bool = false
+## The figure the last thought was actually about, as bits | moving << 6.
+var _spoken_key: int = -1
 
 
 func bind(store: HexyStore, mnn: Mnn) -> void:
@@ -44,7 +48,7 @@ func thoughts_fired() -> int:
 # --- naming -----------------------------------------------------------------
 
 ## Short label for a figure; cached, since KingWen walks a table each time.
-func name(bits: int) -> String:
+func label(bits: int) -> String:
 	var b: int = bits & 63
 	if not _names.has(b):
 		_names[b] = KingWen.name(b)
@@ -105,15 +109,58 @@ func ask(question: String) -> Signal:
 
 
 ## Ask "What is this moment?" on the store's own beat, at most once per 3 s.
+##
+## The cooldown thins the stream; it must not swallow its end. A change that
+## arrives too soon is not dropped but OWED: one timer is armed for the rest
+## of the cooldown, and when it rings the figure is spoken for -- unless the
+## store has meanwhile come back to the figure we already answered, in which
+## case there is nothing left to say.
 func thought() -> bool:
 	var now: int = Time.get_ticks_msec()
 	if now - _last_thought_ms < COOLDOWN_MS:
+		_owe(COOLDOWN_MS - (now - _last_thought_ms))
 		return false
-	_last_thought_ms = now
+	_speak()
+	return true
+
+
+func _speak() -> void:
+	_owed = false
+	_last_thought_ms = Time.get_ticks_msec()
+	_spoken_key = _figure_key()
 	_thoughts += 1
 	thought_started.emit(THOUGHT_QUESTION)
 	ask(THOUGHT_QUESTION)
-	return true
+
+
+## What is on the glass right now, as one comparable number.
+func _figure_key() -> int:
+	if _store == null:
+		return -1
+	return (_store.primary() & 63) | ((int(_store.hexagram.get("moving", 0)) & 63) << 6)
+
+
+## Arm the one trailing thought. A debt already owed is not owed twice: the
+## timer already running will read the store as it finds it then, which is by
+## definition the latest figure.
+func _owe(wait_ms: int) -> void:
+	if _owed:
+		return
+	_owed = true
+	if is_inside_tree() and get_tree() != null:
+		var wait_s: float = maxf(0.01, float(wait_ms) / 1000.0)
+		get_tree().create_timer(wait_s).timeout.connect(_settle)
+	else:
+		_settle.call_deferred()
+
+
+func _settle() -> void:
+	if not _owed:
+		return
+	_owed = false
+	if _figure_key() == _spoken_key:
+		return
+	_speak()
 
 
 func _on_hexagram_changed(_h: Dictionary) -> void:

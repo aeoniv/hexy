@@ -181,7 +181,7 @@ func save(path: String = PATH) -> Error:
 	return OK
 
 
-func load(path: String = PATH) -> Error:
+func load_file(path: String = PATH) -> Error:
 	if not FileAccess.file_exists(path):
 		return ERR_FILE_NOT_FOUND
 	var f := FileAccess.open(path, FileAccess.READ)

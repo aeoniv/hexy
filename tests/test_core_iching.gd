@@ -104,12 +104,28 @@ func _test_room_cast() -> void:
 	var dthick: Dictionary = Cast.room_cast([63, 63, 63, 0])
 	check(int(dthick["bits"]) == 63 and int(dthick["moving"]) == 0, "a 3-1 majority is thick, so nothing moves")
 	var d2: Dictionary = Cast.room_cast([63, 0])
-	check(int(d2["bits"]) == 63, "a tie keeps the first peer's line")
+	check(int(d2["bits"]) == 0, "with no ids a tie takes the lowest bits value")
 	check(int(d2["moving"]) == 63, "a tie on every line is thin, so every line moves")
 	var d3: Dictionary = Cast.room_cast([1, 1, 1, 0])
 	check(int(d3["bits"]) == 1, "3-1 majority on the bottom line")
 	check(int(d3["moving"]) == 0, "a 3-1 majority is thick")
 	check(Q6.median([63, 63, 0]) == int(d["bits"]), "Q6.median agrees with room_cast")
+
+	# The tie-break is a property of the SET, never of the caller's position
+	# in it: the same two voices must give the same figure on both phones.
+	var ab: Dictionary = Cast.room_cast([63, 0], ["a", "b"])
+	var ba: Dictionary = Cast.room_cast([0, 63], ["b", "a"])
+	check(int(ab["bits"]) == 63, "a tie takes the line of the smallest who")
+	check(ab == ba, "the same room read from either side is the same figure")
+	check(Cast.room_cast([0, 63]) == Cast.room_cast([63, 0]),
+		"and the same again with no ids at all")
+	check(Q6.median([63, 0], ["a", "b"]) == 63, "Q6.median breaks ties by who too")
+	check(Cast.anchor_index([9, 4, 7]) == 1, "with no ids the anchor is the lowest bits value")
+	check(Cast.anchor_index([9, 4, 7], ["c", "b", "a"]) == 2, "with ids the anchor is the smallest who")
+
+	var solo: Dictionary = Cast.room_cast([42])
+	check(int(solo["bits"]) == 42, "one voice is that voice's figure")
+	check(int(solo["moving"]) == 0, "one voice has no thin majority: nothing moves")
 
 
 func _test_q6() -> void:
@@ -267,8 +283,8 @@ func _test_store() -> void:
 	store.set_room({"bits": 7, "moving": 1, "peers": 3})
 	var d: Dictionary = store.dump()
 	var other: Node = HexyStoreScript.new()
-	other.load(d)
-	check(other.dump() == d, "dump and load round trip")
-	check(int(other.machine["trigram"]) == 2 and int(other.room["peers"]) == 3, "load restores the families and the room")
+	other.load_dump(d)
+	check(other.dump() == d, "dump and load_dump round trip")
+	check(int(other.machine["trigram"]) == 2 and int(other.room["peers"]) == 3, "load_dump restores the families and the room")
 	store.free()
 	other.free()

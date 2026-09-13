@@ -149,7 +149,7 @@ func broadcast_figure(h: Dictionary) -> Dictionary:
 		"sig": String(h.get("sig", "")),
 	}
 	_self_h = _figure_from(fabric.fabric_id, bits, payload)
-	room.set_self(bits, moving, now_ms())
+	room.set_self(bits, moving, now_ms(), fabric.fabric_id)
 	if keep_ledger:
 		ledger.append(_self_h, [])
 	presence.force_due()

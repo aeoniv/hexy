@@ -53,12 +53,22 @@ static func sense_cast(machine_scores: Array[float], human_scores: Array[float],
 	return {"bits": bits, "moving": moving, "throws": throws_of(bits, moving)}
 
 
-## Per-line majority across peers. A tie keeps the line of the first peer.
-## A line whose majority is thin (margin <= 1) is moving.
-static func room_cast(peer_bits: Array[int]) -> Dictionary:
+## Per-line majority across peers, read the same way on every phone.
+##
+## A tie cannot be broken by "the first peer": each phone lists itself first,
+## so first is a different person on every device and the room would disagree
+## with itself. The anchor is therefore a property of the SET -- the peer with
+## the smallest `who` when ids are passed, otherwise the numerically lowest
+## bits value -- which every phone computes identically.
+##
+## A line whose majority is thin (margin <= 1) is moving. One voice alone has
+## no margin to be thin: a room of one is not a room arguing with itself, so
+## nothing moves.
+static func room_cast(peer_bits: Array[int], ids: Array[String] = ([] as Array[String])) -> Dictionary:
 	if peer_bits.is_empty():
 		return {"bits": 0, "moving": 0, "throws": throws_of(0, 0)}
-	var first: int = peer_bits[0] & 63
+	var anchor: int = int(peer_bits[anchor_index(peer_bits, ids)]) & 63
+	var alone: bool = peer_bits.size() <= 1
 	var bits: int = 0
 	var moving: int = 0
 	for i in range(6):
@@ -73,12 +83,28 @@ static func room_cast(peer_bits: Array[int]) -> Dictionary:
 		elif yin > yang:
 			line = 0
 		else:
-			line = (first >> i) & 1
+			line = (anchor >> i) & 1
 		if line == 1:
 			bits |= 1 << i
-		if absi(yang - yin) <= 1:
+		if not alone and absi(yang - yin) <= 1:
 			moving |= 1 << i
 	return {"bits": bits, "moving": moving, "throws": throws_of(bits, moving)}
+
+
+## Which peer a tied line is read from: smallest id when ids line up with the
+## bits, else the lowest bits value. Never the caller's own position.
+static func anchor_index(peer_bits: Array[int], ids: Array[String] = ([] as Array[String])) -> int:
+	if peer_bits.is_empty():
+		return 0
+	var best: int = 0
+	var by_id: bool = ids.size() == peer_bits.size()
+	for i in range(1, peer_bits.size()):
+		if by_id:
+			if String(ids[i]) < String(ids[best]):
+				best = i
+		elif (int(peer_bits[i]) & 63) < (int(peer_bits[best]) & 63):
+			best = i
+	return best
 
 
 static func transform(bits: int, moving: int) -> int:

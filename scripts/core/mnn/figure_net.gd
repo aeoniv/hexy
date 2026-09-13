@@ -172,7 +172,7 @@ func save(path: String = SAVE_PATH) -> bool:
 	return true
 
 
-func load(path: String = SAVE_PATH) -> bool:
+func load_file(path: String = SAVE_PATH) -> bool:
 	if not FileAccess.file_exists(path):
 		return false
 	var f: FileAccess = FileAccess.open(path, FileAccess.READ)

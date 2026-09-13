@@ -101,7 +101,7 @@ func info() -> Dictionary:
 
 ## Bring up one tier by id ("floor" | "mid" | "high"). Returns false when the
 ## weights are not there; the mock takes over and the app keeps speaking.
-func load(tier_id: String = TIER_FLOOR) -> bool:
+func load_tier(tier_id: String = TIER_FLOOR) -> bool:
 	_tier = tier_id
 	var dir: String = ""
 	for row in tiers():
@@ -126,7 +126,7 @@ func generate(prompt: String, max_tokens: int = 80) -> Signal:
 	_ensure_mock()
 	if available():
 		if not _loaded:
-			load(_tier if _tier != "" else TIER_FLOOR)
+			load_tier(_tier if _tier != "" else TIER_FLOOR)
 		if _loaded:
 			_live = true
 			_runtime.chat_stream(prompt)
