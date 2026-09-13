@@ -1,13 +1,13 @@
 extends SceneTree
 
-## THE GLASS, BOOTED FOR REAL.
+## THE OWNER'S HUD, BOOTED FOR REAL.
 ##
 ## scenes/hexy.tscn is instanced into a live tree with no device, no model and
-## no room, and then poked exactly the way a finger would poke it: the top
-## target is pressed, the plus is pressed, a question is sent. Nothing here
-## calls a private helper -- every act goes through a signal a real touch would
-## have emitted, because a smoke test that takes a shortcut the user cannot
-## take is testing a program nobody runs.
+## no room, and then poked exactly the way a finger would poke it: the hub in
+## the middle of the human ring is tapped, the plus is pressed, a question is
+## sent. Nothing here calls a private helper -- every act goes through a signal
+## a real touch would have emitted, because a smoke test that takes a shortcut
+## the user cannot take is testing a program nobody runs.
 
 const SCENE: String = "res://scenes/hexy.tscn"
 
@@ -23,7 +23,7 @@ func check(ok: bool, label: String) -> void:
 
 
 func _initialize() -> void:
-	print("\n--- TEST GLASS SMOKE (boot + tap + send + sheet) ---")
+	print("\n--- TEST GLASS SMOKE (boot + tap + send + sheet + dials) ---")
 	await _run()
 	if failures == 0:
 		print("--- ALL GLASS SMOKE TESTS PASSED PERFECTLY ---\n")
@@ -55,29 +55,51 @@ func _run() -> void:
 	check(_is_ascii(boot), "the boot line is plain ASCII")
 
 	var store: HexyStore = app.store
-	var glass: Glass = app.glass
+	var hud: HudBridge = app.hud
 
-	# -- the top line --------------------------------------------------------
-	var top: String = glass.top_text()
+	# -- the owner's interface is the one on screen --------------------------
+	check(hud.hud != null and hud.hud is MobileHudStore,
+		"the surface is the owner's MobileHUD, not the sixteen-seat ring")
+	check(hud.hud.has_node("TopBar") and hud.hud.has_node("HexCard")
+			and hud.hud.has_node("ThoughtBubble") and hud.hud.has_node("Composer"),
+		"the top bar, the figure card, the thought bubble and the composer are all there")
+	check(hud.body_dial() is BodyDial2D, "the machine ring is the owner's BodyDial2D")
+	check(hud.mandala_dial() is MandalaDial2D, "the human ring is the owner's MandalaDial2D")
+	check(hud.mandala_dial().get_parent().name == "MandalaContainer",
+		"the human ring still hangs in MandalaContainer")
+
+	# -- the figure line -----------------------------------------------------
+	var top: String = hud.top_text()
 	print("top: ", top)
-	check(top.begins_with("now - "), "the top line opens with now")
+	check(top.begins_with("now - "), "the figure line opens with now")
 	check(top.contains(KingWen.pinyin(store.primary())),
-		"the top line carries the pinyin of the figure on the glass")
+		"the figure line carries the pinyin of the figure on the glass")
 
-	# -- a tap is a cast -----------------------------------------------------
+	# -- a tap on the hub is a cast ------------------------------------------
 	store.set_hexagram({"bits": 21, "moving": 0, "source": "senses", "when": 1})
 	check(String(store.hexagram.get("source", "")) == "senses", "the senses hold the figure first")
-	glass.top_button().emit_signal("pressed")
+	hud.mandala_dial().emit_signal("center_hub_clicked")
 	await process_frame
 	check(String(store.hexagram.get("source", "")) == "tap",
-		"a tap on the top target casts, and the cast says it was a tap")
+		"a tap on the centre hub casts, and the cast says it was a tap")
 	check(int(store.hexagram.get("when", 0)) > 0, "the cast is stamped with an instant")
-	check(String(store.hexagram.get("who", "")) == glass.who(), "the cast is signed by this phone")
+	check(String(store.hexagram.get("who", "")) == hud.who(), "the cast is signed by this phone")
 	check((store.hexagram.get("throws", []) as Array).size() == 6, "six lines were thrown")
+
+	# -- no drag survives on either ring -------------------------------------
+	check(hud.body_dial() is BodyDialTap and hud.mandala_dial() is MandalaDialTap,
+		"both rings are the tap-only dials")
+	var before: int = store.primary()
+	var drag := InputEventScreenDrag.new()
+	drag.position = Vector2(40.0, 40.0)
+	hud.mandala_dial()._gui_input(drag)
+	hud.body_dial()._gui_input(drag)
+	await process_frame
+	check(store.primary() == before, "a drag across either ring changes nothing")
 
 	# -- a question is answered ----------------------------------------------
 	store.set_answer("")
-	check(glass.send_text("what is this moment"), "send takes a question")
+	check(hud.send_text("what is this moment"), "send takes a question")
 	var waited: float = 0.0
 	while store.answer == "" and waited < 2.0:
 		await process_frame
@@ -85,7 +107,7 @@ func _run() -> void:
 		await create_timer(0.05).timeout
 	check(store.answer != "", "an answer landed in the store within 2 s: %s" % store.answer)
 	await process_frame
-	check(glass.answer_text() != "", "the answer line on the glass is not empty")
+	check(hud.answer_text() != "", "the thought bubble is not empty")
 
 	# -- the answer line holds its three thoughts apart -----------------------
 	store.set_machine({"trigram": 4, "score": 0.9, "sentence": "flat on a surface, untouched"})
@@ -93,33 +115,58 @@ func _run() -> void:
 	await process_frame
 	store.set_answer("Keeping Still. flat on a surface, untouched day, screen on")
 	await process_frame
-	print("answer: ", glass.answer_text())
-	check(glass.answer_text() ==
+	print("answer: ", hud.answer_text())
+	check(hud.answer_text() ==
 		"Keeping Still. | flat on a surface, untouched | day, screen on",
 		"the answer line joins judgement and the two sentences with a bar")
 	store.set_answer("Keeping Still.")
 	await process_frame
-	check(glass.answer_text() == "Keeping Still.",
+	check(hud.answer_text() == "Keeping Still.",
 		"an answer carrying no sentences is left alone")
 
+	# -- the two rings are fed the sixteen ------------------------------------
+	check(hud.body_dial().scores.size() == 8,
+		"the machine ring holds eight scores (got %d)" % hud.body_dial().scores.size())
+	check(hud.mandala_dial().scores.size() == 8,
+		"the human ring holds eight scores (got %d)" % hud.mandala_dial().scores.size())
+	check(hud.body_dial().active_machine_trigram == int(store.machine.get("trigram", -1)),
+		"the machine ring lights the trigram the store elected")
+	check(hud.mandala_dial().active_human_trigram == int(store.human.get("trigram", -1)),
+		"the human ring lights the trigram the store elected")
+
+	# -- the creature is on the stage, and it is fed -------------------------
+	check(app.creature.get_parent() == hud.view, "the creature stands in the stage viewport")
+	check(app.creature.ball.get_parent() == app.creature, "the ball is the creature's own")
+	check(app.creature.mandala.get_parent() == app.creature, "the dual orbit mandala is there too")
+	check((app.creature.mandala.line_strains as Array).size() == 6,
+		"the 3D mandala carries six line strains read off the sixteen")
+
 	# -- the sheet -----------------------------------------------------------
-	check(not glass.sheet_open(), "the sheet is shut until it is asked for")
-	glass.plus_button().emit_signal("pressed")
+	check(not hud.sheet_open(), "the sheet is shut until it is asked for")
+	hud.plus_button().emit_signal("pressed")
 	await process_frame
-	check(glass.sheet_open(), "the plus opens the sheet")
-	check(glass.sheet_row_count() == 16,
-		"the sheet lists eight machine rows and eight human ones (got %d)" % glass.sheet_row_count())
-	var skin: StyleBox = glass.get_node("Sheet").get_theme_stylebox("panel")
+	check(hud.sheet_open(), "the plus opens the sheet")
+	check(hud.sheet_row_count() == 16,
+		"the sheet lists eight machine rows and eight human ones (got %d)" % hud.sheet_row_count())
+	var skin: StyleBox = hud.sheet().get_theme_stylebox("panel")
 	check(skin is StyleBoxFlat, "the sheet carries a ground of its own")
 	check((skin as StyleBoxFlat).bg_color.a > 0.95,
 		"the sheet is opaque enough to read text on (alpha %f)" % (skin as StyleBoxFlat).bg_color.a)
-	glass.close_sheet()
-	check(not glass.sheet_open(), "the sheet shuts again")
+	hud.close_sheet()
+	check(not hud.sheet_open(), "the sheet shuts again")
 
 	# -- the becoming line ---------------------------------------------------
-	print("becomes: ", glass.becomes_text())
-	check(glass.becomes_text() != "", "the becoming line says something")
-	check(_is_ascii_but_figures(glass.becomes_text()), "the becoming line is ASCII but for its glyph")
+	print("becomes: ", hud.becomes_text())
+	check(hud.becomes_text() != "", "the becoming line says something")
+	check(_is_ascii_but_figures(hud.becomes_text()), "the becoming line is ASCII but for its glyph")
+
+	# -- the head wheel previews, it does not decide -------------------------
+	var held: int = store.primary()
+	hud.hud.btn_next.emit_signal("pressed")
+	await process_frame
+	print("wheel: ", hud.becomes_text())
+	check(hud.becomes_text().begins_with("wheel "), "the arrow previews the next head figure")
+	check(store.primary() == held, "looking at the wheel does not write to the store")
 
 	# -- the period is one number, and the clock follows it -------------------
 	app.senses.period_ms = 1000
@@ -128,16 +175,16 @@ func _run() -> void:
 	check(app.senses.period_ms == 1000, "the senses keep the period they were given")
 
 	# -- the stage is letterboxed, not stretched -----------------------------
-	glass._center.size = Vector2(300.0, 500.0)
-	var mid: Vector2 = glass._to_stage(Vector2(150.0, 250.0))
+	hud.field.size = Vector2(300.0, 500.0)
+	var mid: Vector2 = hud._to_stage(Vector2(150.0, 250.0))
 	print("stage mid: ", mid)
 	check(mid.is_equal_approx(Vector2(320.0, 320.0)),
-		"the centre of a 300x500 panel is the centre of the square stage")
-	var corner: Vector2 = glass._to_stage(Vector2(300.0, 500.0))
+		"the centre of a 300x500 field is the centre of the square stage")
+	var corner: Vector2 = hud._to_stage(Vector2(300.0, 500.0))
 	print("stage corner: ", corner)
 	check(corner.x >= 0.0 and corner.x <= 640.0 and corner.y >= 0.0 and corner.y <= 640.0,
-		"a corner of the panel still lands inside the 640 square")
-	check(glass._view.size == Vector2i(640, 640), "the stage viewport stays a 640 square")
+		"a corner of the field still lands inside the 640 square")
+	check(hud.view.size == Vector2i(640, 640), "the stage viewport stays a 640 square")
 
 	app.wmn.stop()
 	root.remove_child(app)

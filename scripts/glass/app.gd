@@ -4,7 +4,7 @@ extends Node
 ## THE ROOT, AND THE ONLY PLACE THE PARTS MEET.
 ##
 ## Seven objects, built once, wired once, and never again referred to by each
-## other by name: store, mnn, qwen, wmn, senses, creature, glass. Every one of
+## other by name: store, mnn, qwen, wmn, senses, creature, hud. Every one of
 ## them is handed its neighbours through a bind() and nothing reaches sideways
 ## for a singleton. That is why the import wall test can be short.
 ##
@@ -19,7 +19,10 @@ var qwen: Qwen = null
 var wmn: Wmn = null
 var senses: Senses = null
 var creature: Creature = null
-var glass: Glass = null
+## The surface is the OWNER'S HUD, bridged to the core -- not the sixteen-seat
+## ring that scripts/glass/glass.gd draws. That file stays on disk, and the
+## import wall still keeps it honest, but nothing boots it any more.
+var hud: HudBridge = null
 
 var _ticker: Timer = null
 var _boot_line: String = ""
@@ -47,10 +50,9 @@ func _ready() -> void:
 	senses.period_changed.connect(_on_period_changed)
 	add_child(senses)
 
-	glass = Glass.new()
-	glass.name = "Glass"
-	glass.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(glass)
+	hud = HudBridge.new()
+	hud.name = "Hud"
+	add_child(hud)
 
 	creature = Creature.new()
 	creature.name = "Creature"
@@ -58,14 +60,14 @@ func _ready() -> void:
 	qwen.bind(store, mnn)
 	senses.bind(store)
 	wmn.bind(store)
-	glass.bind(store, qwen, mnn, wmn)
-	glass.set_senses(senses)
-	glass.set_creature(creature)
+	hud.bind(store, qwen, mnn, wmn)
+	hud.set_senses(senses)
+	hud.set_creature(creature)
 	creature.bind(store)
 	creature.set_senses(senses)
 
-	glass.set_who(_identity_name())
-	wmn.start(glass.who())
+	hud.set_who(_identity_name())
+	wmn.start(hud.who())
 
 	mnn.token.connect(_on_token)
 	mnn.done.connect(_on_done)
@@ -112,7 +114,7 @@ func _on_done(_text: String) -> void:
 	creature.set_thinking(false)
 
 
-## A name for this phone. The glass can change it later; this is only the one
+## A name for this phone. The sheet can change it later; this is only the one
 ## it wakes up with, and a machine with no user name is still somebody.
 static func _identity_name() -> String:
 	var n: String = OS.get_environment("HEXY_WHO").strip_edges()
