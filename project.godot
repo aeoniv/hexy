@@ -8,7 +8,7 @@ config_version=5
 
 config/name="hexy-mnn-iching"
 config/version="1.0"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/hexy.tscn"
 config/icon="res://icon.png"
 config/features=PackedStringArray("4.7", "Mobile")
 

@@ -1,0 +1,115 @@
+class_name HexyApp
+extends Node
+
+## THE ROOT, AND THE ONLY PLACE THE PARTS MEET.
+##
+## Seven objects, built once, wired once, and never again referred to by each
+## other by name: store, mnn, qwen, wmn, senses, creature, glass. Every one of
+## them is handed its neighbours through a bind() and nothing reaches sideways
+## for a singleton. That is why the import wall test can be short.
+##
+## THE BOOT LINE IS THE CONTRACT. One ASCII line, printed once, saying whether
+## a model is really on the device, which fabric the mesh came up on, and that
+## the sixteen are all there. A person reading a logcat should learn the three
+## things that change what the app can do, and nothing else.
+
+## How often the sixteen are read.
+const TICK_S: float = 3.5
+
+var store: HexyStore = null
+var mnn: Mnn = null
+var qwen: Qwen = null
+var wmn: Wmn = null
+var senses: Senses = null
+var creature: Creature = null
+var glass: Glass = null
+
+var _ticker: Timer = null
+var _boot_line: String = ""
+
+
+func _ready() -> void:
+	store = HexyStore.new()
+	store.name = "Store"
+	add_child(store)
+
+	mnn = Mnn.new()
+	mnn.name = "Mnn"
+	add_child(mnn)
+
+	qwen = Qwen.new()
+	qwen.name = "Qwen"
+	add_child(qwen)
+
+	wmn = Wmn.new()
+	wmn.name = "Wmn"
+	add_child(wmn)
+
+	senses = Senses.new()
+	senses.name = "Senses"
+	senses.period_ms = int(TICK_S * 1000.0)
+	add_child(senses)
+
+	glass = Glass.new()
+	glass.name = "Glass"
+	glass.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(glass)
+
+	creature = Creature.new()
+	creature.name = "Creature"
+
+	qwen.bind(store, mnn)
+	senses.bind(store)
+	wmn.bind(store)
+	glass.bind(store, qwen, mnn, wmn)
+	glass.set_senses(senses)
+	glass.set_creature(creature)
+	creature.bind(store)
+	creature.set_senses(senses)
+
+	glass.set_who(_identity_name())
+	wmn.start(glass.who())
+
+	mnn.token.connect(_on_token)
+	mnn.done.connect(_on_done)
+
+	_ticker = Timer.new()
+	_ticker.name = "Ticker"
+	_ticker.wait_time = TICK_S
+	_ticker.autostart = true
+	_ticker.timeout.connect(_on_tick)
+	add_child(_ticker)
+
+	_boot_line = "hexy base: mnn=%s mesh=%s senses=%d" % [
+		"yes" if mnn.available() else "no",
+		"lan" if wmn.force_lan else "nearby",
+		senses.machine.size() + senses.human.size(),
+	]
+	print(_boot_line)
+
+
+## The line printed at boot, for a test to read back.
+func boot_line() -> String:
+	return _boot_line
+
+
+func _on_tick() -> void:
+	senses.tick(wmn.now_ms(), senses.telemetry_from_input())
+
+
+func _on_token(_t: String) -> void:
+	creature.set_thinking(true)
+
+
+func _on_done(_text: String) -> void:
+	creature.set_thinking(false)
+
+
+## A name for this phone. The glass can change it later; this is only the one
+## it wakes up with, and a machine with no user name is still somebody.
+static func _identity_name() -> String:
+	var n: String = OS.get_environment("HEXY_WHO").strip_edges()
+	if n != "":
+		return n
+	n = String(ProjectSettings.get_setting("application/config/name", "")).strip_edges()
+	return n if n != "" else "hexy"
