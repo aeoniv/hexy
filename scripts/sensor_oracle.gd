@@ -1,4 +1,4 @@
-﻿class_name SensorOracle
+class_name SensorOracle
 extends Node
 
 ## Autonomous 8x8 Cybernetic Sensor Fusion Engine (Machine Context x Human Activity)
@@ -89,8 +89,12 @@ var last_haptic_time: float = 0.0
 var current_machine_tri: int = 7 # Heaven
 var current_human_tri: int = 7   # Heaven
 
+const FlyCentralComplexScript := preload("res://scripts/brain/fly_central_complex.gd")
+var central_complex: RefCounted = null
+
 
 func _ready() -> void:
+	central_complex = FlyCentralComplexScript.new()
 	anchor_grav = Vector3(0.0, -9.8, 0.0)
 	filtered_grav = anchor_grav
 	var time_dict = Time.get_time_dict_from_system()
@@ -149,6 +153,9 @@ func _process(delta: float) -> void:
 		current_heading_deg = posmod(rad_to_deg(heading_rad), 360.0)
 		
 	_sample_hardware_extensions()
+	
+	if central_complex != null:
+		central_complex.step(delta, filtered_gyro.z, 0.015)
 	
 	var time_dict = Time.get_time_dict_from_system()
 	solar_hour = float(time_dict.get("hour", 12)) + float(time_dict.get("minute", 0)) / 60.0

@@ -46,10 +46,47 @@ var machine: Dictionary = _empty_family()
 ## {trigram:int 0..7, score:float, sentence:String}
 var human: Dictionary = _empty_family()
 
+const CharacterScript := preload("res://scripts/brain/character.gd")
+
 ## {bits:int, moving:int, peers:int}
 var room: Dictionary = _empty_room()
 
 var answer: String = ""
+
+## Biological Fruit Fly Character Homeostat
+var character: RefCounted = null
+
+
+func _init() -> void:
+	character = CharacterScript.new()
+	character.line_opened.connect(_on_character_line_opened)
+	character.line_closed.connect(_on_character_line_closed)
+
+
+func _on_character_line_opened(line: int) -> void:
+	var meta = character.fly_neuromodulator(line - 1)
+	set_last_flip({
+		"line": line - 1,
+		"to_yang": true,
+		"reason": meta.get("transmitter", "open"),
+		"when": Time.get_ticks_msec()
+	})
+
+
+func _on_character_line_closed(line: int) -> void:
+	var meta = character.fly_neuromodulator(line - 1)
+	set_last_flip({
+		"line": line - 1,
+		"to_yang": false,
+		"reason": meta.get("transmitter", "closed"),
+		"when": Time.get_ticks_msec()
+	})
+
+
+func get_character() -> RefCounted:
+	if character == null:
+		character = CharacterScript.new()
+	return character
 
 
 static func _empty_hexagram() -> Dictionary:

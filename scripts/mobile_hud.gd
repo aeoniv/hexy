@@ -1,4 +1,4 @@
-﻿extends Control
+extends Control
 
 const MnnRuntime = preload("res://scripts/brain/mnn_runtime.gd")
 const MandalaDial2D = preload("res://scripts/mandala_dial_2d.gd")
@@ -6,6 +6,7 @@ const CreatureBall3D = preload("res://scripts/creature_ball_3d.gd")
 const SensorOracle = preload("res://scripts/sensor_oracle.gd")
 const MeshFabric = preload("res://scripts/net/mesh_fabric.gd")
 const IdentityScript = preload("res://scripts/social/identity.gd")
+const ReadingWordsScript = preload("res://scripts/creature/reading_words.gd")
 
 @onready var top_bar: PanelContainer = $TopBar
 @onready var lbl_title: Label = $TopBar/Margin/HBox/Title
@@ -473,10 +474,14 @@ func _update_huohoutu_ui(mutation_reason: String = "") -> void:
 	var sun: Dictionary = sensor_oracle.get_sun_cycle() if sensor_oracle else {}
 	
 	if mutation_reason != "":
-		lbl_thought.text = "🔥 HUOHOUTU (火候圖) ALCHEMY MUTATION:\n• 🌙 HEAD [Oracle]: #%d %s '%s'\n• ☀️ BODY [Tensegrity]: #%d %s '%s'\n• %s" % [
+		var bio_obs: String = ""
+		var line_idx: int = (head_hex_id % 6)
+		var user_lang: String = "pt" if OS.get_locale_language() == "pt" else "en"
+		bio_obs = "\n• 🪰 FF-Brain: " + ReadingWordsScript.biological_sentence(line_idx + 1, 0.6, user_lang)
+		lbl_thought.text = "🔥 HUOHOUTU (火候圖) ALCHEMY MUTATION:\n• 🌙 HEAD [Oracle]: #%d %s '%s'\n• ☀️ BODY [Tensegrity]: #%d %s '%s'\n• %s%s" % [
 			head_data["id"], head_data.get("zh", ""), head_data["name"],
 			body_data["id"], body_data.get("zh", ""), body_data["name"],
-			mutation_reason
+			mutation_reason, bio_obs
 		]
 	else:
 		lbl_thought.text = "🔥 HUOHOUTU (火候圖) REAL-TIME RESONANCE:\n• 🌙 HEAD (Manual Oracle): #%d %s '%s' (Moon %s)\n• ☀️ BODY (Auto Tensegrity): #%d %s '%s' (Sun %s)\n• Spin bottom dial to cast Head; hold still 2.5s for Civil Fire." % [
