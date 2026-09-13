@@ -13,9 +13,6 @@ extends Node
 ## the sixteen are all there. A person reading a logcat should learn the three
 ## things that change what the app can do, and nothing else.
 
-## How often the sixteen are read.
-const TICK_S: float = 3.5
-
 var store: HexyStore = null
 var mnn: Mnn = null
 var qwen: Qwen = null
@@ -47,7 +44,7 @@ func _ready() -> void:
 
 	senses = Senses.new()
 	senses.name = "Senses"
-	senses.period_ms = int(TICK_S * 1000.0)
+	senses.period_changed.connect(_on_period_changed)
 	add_child(senses)
 
 	glass = Glass.new()
@@ -75,7 +72,7 @@ func _ready() -> void:
 
 	_ticker = Timer.new()
 	_ticker.name = "Ticker"
-	_ticker.wait_time = TICK_S
+	_ticker.wait_time = _period_s()
 	_ticker.autostart = true
 	_ticker.timeout.connect(_on_tick)
 	add_child(_ticker)
@@ -91,6 +88,16 @@ func _ready() -> void:
 ## The line printed at boot, for a test to read back.
 func boot_line() -> String:
 	return _boot_line
+
+
+## The ticker's period, in seconds, taken from the one place it lives.
+func _period_s() -> float:
+	return maxf(0.001, float(senses.period_ms) / 1000.0)
+
+
+func _on_period_changed(_ms: int) -> void:
+	if _ticker != null:
+		_ticker.wait_time = _period_s()
 
 
 func _on_tick() -> void:

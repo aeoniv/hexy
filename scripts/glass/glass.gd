@@ -43,6 +43,10 @@ var _senses: Node = null
 var _creature: Node = null
 
 var _top: Button = null
+## The side of the creature's stage, in viewport pixels. It is square and it
+## does not change; only the scale it is drawn at does.
+const STAGE_PX: int = 640
+
 var _center: Control = null
 var _svc: SubViewportContainer = null
 var _view: SubViewport = null
@@ -126,13 +130,14 @@ func _build_center() -> void:
 	_svc = SubViewportContainer.new()
 	_svc.name = "Stage"
 	_svc.stretch = true
-	_svc.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_svc.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_svc.size = Vector2(float(STAGE_PX), float(STAGE_PX))
 	_svc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_center.add_child(_svc)
 
 	_view = SubViewport.new()
 	_view.name = "Stagelet"
-	_view.size = Vector2i(640, 640)
+	_view.size = Vector2i(STAGE_PX, STAGE_PX)
 	_view.transparent_bg = true
 	_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	_svc.add_child(_view)
@@ -506,12 +511,20 @@ static func _is_release(event: InputEvent) -> bool:
 
 
 ## A point on the glass, in the pixels of the stage viewport.
+##
+## The stage is a SQUARE and the panel usually is not, so the mapping is a
+## letterbox: one scale for both axes, taken from the shorter side, with the
+## leftover split evenly as a margin. Scaling x and y apart would put the
+## creature's answer somewhere the finger did not point.
 func _to_stage(p: Vector2) -> Vector2:
 	var box: Vector2 = _center.size
-	if box.x <= 0.0 or box.y <= 0.0:
+	var side: float = minf(box.x, box.y)
+	if side <= 0.0:
 		return p
 	var v := Vector2(_view.size)
-	return Vector2(p.x / box.x * v.x, p.y / box.y * v.y)
+	var off: Vector2 = (box - Vector2(side, side)) * 0.5
+	var q: Vector2 = (p - off) / side
+	return Vector2(clampf(q.x, 0.0, 1.0) * v.x, clampf(q.y, 0.0, 1.0) * v.y)
 
 
 func _on_seat_pressed(family: int, trigram: int) -> void:
@@ -656,8 +669,15 @@ func _layout_center() -> void:
 	var box: Vector2 = _center.size
 	if box.x < 8.0 or box.y < 8.0:
 		return
-	# The stage viewport is NOT resized here: `stretch` already keeps it exactly
-	# the size of its container, and setting it by hand only argues with that.
+	# The stage stays a fixed square of STAGE_PX pixels -- `stretch` would
+	# otherwise hand the viewport the panel's own oblong size and render the
+	# creature squashed. The container keeps that square and is SCALED into the
+	# centred square of the panel instead, so one number scales both axes.
+	var side: float = minf(box.x, box.y)
+	var k: float = side / float(STAGE_PX)
+	_svc.size = Vector2(float(STAGE_PX), float(STAGE_PX))
+	_svc.scale = Vector2(k, k)
+	_svc.position = (box - Vector2(side, side)) * 0.5
 	var mid: Vector2 = box * 0.5
 	var r: float = minf(box.x, box.y) * 0.5
 	var pad: float = minf(34.0, r * 0.14)

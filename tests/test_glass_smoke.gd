@@ -102,6 +102,24 @@ func _run() -> void:
 	check(glass.becomes_text() != "", "the becoming line says something")
 	check(_is_ascii_but_figures(glass.becomes_text()), "the becoming line is ASCII but for its glyph")
 
+	# -- the period is one number, and the clock follows it -------------------
+	app.senses.period_ms = 1000
+	check(is_equal_approx(float(app._ticker.wait_time), 1.0),
+		"setting senses.period_ms moves the app ticker to 1.0 s")
+	check(app.senses.period_ms == 1000, "the senses keep the period they were given")
+
+	# -- the stage is letterboxed, not stretched -----------------------------
+	glass._center.size = Vector2(300.0, 500.0)
+	var mid: Vector2 = glass._to_stage(Vector2(150.0, 250.0))
+	print("stage mid: ", mid)
+	check(mid.is_equal_approx(Vector2(320.0, 320.0)),
+		"the centre of a 300x500 panel is the centre of the square stage")
+	var corner: Vector2 = glass._to_stage(Vector2(300.0, 500.0))
+	print("stage corner: ", corner)
+	check(corner.x >= 0.0 and corner.x <= 640.0 and corner.y >= 0.0 and corner.y <= 640.0,
+		"a corner of the panel still lands inside the 640 square")
+	check(glass._view.size == Vector2i(640, 640), "the stage viewport stays a 640 square")
+
 	app.wmn.stop()
 	root.remove_child(app)
 	app.queue_free()

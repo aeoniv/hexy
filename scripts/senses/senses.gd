@@ -30,8 +30,20 @@ extends Node
 ## How long a tap's figure is protected from the senses.
 const TAP_HOLD_MS: int = 300000
 
-## How often the sixteen are read, when the host ticks faster than this.
-@export var period_ms: int = 3500
+## Announced whenever [member period_ms] changes, so the host's clock can
+## follow the one number that decides it instead of keeping a copy.
+signal period_changed(ms: int)
+
+## How often the sixteen are read, when the host ticks faster than this. This
+## is the ONLY place the period lives: the app reads it for its ticker and
+## listens to [signal period_changed] to follow it.
+@export var period_ms: int = 3500:
+	set(value):
+		var v: int = maxi(1, value)
+		if v == period_ms:
+			return
+		period_ms = v
+		period_changed.emit(v)
 
 var machine: Array[Sense] = ([] as Array[Sense])
 var human: Array[Sense] = ([] as Array[Sense])
