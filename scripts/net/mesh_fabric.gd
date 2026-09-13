@@ -123,7 +123,14 @@ func peer_count() -> int:
 
 
 func backend_name() -> String:
-	return _transports[0].backend_name() if not _transports.is_empty() else "none"
+	if _transports.is_empty():
+		return "none"
+	var names: Array[String] = []
+	for t in _transports:
+		var b := t.backend_name()
+		if not b in names:
+			names.append(b)
+	return "+".join(names)
 
 
 ## How far away a fabric id is, in hops, or -1 for "not known". Only 0 is ever

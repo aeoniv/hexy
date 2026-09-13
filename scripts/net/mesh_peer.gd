@@ -30,6 +30,7 @@ const MeshAdapterScript = preload("res://scripts/adapters/mesh_adapter.gd")
 
 var _android: Object = null
 var _door := MeshAdapterScript.new(NEEDS, "mesh", "nearby", "lan")
+var force_lan: bool = false
 var _lan: LanMesh = null
 
 
@@ -38,7 +39,7 @@ var _lan: LanMesh = null
 ## has no equivalent knob today, so it ignores the token — honest, not silent:
 ## on device every peer in range is a candidate, as Nearby intends.
 func start(display_name: String, session_token: String = "") -> Error:
-	if _door.present():
+	if _door.present() and not force_lan:
 		# THE VERSION HANDSHAKE happens inside the adapter. A stale ixmesh under a
 		# fresh script is the silent failure `scripts/seam.gd` exists for; on a
 		# mismatch this peer refuses rather than half-speaking Nearby.

@@ -4,6 +4,8 @@ const MnnRuntime = preload("res://scripts/brain/mnn_runtime.gd")
 const MandalaDial2D = preload("res://scripts/mandala_dial_2d.gd")
 const CreatureBall3D = preload("res://scripts/creature_ball_3d.gd")
 const SensorOracle = preload("res://scripts/sensor_oracle.gd")
+const MeshFabric = preload("res://scripts/net/mesh_fabric.gd")
+const IdentityScript = preload("res://scripts/social/identity.gd")
 
 @onready var top_bar: PanelContainer = $TopBar
 @onready var lbl_title: Label = $TopBar/Margin/HBox/Title
@@ -37,7 +39,11 @@ const SensorOracle = preload("res://scripts/sensor_oracle.gd")
 @onready var tab_brain: Button = $BottomNav/HBox/TabBrain
 @onready var tab_telemetry: Button = $BottomNav/HBox/TabTelemetry
 
+var btn_mesh_status: Button
 var mnn: MnnRuntime
+var mesh_fabric: MeshFabric = null
+var mesh_peers: Dictionary = {}
+var last_mesh_event: String = "No events yet"
 var creature_node: Node3D
 var mandala_3d_node: Node3D
 var active_mode: String = "companion"
@@ -92,12 +98,82 @@ func _ready() -> void:
 	tab_brain.pressed.connect(func(): _switch_mode("brain"))
 	tab_telemetry.pressed.connect(func(): _switch_mode("telemetry"))
 	
+	btn_mesh_status = Button.new()
+	btn_mesh_status.name = "BtnMeshStatus"
+	btn_mesh_status.text = "🌐 MESH: ..."
+	btn_mesh_status.modulate = Color(0.2, 0.85, 1.0)
+	btn_mesh_status.add_theme_font_size_override("font_size", 11)
+	$TopBar/Margin/HBox.add_child(btn_mesh_status)
+	$TopBar/Margin/HBox.move_child(btn_mesh_status, 1)
+	btn_mesh_status.pressed.connect(func(): _switch_mode("telemetry"))
+	
 	_update_mode_ui()
 	btn_cast_mode.text = "🔥 HUOHOUTU"
 	btn_cast_mode.modulate = Color(1.0, 0.75, 0.2)
 	btn_cast.text = "🪙 CAST HEAD"
 	btn_cast.modulate = Color(0.5, 0.9, 1.0)
 	_switch_mode("companion")
+
+
+func setup_mesh(fabric: MeshFabric) -> void:
+	mesh_fabric = fabric
+	if mesh_fabric:
+		mesh_fabric.peer_found.connect(_on_mesh_peer_found)
+		mesh_fabric.peer_lost.connect(_on_mesh_peer_lost)
+		mesh_fabric.peer_named.connect(_on_mesh_peer_named)
+		mesh_fabric.peer_proximity.connect(_on_mesh_peer_proximity)
+		mesh_fabric.fabric_event.connect(_on_mesh_fabric_event)
+		print("HUD_MESH: Connected to MeshFabric (backend=", mesh_fabric.backend_name(), " id=", mesh_fabric.fabric_id, ")")
+		if active_mode == "telemetry":
+			_update_telemetry_view()
+
+func _on_mesh_peer_found(id: String, peer_name: String) -> void:
+	mesh_peers[id] = {"name": peer_name, "class": "room", "last_seen": Time.get_ticks_msec()}
+	print("HUD_MESH: Peer found: ", id, " (", peer_name, ")")
+	Input.vibrate_handheld(30)
+	if active_mode == "telemetry":
+		_update_telemetry_view()
+
+func _on_mesh_peer_lost(id: String) -> void:
+	mesh_peers.erase(id)
+	print("HUD_MESH: Peer lost: ", id)
+	if active_mode == "telemetry":
+		_update_telemetry_view()
+
+func _on_mesh_peer_named(id: String, peer_name: String) -> void:
+	if id in mesh_peers and mesh_peers[id] is Dictionary:
+		mesh_peers[id]["name"] = peer_name
+	else:
+		mesh_peers[id] = {"name": peer_name, "class": "room", "last_seen": Time.get_ticks_msec()}
+	if active_mode == "telemetry":
+		_update_telemetry_view()
+
+func _on_mesh_peer_proximity(id: String, cls: String) -> void:
+	if id in mesh_peers and mesh_peers[id] is Dictionary:
+		mesh_peers[id]["class"] = cls
+	if active_mode == "telemetry":
+		_update_telemetry_view()
+
+func _on_mesh_fabric_event(src: String, kind: String, body: Dictionary, _prov: String) -> void:
+	last_mesh_event = "[%s] %s: %s" % [IdentityScript.short_name(src), kind, JSON.stringify(body)]
+	print("HUD_MESH: Received fabric event: ", last_mesh_event)
+	Input.vibrate_handheld(15)
+	if active_mode == "telemetry":
+		_update_telemetry_view()
+
+func send_mesh_ping() -> void:
+	if mesh_fabric:
+		var s_name := IdentityScript.short_name(mesh_fabric.fabric_id)
+		mesh_fabric.emit_event("ping", {
+			"from": s_name,
+			"ts": Time.get_ticks_msec(),
+			"head_hex": head_hex_id,
+			"body_hex": body_hex_id
+		})
+		last_mesh_event = "[LOCAL] Broadcast ping from %s" % s_name
+		Input.vibrate_handheld(25)
+		if active_mode == "telemetry":
+			_update_telemetry_view()
 
 func setup_creature(creature: Node3D, mandala: Node3D = null) -> void:
 	creature_node = creature
@@ -125,6 +201,12 @@ func setup_creature(creature: Node3D, mandala: Node3D = null) -> void:
 
 func _process(_delta: float) -> void:
 	lbl_fps.text = "%d FPS" % Engine.get_frames_per_second()
+	if btn_mesh_status and mesh_fabric:
+		var p_count := mesh_peers.size()
+		var b_name := mesh_fabric.backend_name().to_upper()
+		var s_name := IdentityScript.short_name(mesh_fabric.fabric_id)
+		btn_mesh_status.text = "🌐 %s:%s (%d)" % [b_name, s_name, p_count]
+		btn_mesh_status.modulate = Color(0.4, 1.0, 0.6) if p_count > 0 else Color(0.25, 0.85, 1.0)
 
 func _on_cast_mode_toggle_pressed() -> void:
 	# Single Unified Huohoutu Mode - Tap indicates alchemical resonance
@@ -277,10 +359,8 @@ func _update_telemetry_view() -> void:
 	var hum_tri_name: String = SensorOracle.TRIGRAM_NAMES[hum_idx]
 	
 	var hex_bits: int = (hum_idx << 3) | mach_idx
-	var hex_idx: int = mandala_dial.find_index_by_bits(hex_bits) if mandala_dial else 0
-	var hex_info: Dictionary = mandala_dial.KING_WEN_DATA[hex_idx] if mandala_dial and hex_idx < mandala_dial.KING_WEN_DATA.size() else {}
-	var wen_num: int = hex_info.get("wen", 1)
-	var hex_label: String = "#%d %s '%s'" % [wen_num, hex_info.get("zh", ""), hex_info.get("name", "")]
+	var hex_data: Dictionary = HuohoutuData.get_by_bits(hex_bits)
+	var hex_label: String = "#%d %s '%s'" % [hex_data.get("id", 1), hex_data.get("zh", ""), hex_data.get("name", "")]
 	
 	lbl_thought.text = """☸ 8x8 SENSOR-HABIT SYNERGY TELEMETRY:
 • MACHINE SUBSTRATE (Inner Trigram): %s
@@ -297,6 +377,33 @@ func _update_telemetry_view() -> void:
 		strains[3] * 100.0, strains[4] * 100.0, strains[5] * 100.0,
 		exc_val * 100.0, heading
 	]
+	if mesh_fabric:
+		var b_name := mesh_fabric.backend_name().to_upper()
+		var s_name := IdentityScript.short_name(mesh_fabric.fabric_id)
+		var p_count := mesh_peers.size()
+		var p_roster := ""
+		if p_count > 0:
+			var lines := []
+			for pid in mesh_peers:
+				var pinfo = mesh_peers[pid]
+				var pname: String = pinfo.get("name", pid) if pinfo is Dictionary else String(pinfo)
+				var pcls: String = pinfo.get("class", "room") if pinfo is Dictionary else "room"
+				lines.append("    • %s [%s] (link: %s)" % [pname, pcls, pid])
+			p_roster = "\n" + "\n".join(lines)
+		else:
+			p_roster = " None (Broadcasting/Scanning for peers...)"
+		
+		lbl_thought.text += """\n
+🌐 WIRELESS MESH NETWORK (WMN ENGINE):
+• Backend: %s | Node ID: %s (%s)
+• Status: BROADCASTING & DISCOVERING
+• Connected Peers (%d):%s
+• Last Mesh Event: %s
+• Wire Action: Tap [📡 PING MESH] below to broadcast test datagram""" % [
+			b_name, s_name, mesh_fabric.fabric_id,
+			p_count, p_roster,
+			last_mesh_event
+		]
 
 func _on_geo_toggle_pressed() -> void:
 	if creature_node and creature_node.has_method("cycle_geometry_mode"):
@@ -359,6 +466,9 @@ func _update_huohoutu_ui(mutation_reason: String = "") -> void:
 	]
 	lbl_moving_line.text = "Huohoutu Pacing: 文火 Civil Dwell (2.5s) · 武火 Martial Shake"
 	
+	if active_mode != "companion" and active_mode != "oracle":
+		return
+	
 	var moon: Dictionary = sensor_oracle.get_moon_phase() if sensor_oracle else {}
 	var sun: Dictionary = sensor_oracle.get_sun_cycle() if sensor_oracle else {}
 	
@@ -384,6 +494,9 @@ func _on_next_pressed() -> void:
 		mandala_dial.select_next()
 
 func _on_cast_pressed() -> void:
+	if active_mode == "telemetry":
+		send_mesh_ping()
+		return
 	# Manual Head Cast: Randomly steps through Head sequence using oracle coin toss
 	Input.vibrate_handheld(25)
 	var rand_idx: int = randi() % HuohoutuData.HEAD_SEQUENCE.size()
@@ -392,11 +505,24 @@ func _on_cast_pressed() -> void:
 	mandala_dial._emit_current()
 	var head_data: Dictionary = HuohoutuData.get_head_hex(rand_idx)
 	lbl_thought.text = "🪙 Cast Head Hexagram: #%d %s '%s'. Manual oracle cast anchored." % [head_data["id"], head_data.get("zh", ""), head_data["name"]]
+	if mesh_fabric:
+		mesh_fabric.emit_event("oracle_cast", {
+			"head_hex": head_hex_id,
+			"body_hex": body_hex_id,
+			"mode": "huohoutu",
+			"ts": Time.get_ticks_msec()
+		})
+		last_mesh_event = "[LOCAL] broadcast oracle_cast Head #%d Body #%d" % [head_hex_id, body_hex_id]
 
 func _on_ask_pressed() -> void:
+	if active_mode == "telemetry":
+		_update_telemetry_view()
+		Input.vibrate_handheld(15)
+		return
 	Input.vibrate_handheld(20)
-	var cur: Dictionary = mandala_dial.KING_WEN_DATA[mandala_dial.current_hex_index]
-	var moving: int = (cur["wen"] % 6) + 1
+	var cur: Dictionary = HuohoutuData.get_head_hex(mandala_dial.current_hex_index)
+	var cur_id: int = cur.get("id", 1)
+	var moving: int = (cur_id % 6) + 1
 	var need_names := ["Body", "Food", "Breath", "Rest", "Focus", "Connection"]
 	var changing_need: String = need_names[moving - 1]
 	
@@ -407,20 +533,20 @@ func _on_ask_pressed() -> void:
 		var hum_desc: String = telem.get("human_name", "Calm Posture")
 		lbl_thought.text = "🧠 Consulting Qwen %s [%s Tier]...\nHexagram #%d %s (0b%06s) • Moving Line %d (%s)" % [
 			mnn.short_name(), mnn.tier_name(),
-			cur["wen"], cur["name"],
+			cur_id, cur["name"],
 			String.num_int64(cur["bits"], 2).pad_zeros(6),
 			moving, changing_need
 		]
 		prompt = "You are Hexy, a worn cybernetic companion building discipline by sensing body and machine. Environment context: %s. Human habit discipline: %s. Current King Wen Hexagram is #%d (%s '%s', bits 0b%06s). Changing line is Line %d (%s need). Give a concise 2-sentence reflection grounding discipline, habit motivation, and embodied balance in this moment." % [
 			mach_desc, hum_desc,
-			cur["wen"], cur["zh"], cur["name"],
+			cur_id, cur["zh"], cur["name"],
 			String.num_int64(cur["bits"], 2).pad_zeros(6),
 			moving, changing_need
 		]
 	else:
-		lbl_thought.text = "☯ Consulting I-Ching Persona (%s)...\nHexagram #%d %s" % [mnn.short_name(), cur["wen"], cur["name"]]
+		lbl_thought.text = "☯ Consulting I-Ching Persona (%s)...\nHexagram #%d %s" % [mnn.short_name(), cur_id, cur["name"]]
 		prompt = "You are the ancient Book of Changes oracle. Speak in brief poetic wisdom on Hexagram #%d %s (%s). Two sentences maximum." % [
-			cur["wen"], cur["zh"], cur["name"]
+			cur_id, cur["zh"], cur["name"]
 		]
 	
 	thought_bubble.visible = true
@@ -439,17 +565,43 @@ func _switch_mode(mode: String) -> void:
 	
 	if mode == "companion":
 		mandala_container.visible = true
+		if body_dial_container:
+			body_dial_container.visible = true
 		thought_bubble.visible = true
 		hex_card.visible = true
 		if creature_node:
 			creature_node.visible = is_enhanced_mode
+		btn_cast.text = "🪙 CAST HEAD"
+		btn_cast.modulate = Color(0.5, 0.9, 1.0)
+		btn_ask.text = "🧠 Ask MNN"
+		btn_ask.modulate = Color(1.0, 1.0, 1.0)
+		btn_prev.visible = true
+		btn_next.visible = true
+		_update_huohoutu_ui()
 	elif mode == "oracle":
 		mandala_container.visible = true
+		if body_dial_container:
+			body_dial_container.visible = true
 		thought_bubble.visible = true
 		hex_card.visible = true
+		btn_cast.text = "🪙 CAST HEAD"
+		btn_cast.modulate = Color(0.5, 0.9, 1.0)
+		btn_ask.text = "🧠 Ask MNN"
+		btn_ask.modulate = Color(1.0, 1.0, 1.0)
+		btn_prev.visible = true
+		btn_next.visible = true
+		_update_huohoutu_ui()
 	elif mode == "brain":
 		mandala_container.visible = false
+		if body_dial_container:
+			body_dial_container.visible = false
 		thought_bubble.visible = true
+		btn_cast.text = "🪙 CAST HEAD"
+		btn_cast.modulate = Color(0.5, 0.9, 1.0)
+		btn_ask.text = "🧠 Ask MNN"
+		btn_ask.modulate = Color(1.0, 1.0, 1.0)
+		btn_prev.visible = false
+		btn_next.visible = false
 		var v1: PackedFloat32Array = mnn.embed("hexy iching consultation")
 		var v2: PackedFloat32Array = mnn.embed("hexy iching consultation")
 		var sim: float = MnnRuntime.cosine(v1, v2)
@@ -473,5 +625,13 @@ func _switch_mode(mode: String) -> void:
 		]
 	elif mode == "telemetry":
 		mandala_container.visible = false
+		if body_dial_container:
+			body_dial_container.visible = false
 		thought_bubble.visible = true
+		btn_cast.text = "📡 PING MESH"
+		btn_cast.modulate = Color(0.3, 1.0, 0.7)
+		btn_ask.text = "🔄 REFRESH"
+		btn_ask.modulate = Color(0.4, 0.8, 1.0)
+		btn_prev.visible = false
+		btn_next.visible = false
 		_update_telemetry_view()
