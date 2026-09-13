@@ -1,4 +1,4 @@
-﻿class_name CreatureBall3D
+class_name CreatureBall3D
 extends Node3D
 
 signal machine_node_clicked(node_idx: int)
@@ -17,7 +17,7 @@ enum GeometryMode {
 	RHOMBIC_TRIACONTAHEDRON = 2
 }
 
-@export var geometry_mode: GeometryMode = GeometryMode.ICOSAHEDRON
+@export var geometry_mode: GeometryMode = GeometryMode.RHOMBIC_DODECAHEDRON
 @export var hexagram_bits: int = 0b111111 # 6-bit hexagram (0..63)
 @export var moving_line: int = -1 # 0..5 or -1 if none
 @export var fold_factor: float = 0.0

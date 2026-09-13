@@ -1,24 +1,21 @@
 class_name BodyDialTap
 extends BodyDial2D
 
-## THE OWNER'S MACHINE BA-GUA RING, WITH THE DRAG TAKEN OUT.
+## THE MACHINE REALM DIAL: FULL TOUCH-DRAG ORBIT & MACHINE SENSORS.
 ##
-## Everything drawn here is BodyDial2D's own drawing; this subclass adds two
-## things and removes one.
-##
-## ADDED: the eight machine scores, drawn as an arc around each station, so a
-## person can see how loudly every machine sense is speaking and not only which
-## one won. And the winner ring, which the base already lights, is now told by
-## the store instead of by a sensor object of its own.
-##
-## REMOVED: the drag. The base dial span the 64-figure wheel under a finger,
-## which is a hidden gesture -- two fingers' travel decided the figure and
-## nothing on the glass said so. On this surface a figure arrives by a TAP on
-## the hub or by the senses, and the ring answers taps on its eight stations
-## only. The base script is not edited: the old app keeps its drag.
+## Dragging around the dial orbits the 3D creature and rotates the machine dial.
+## Tapping the 8 machine diamond stations opens telemetry for that sensor.
+
+signal dial_dragged(delta_angle: float)
 
 ## The eight machine scores, 0..1, indexed by trigram code.
 var scores: Array = []
+
+var _is_dragging: bool = false
+var _touch_down_pos: Vector2 = Vector2.ZERO
+var _touch_down_time: int = 0
+var _prev_angle: float = 0.0
+var _has_moved: bool = false
 
 
 func _ready() -> void:
@@ -26,8 +23,6 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 
-## The base lerps its wheel angle every frame toward a drag that can no longer
-## happen. Redraw, and leave the angle where it was put.
 func _process(_delta: float) -> void:
 	queue_redraw()
 
@@ -42,15 +37,11 @@ func score_of(trigram: int) -> float:
 	return float(scores[t]) if t < scores.size() else 0.0
 
 
-## The centre and the radius, worked out from the size the ring was given.
-## The base only sets these while DRAWING, so a ring laid out but not yet
-## painted would answer every tap at its top-left corner.
 func _measure() -> void:
 	dial_center = size * 0.5
 	dial_radius = min(size.x, size.y) * 0.46
 
 
-## Where a machine diamond sits on the glass, for a bubble that points at it.
 func station_position(trigram: int) -> Vector2:
 	_measure()
 	for station in MACHINE_STATIONS:
@@ -60,14 +51,10 @@ func station_position(trigram: int) -> Vector2:
 	return dial_center
 
 
-## The body slot this ring is showing, 0..63.
 func body_slot() -> int:
 	return current_hex_index
 
 
-## Turn the sixty-four graduations to a slot of HuohoutuData.BODY_SEQUENCE.
-## Both angles are set: the base lerps toward the target every frame and this
-## subclass does not, so leaving one behind would show two different figures.
 func set_body_slot(slot: int) -> void:
 	current_hex_index = posmod(slot, HuohoutuData.BODY_SEQUENCE.size())
 	current_hex_id = HuohoutuData.BODY_SEQUENCE[current_hex_index]
@@ -76,7 +63,6 @@ func set_body_slot(slot: int) -> void:
 	queue_redraw()
 
 
-## The same turn, said in bits, which is how the store says it.
 func set_body_bits(bits: int) -> void:
 	var id: int = int(HuohoutuData.get_by_bits(bits & 63).get("id", 1))
 	set_body_slot(HuohoutuData.find_body_index_by_id(id))
@@ -98,25 +84,54 @@ func _draw() -> void:
 			draw_arc(pos, r, a, a + TAU * s, 24, Color(1.0, 0.78, 0.22, 0.9), 3.0, true)
 
 
-## Tap only: the eight stations, and nothing else on the ring.
 func _gui_input(event: InputEvent) -> void:
-	if not _is_release(event):
-		return
 	_measure()
-	var pos: Vector2 = event.position
-	for station in MACHINE_STATIONS:
-		var ang: float = float(station["angle"])
-		var st: Vector2 = dial_center + Vector2(cos(ang), sin(ang)) * (dial_radius * 0.78)
-		if (pos - st).length() < 34.0:
-			machine_station_clicked.emit(int(station["trigram"]))
-			accept_event()
-			return
+	var is_press: bool = false
+	var is_release: bool = false
+	var is_move: bool = false
+	var ev_pos: Vector2 = Vector2.ZERO
 
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		ev_pos = event.position
+		is_press = event.pressed
+		is_release = not event.pressed
+	elif event is InputEventScreenTouch:
+		ev_pos = event.position
+		is_press = event.pressed
+		is_release = not event.pressed
+	elif event is InputEventMouseMotion or event is InputEventScreenDrag:
+		ev_pos = event.position
+		is_move = true
 
-static func _is_release(event: InputEvent) -> bool:
-	if event is InputEventScreenTouch:
-		return not (event as InputEventScreenTouch).pressed
-	if event is InputEventMouseButton:
-		var mb := event as InputEventMouseButton
-		return mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed
-	return false
+	if is_press:
+		_is_dragging = true
+		_touch_down_pos = ev_pos
+		_touch_down_time = int(Time.get_ticks_msec())
+		_has_moved = false
+		_prev_angle = (ev_pos - dial_center).angle()
+		accept_event()
+	elif is_move and _is_dragging:
+		if (ev_pos - _touch_down_pos).length() > 14.0:
+			_has_moved = true
+		var cur_angle: float = (ev_pos - dial_center).angle()
+		var delta_ang: float = wrapf(cur_angle - _prev_angle, -PI, PI)
+		_prev_angle = cur_angle
+		dial_angle += delta_ang
+		target_dial_angle = dial_angle
+		dial_dragged.emit(delta_ang)
+		queue_redraw()
+		accept_event()
+	elif is_release:
+		var move_dist: float = (ev_pos - _touch_down_pos).length()
+		var tap_dur: int = int(Time.get_ticks_msec()) - _touch_down_time
+		_is_dragging = false
+		if not _has_moved and move_dist < 18.0 and tap_dur < 400:
+			var pos: Vector2 = ev_pos
+			for station in MACHINE_STATIONS:
+				var ang: float = float(station["angle"])
+				var st: Vector2 = dial_center + Vector2(cos(ang), sin(ang)) * (dial_radius * 0.78)
+				if (pos - st).length() < 34.0:
+					machine_station_clicked.emit(int(station["trigram"]))
+					accept_event()
+					return
+		accept_event()

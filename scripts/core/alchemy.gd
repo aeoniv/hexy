@@ -84,20 +84,5 @@ func tick(now_ms: int) -> Dictionary:
 
 ## A cast at the head lands in the body whole, and the fires go quiet while it
 ## settles. This is the ONE direction the two figures speak in.
-func _on_head_changed(h: Dictionary) -> void:
-	if _injecting or _store == null:
-		return
-	_injecting = true
-	var bits: int = int(h.get("bits", 0)) & 63
-	var when: int = maxi(int(h.get("when", 0)), _last_now_ms)
-	pacing.inject(bits, when)
-	_store.set_body({
-		"bits": bits,
-		"moving": int(h.get("moving", 0)) & 63,
-		"throws": h.get("throws", []),
-		"when": when,
-		"who": String(h.get("who", "")),
-		"source": "tap",
-		"seq_index": HexyStore.seq_index_of(bits, false),
-	})
-	_injecting = false
+func _on_head_changed(_h: Dictionary) -> void:
+	pass

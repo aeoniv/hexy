@@ -69,34 +69,33 @@ func _draw() -> void:
 			draw_circle(st_pos, node_r + 4.0, Color(1.0, 0.85, 0.25, 0.35))
 		draw_circle(st_pos, node_r, node_col)
 	
-	# Center Hub (Circle)
+	# Center Hub (Circle): Human Consciousness & Breathing Vitality
 	var hub_r := dial_radius * 0.48
-	draw_circle(dial_center, hub_r, Color(0.06, 0.09, 0.14, 0.92))
-	draw_arc(dial_center, hub_r, 0, TAU, 32, Color(0.2, 0.7, 0.9, 0.8), 2.0, true)
-	
-	# Draw Hexagram Lines inside Center Hub (Head=Gold over Body=Cyan)
-	var cur_data: Dictionary = HuohoutuData.get_head_hex(current_hex_index)
-	var bits: int = cur_data["bits"]
-	var line_w: float = hub_r * 1.1
-	var line_h: float = 4.0
-	var line_gap: float = 7.0
-	var start_y: float = dial_center.y + (line_gap * 2.5)
-	
-	for line_idx in range(6):
-		var y: float = start_y - float(line_idx) * (line_h + line_gap)
-		var is_yang: bool = ((bits >> line_idx) & 1) == 1
-		var is_upper: bool = line_idx >= 3
-		var col: Color = (Color(1.0, 0.82, 0.25) if is_yang else Color(0.75, 0.58, 0.2)) if is_upper else (Color(0.25, 0.85, 1.0) if is_yang else Color(0.18, 0.55, 0.85))
+	draw_circle(dial_center, hub_r, Color(0.05, 0.08, 0.13, 0.94))
+	draw_arc(dial_center, hub_r, 0, TAU, 32, Color(0.2, 0.7, 0.9, 0.75), 2.0, true)
+	draw_arc(dial_center, hub_r - 4.0, 0, TAU, 32, Color(0.15, 0.45, 0.7, 0.35), 1.0, true)
+
+	# Breathing Vitality Wave (pulsing with time and stillness)
+	var t_msec: float = float(Time.get_ticks_msec())
+	var breath: float = 0.5 + 0.5 * sin(t_msec * 0.002)
+	var aura_r: float = hub_r * (0.35 + 0.22 * breath)
+	draw_circle(dial_center, aura_r, Color(0.2, 0.65, 0.9, 0.12 + 0.1 * breath))
+	draw_arc(dial_center, aura_r, 0, TAU, 32, Color(0.3, 0.8, 1.0, 0.3 + 0.35 * breath), 1.5, true)
+
+	# Central Human Symbol (Active Habit Trigram Glyph & Caption)
+	var font: Font = get_theme_default_font()
+	if font != null:
+		var tri_name: String = KingWen.trigram_name(active_human_trigram)
+		var tri_glyph: String = KingWen.trigram_glyph(active_human_trigram)
+		var title: String = "HUMAN · %s" % tri_name.to_upper()
+		var tw: float = font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9).x
+		draw_string(font, dial_center + Vector2(-tw * 0.5, hub_r * 0.68), title,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9, Color(0.65, 0.85, 1.0, 0.85))
 		
-		if is_yang:
-			# Solid Line
-			draw_line(Vector2(dial_center.x - line_w * 0.5, y), Vector2(dial_center.x + line_w * 0.5, y), col, line_h)
-		else:
-			# Split Line (Yin)
-			var half_span: float = line_w * 0.5
-			var gap: float = line_w * 0.2
-			draw_line(Vector2(dial_center.x - half_span, y), Vector2(dial_center.x - gap * 0.5, y), col, line_h)
-			draw_line(Vector2(dial_center.x + gap * 0.5, y), Vector2(dial_center.x + half_span, y), col, line_h)
+		# Center Glyph
+		var gw: float = font.get_string_size(tri_glyph, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 22).x
+		draw_string(font, dial_center + Vector2(-gw * 0.5, 7.0), tri_glyph,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 22, Color(1.0, 0.85, 0.3, 0.95))
 
 func _gui_input(event: InputEvent) -> void:
 	var is_press: bool = false

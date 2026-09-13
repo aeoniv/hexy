@@ -1,35 +1,32 @@
 class_name MandalaDialTap
 extends MandalaDial2D
 
-## THE OWNER'S HUMAN RING AND ITS CENTRE HUB, WITH THE DRAG TAKEN OUT.
+## THE HUMAN REALM DIAL: FULL TOUCH-DRAG ROTATION & SENSORY STATIONS.
 ##
-## Same bargain as BodyDialTap: the base's drawing is kept whole, the eight
-## human scores are drawn on top of it, and the wheel-under-the-finger is gone.
-## The hub is the one target that casts, and the two arrows beneath the ring
-## are the wheel now -- a visible thing, tapped once.
-##
-## THE RING IS THE WHEEL NOW. The drag that spun sixty-four figures under a
-## finger is gone, but the sixty-four ticks it spun are still drawn, and a tick
-## a person can see is a tick a person may touch: a tap on the ring walks the
-## HEAD to the slot nearest the finger and says so through
-## [signal ring_slot_tapped]. One visible target, one figure, no hidden travel.
+## The dial spins smoothly under the finger to browse the 64 Huohoutu slots,
+## with snapping to ticks on release. The 8 human habit sensor stations show
+## real-time vitality arcs. The center hub showcases human consciousness,
+## breathing, and focus state with zero hexagram lines.
 
-## A tap on the outer ring, as a slot 0..63 of HuohoutuData.HEAD_SEQUENCE.
 signal ring_slot_tapped(slot: int)
 
-## How close to the rim a tap must land to be the ring rather than a dot.
-const RING_INNER: float = 0.86
-
-## How close to a human dot a tap must land to be that dot, in pixels.
+const RING_INNER: float = 0.82
 const DOT_REACH: float = 28.0
 
-## The eight human scores, 0..1, indexed by trigram code.
 var scores: Array = []
+var _is_dragging: bool = false
+var _touch_down_pos: Vector2 = Vector2.ZERO
+var _drag_start_angle: float = 0.0
+var _has_moved: bool = false
 
 
 func _ready() -> void:
 	super()
 	mouse_filter = Control.MOUSE_FILTER_STOP
+
+
+func _process(_delta: float) -> void:
+	queue_redraw()
 
 
 func set_scores(row: Array) -> void:
@@ -47,16 +44,11 @@ func hub_radius() -> float:
 	return dial_radius * 0.48
 
 
-## The centre and the radius, worked out from the size the ring was given.
-## The base only sets these while DRAWING, so a ring that has been laid out but
-## not yet painted answers every tap at the top-left corner. A finger does not
-## wait for a frame; neither does this.
 func _measure() -> void:
 	dial_center = size * 0.5
 	dial_radius = min(size.x, size.y) * 0.44
 
 
-## Where a human dot sits on the glass, for a bubble that points at it.
 func dot_position(station: int) -> Vector2:
 	_measure()
 	var s: int = clampi(station, 0, 7)
@@ -64,19 +56,15 @@ func dot_position(station: int) -> Vector2:
 	return dial_center + Vector2(cos(ang), sin(ang)) * (dial_radius * 0.72)
 
 
-## Where the dot of a given trigram sits, by trigram code rather than seat.
 func trigram_position(trigram: int) -> Vector2:
 	var seat: int = HUMAN_STATION_TRIGRAMS.find(clampi(trigram, 0, 7))
 	return dot_position(maxi(0, seat))
 
 
-## The head slot this ring is showing, 0..63.
 func head_slot() -> int:
 	return current_hex_index
 
 
-## Walk the ring to a slot of HuohoutuData.HEAD_SEQUENCE. The ticks turn with
-## it, so the figure in the hub and the graduation at the pointer agree.
 func set_head_slot(slot: int) -> void:
 	current_hex_index = posmod(slot, HuohoutuData.HEAD_SEQUENCE.size())
 	dial_angle = -float(current_hex_index) * (TAU / 64.0)
@@ -84,13 +72,11 @@ func set_head_slot(slot: int) -> void:
 	queue_redraw()
 
 
-## The same walk, said in bits, which is how the store says it.
 func set_head_bits(bits: int) -> void:
 	var id: int = int(HuohoutuData.get_by_bits(bits & 63).get("id", 1))
 	set_head_slot(HuohoutuData.find_head_index_by_id(id))
 
 
-## The slot whose graduation lies under a point, 0..63.
 func slot_at(point: Vector2) -> int:
 	var ang: float = (point - dial_center).angle()
 	var step: float = TAU / 64.0
@@ -113,31 +99,65 @@ func _draw() -> void:
 			draw_arc(pos, r, a, a + TAU * v, 24, Color(0.35, 0.85, 1.0, 0.9), 3.0, true)
 
 
-## Tap only, and three targets in order of how small they are: the hub, then
-## the eight dots, then the ring. The smallest thing a finger could have meant
-## is asked first, so a dot never loses its tap to the ring behind it.
 func _gui_input(event: InputEvent) -> void:
-	if not _is_release(event):
-		return
 	_measure()
 	var point: Vector2 = event.position
-	var v: Vector2 = point - dial_center
-	var dist: float = v.length()
-	if dist < hub_radius():
-		center_hub_clicked.emit()
+
+	if _is_release(event):
+		var was_drag: bool = _is_dragging and _has_moved
+		_is_dragging = false
+		_has_moved = false
+		if not was_drag:
+			var v: Vector2 = point - dial_center
+			var dist: float = v.length()
+			if dist < hub_radius():
+				center_hub_clicked.emit()
+				accept_event()
+				return
+			for seat in range(8):
+				if (point - dot_position(seat)).length() < DOT_REACH:
+					var tri: int = HUMAN_STATION_TRIGRAMS[seat]
+					active_human_trigram = tri
+					queue_redraw()
+					human_station_clicked.emit(tri)
+					accept_event()
+					return
+			if dist >= dial_radius * RING_INNER and dist <= dial_radius * 1.35:
+				var slot: int = slot_at(point)
+				set_head_slot(slot)
+				ring_slot_tapped.emit(slot)
+				accept_event()
+				return
+		else:
+			target_dial_angle = -float(current_hex_index) * (TAU / 64.0)
+			dial_angle = target_dial_angle
+			queue_redraw()
+			accept_event()
+		return
+
+	if (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed) or (event is InputEventScreenTouch and event.pressed):
+		_is_dragging = true
+		_touch_down_pos = point
+		_has_moved = false
+		var dir: Vector2 = point - dial_center
+		_drag_start_angle = dir.angle() - dial_angle
 		accept_event()
 		return
-	for seat in range(8):
-		if (point - dot_position(seat)).length() < DOT_REACH:
-			var tri: int = HUMAN_STATION_TRIGRAMS[seat]
-			active_human_trigram = tri
-			queue_redraw()
-			human_station_clicked.emit(tri)
-			accept_event()
-			return
-	if dist >= dial_radius * RING_INNER and dist <= dial_radius * 1.25:
-		ring_slot_tapped.emit(slot_at(point))
+
+	if (event is InputEventMouseMotion or event is InputEventScreenDrag) and _is_dragging:
+		if (point - _touch_down_pos).length() > 10.0:
+			_has_moved = true
+		var dir: Vector2 = point - dial_center
+		dial_angle = dir.angle() - _drag_start_angle
+		target_dial_angle = dial_angle
+		var step_rad := TAU / 64.0
+		var new_idx: int = posmod(int(round(-dial_angle / step_rad)), HuohoutuData.HEAD_SEQUENCE.size())
+		if new_idx != current_hex_index:
+			current_hex_index = new_idx
+			ring_slot_tapped.emit(new_idx)
+		queue_redraw()
 		accept_event()
+		return
 
 
 static func _is_release(event: InputEvent) -> bool:

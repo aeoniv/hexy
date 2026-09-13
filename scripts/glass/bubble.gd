@@ -70,6 +70,9 @@ func _ready() -> void:
 
 	_margin = MarginContainer.new()
 	_margin.name = "Margin"
+	_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	for side in ["left", "right", "top", "bottom"]:
 		_margin.add_theme_constant_override("margin_" + side, 10)
 	_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -77,6 +80,8 @@ func _ready() -> void:
 
 	_scroll = ScrollContainer.new()
 	_scroll.name = "Scroll"
+	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -100,6 +105,7 @@ func _ready() -> void:
 func say(text: String, at: Vector2) -> void:
 	_large = false
 	label.max_lines_visible = 4
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_WORD_ELLIPSIS
 	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	label.text = text
 	_place(at)
@@ -110,7 +116,8 @@ func say(text: String, at: Vector2) -> void:
 ## More words than four lines hold: the same bubble, grown and scrollable.
 func open_large(text: String, at: Vector2) -> void:
 	_large = true
-	label.max_lines_visible = 0
+	label.max_lines_visible = -1
+	label.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	label.text = text
 	_place(at)

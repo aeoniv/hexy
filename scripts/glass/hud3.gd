@@ -96,6 +96,15 @@ const PERIODS_MS: Array[int] = [3500, 1000, 2000, 8000]
 
 ## The two Pacing numbers, for when Pacing is not on disk to say them.
 const CIVIL_FIRE_THRESHOLD: float = 2.5
+
+## THE MIC'S THREE WORDS. The button says one of two things and the strip says
+## the third, and none of them is ever a spinner: a person looking at the glass
+## can tell whether the phone is listening without tapping anything.
+const MIC_IDLE: String = "MIC"
+const MIC_LIVE: String = "LISTENING"
+const MIC_PHRASE: String = "MIC: listening"
+## The loudest the meter draws, in the dB scale onRmsChanged speaks.
+const MIC_RMS_FULL: float = 10.0
 const MARTIAL_THRESHOLD: float = 0.85
 
 var layer: CanvasLayer = null
@@ -118,6 +127,7 @@ var creature_field: Control = null
 var composer: PanelContainer = null
 var ask_field: LineEdit = null
 var btn_mic: Button = null
+var mic_meter: ProgressBar = null
 var btn_send: Button = null
 
 var bubble: GlassBubble = null
@@ -129,6 +139,8 @@ var _wmn: Node = null
 var _senses: Node = null
 var _creature: Node = null
 var _alchemy: Node = null
+var _mic: Node = null
+var _mic_listening: bool = false
 
 var _who: String = "hexy"
 var _stream: String = ""
@@ -191,7 +203,8 @@ func _ready() -> void:
 	set_process(true)
 
 
-## 1. THE STATUS STRIP: one line that keeps a person informed, newest first.
+## 1. THE STATUS STRIP: one line that keeps a person informed, newest first,
+## with a configure button on the top-right.
 func _build_status() -> void:
 	status_panel = PanelContainer.new()
 	status_panel.name = "Status"
@@ -210,16 +223,33 @@ func _build_status() -> void:
 	margin.add_theme_constant_override("margin_bottom", 4)
 	status_panel.add_child(margin)
 
+	var hbox := HBoxContainer.new()
+	hbox.name = "HBox"
+	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_child(hbox)
+
 	status_label = Label.new()
 	status_label.name = "Line"
 	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	status_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	status_label.add_theme_font_size_override("font_size", 13)
 	status_label.add_theme_color_override("font_color", Color(0.68, 0.82, 0.92, 1.0))
 	status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	margin.add_child(status_label)
+	hbox.add_child(status_label)
 	status_label.text = "waking"
+
+	var btn_config := Button.new()
+	btn_config.name = "ConfigBtn"
+	btn_config.text = "⚙"
+	btn_config.flat = true
+	btn_config.add_theme_font_size_override("font_size", 16)
+	btn_config.add_theme_color_override("font_color", Color(0.75, 0.88, 1.0, 0.9))
+	btn_config.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn_config.pressed.connect(_on_configure_pressed)
+	hbox.add_child(btn_config)
 
 
 ## 2. THE HEAD DIAL, SMALL: the oracle, walked by a finger on its own ticks.
@@ -250,6 +280,7 @@ func _build_body() -> void:
 	body.set_anchors_preset(Control.PRESET_FULL_RECT)
 	body_band.add_child(body)
 	body.machine_station_clicked.connect(_on_machine_diamond_tapped)
+	body.dial_dragged.connect(_on_body_dial_dragged)
 
 	creature_field = Control.new()
 	creature_field.name = "CreatureField"
@@ -360,10 +391,25 @@ func _build_composer() -> void:
 
 	btn_mic = Button.new()
 	btn_mic.name = "Mic"
-	btn_mic.text = "MIC"
+	btn_mic.text = MIC_IDLE
 	btn_mic.disabled = true
 	btn_mic.add_theme_font_size_override("font_size", 13)
+	btn_mic.pressed.connect(_on_mic_pressed)
 	row.add_child(btn_mic)
+
+	## The loudness the recogniser reports, and nothing else. It stands beside
+	## the button rather than inside it, so the word on the button never moves.
+	mic_meter = ProgressBar.new()
+	mic_meter.name = "MicLevel"
+	mic_meter.custom_minimum_size = Vector2(8.0, 0.0)
+	mic_meter.fill_mode = ProgressBar.FILL_BOTTOM_TO_TOP
+	mic_meter.show_percentage = false
+	mic_meter.min_value = 0.0
+	mic_meter.max_value = MIC_RMS_FULL
+	mic_meter.value = 0.0
+	mic_meter.visible = false
+	mic_meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(mic_meter)
 
 	btn_send = Button.new()
 	btn_send.name = "Send"
@@ -417,6 +463,31 @@ func set_who(who_name: String) -> void:
 
 func who() -> String:
 	return _who
+
+
+## THE MIC. The button is grey until the core says there is a recogniser --
+## the phone's own, or the desktop mock -- and from then on a tap starts it and
+## a second tap stops it. What comes back is WRITTEN INTO THE COMPOSER AND LEFT
+## THERE: the person still taps SEND. Nothing here sends by itself.
+func set_mic(mic: Node) -> void:
+	_mic = mic
+	if _mic == null:
+		btn_mic.disabled = true
+		return
+	_join(_mic, "partial", _on_mic_partial)
+	_join(_mic, "result", _on_mic_result)
+	_join(_mic, "error", _on_mic_error)
+	_join(_mic, "level", _on_mic_level)
+	_join(_mic, "state", _on_mic_state)
+	btn_mic.disabled = not bool(_mic.call("available"))
+
+
+func mic_button() -> Button:
+	return btn_mic
+
+
+func mic_listening() -> bool:
+	return _mic_listening
 
 
 ## The alchemy is held only so the glass can say what it last did.
@@ -495,24 +566,30 @@ func _on_human_dot_tapped(trigram: int) -> void:
 
 
 func _on_head_hub_tapped() -> void:
-	if _qwen == null:
-		return
-	_stream = ""
-	_awaiting = true
-	bubble.say("...", _hub_point(head))
-	_qwen.ask(Qwen.THOUGHT_QUESTION)
+	var at: Vector2 = _hub_point(head)
+	var hb: int = _head_bits()
+	var upper_name: String = KingWen.trigram_name(KingWen.upper(hb))
+	var lower_name: String = KingWen.trigram_name(KingWen.lower(hb))
+	bubble.say("HEAD (HUMAN SENSORS / ORACLE)\n%s\nTrigrams: %s over %s" % [
+		_figure_word(hb), upper_name, lower_name], at)
+	if _qwen != null:
+		_stream = ""
+		_awaiting = true
+		_qwen.ask(Qwen.THOUGHT_QUESTION)
 
 
 func _on_machine_diamond_tapped(trigram: int) -> void:
 	bubble.say(_sentence_of(0, trigram), _point_in_root(body, body.station_position(trigram)))
 
 
-## The eight earth stations, in the order they are drawn.
+## The twelve earth stations, in the order they are drawn.
 func _on_earth_station_tapped(index: int) -> void:
 	var at: Vector2 = _point_in_root(earth, earth.station_position(index))
 	match index:
 		0:
 			_cast_head()
+			if _wmn != null and _wmn.has_method("broadcast"):
+				_wmn.broadcast(_head_dict(), _body_dict())
 			bubble.say("head cast: %s" % _figure_word(_head_bits()), at)
 		1:
 			_walk_head(head.head_slot() - 1, "tap")
@@ -523,7 +600,7 @@ func _on_earth_station_tapped(index: int) -> void:
 		3:
 			_enhanced = not _enhanced
 			stage.visible = _enhanced
-			bubble.say("ENHANCED" if _enhanced else "PURE", at)
+			bubble.say("ENHANCED 3D" if _enhanced else "PURE 2D", at)
 		4:
 			_cycle_geometry()
 			bubble.say("geometry: %s" % _geometry_word(), at)
@@ -533,18 +610,41 @@ func _on_earth_station_tapped(index: int) -> void:
 			bubble.open_large(brain_text(), at)
 		7:
 			bubble.say("sense period %d ms" % _cycle_period(), at)
+		8:
+			if _wmn != null and _wmn.has_method("broadcast"):
+				_wmn.broadcast(_head_dict(), _body_dict())
+				bubble.say("mesh broadcast: %d peers" % _peer_count(), at)
+			else:
+				bubble.say("mesh beacon: solo mode", at)
+		9:
+			if _creature != null and _creature.has_method("reset_orientation"):
+				_creature.reset_orientation()
+			bubble.say("camera reset", at)
+		10:
+			if _senses != null and _senses.has_method("toggle_freeze"):
+				var frz: bool = bool(_senses.toggle_freeze())
+				bubble.say("sensors " + ("FROZEN" if frz else "ACTIVE"), at)
+			else:
+				bubble.say("sensors active", at)
+		11:
+			bubble.open_large(config_text(), at)
 		_:
 			pass
 
 
-## The earth hub: the one act that leaves this phone.
+## The earth hub: Master Casting Altar and mesh broadcast.
 func _on_earth_hub_tapped() -> void:
 	var at: Vector2 = _hub_point(earth)
-	if _wmn == null or not _wmn.has_method("broadcast"):
-		bubble.say("no mesh to broadcast to", at)
-		return
-	_wmn.broadcast(_head_dict(), _body_dict())
-	bubble.say("head and body sent to %d" % _peer_count(), at)
+	_cast_head()
+	if _wmn != null and _wmn.has_method("broadcast"):
+		_wmn.broadcast(_head_dict(), _body_dict())
+	bubble.say("CAST ALTAR (EARTH)\nThrew 6 coins -> %s\nBroadcasting to %d peers" % [
+		_figure_word(_head_bits()), _peer_count()], at)
+
+
+func _on_body_dial_dragged(delta_ang: float) -> void:
+	if _creature != null and _creature.ball != null:
+		_creature.ball.rotate_y(delta_ang * 2.0)
 
 
 ## A finger in the creature's square: the solid answers, not the ring.
@@ -556,11 +656,54 @@ func _on_creature_input(event: InputEvent) -> void:
 
 
 func _on_throw_requested(_trigram: int) -> void:
-	_cast_head()
+	var at: Vector2 = _hub_point(body)
+	var bb: int = _body_bits()
+	bubble.say("BODY (MACHINE SENSORS)\n%s\n%s | %s" % [
+		_figure_word(bb), _geometry_word(), _pacing_phrase()], at)
 
 
 func _on_send_pressed() -> void:
 	composer_send(ask_field.text)
+
+
+# -- the mic -----------------------------------------------------------------
+
+func _on_mic_pressed() -> void:
+	if _mic == null:
+		return
+	if _mic_listening:
+		_mic.call("stop")
+	else:
+		_mic.call("start")
+
+
+func _on_mic_partial(text: String) -> void:
+	ask_field.text = text
+	ask_field.caret_column = text.length()
+
+
+func _on_mic_result(text: String) -> void:
+	if text.strip_edges() == "":
+		return
+	ask_field.text = text
+	ask_field.caret_column = text.length()
+
+
+func _on_mic_error(code: int, message: String) -> void:
+	bubble.say("MIC
+%s (%d)" % [message, code], _hub_point(head))
+
+
+func _on_mic_level(rms: float) -> void:
+	mic_meter.value = clampf(rms, 0.0, MIC_RMS_FULL)
+
+
+func _on_mic_state(name_of: String) -> void:
+	_mic_listening = name_of == "listening"
+	btn_mic.text = MIC_LIVE if _mic_listening else MIC_IDLE
+	mic_meter.visible = _mic_listening
+	if not _mic_listening:
+		mic_meter.value = 0.0
 
 
 func _on_submitted(text: String) -> void:
@@ -571,6 +714,8 @@ func _on_submitted(text: String) -> void:
 
 func _on_head_changed(_h: Dictionary) -> void:
 	head.set_head_bits(_head_bits())
+	if earth != null:
+		earth.set_hexagram(_head_bits())
 
 
 func _on_body_changed(_b: Dictionary) -> void:
@@ -619,6 +764,8 @@ func _refresh_dials() -> void:
 		return
 	head.set_head_bits(_head_bits())
 	body.set_body_bits(_body_bits())
+	if earth != null:
+		earth.set_hexagram(_head_bits())
 	head.active_human_trigram = int(_store.human.get("trigram", 0))
 	body.active_machine_trigram = int(_store.machine.get("trigram", 7))
 	if _senses != null and _senses.has_method("scores"):
@@ -707,6 +854,9 @@ func _to_stage(p: Vector2) -> Vector2:
 ## old surface set in the biggest type it had -- would have been shown almost
 ## never. What a person is holding outranks what just happened to it.
 func _status_line() -> String:
+	if _mic_listening:
+		return _figures_phrase() + "
+" + MIC_PHRASE
 	var news: String = _flip_phrase()
 	return _figures_phrase() + "\n" + (news if news != "" else _state_phrase())
 
@@ -800,6 +950,23 @@ func telemetry_text() -> String:
 			lines.append("%d %s %.2f  %s" % [
 				i, _seat_label(family, i), float(row[i]), _sentence_of(family, i)])
 	return "\n".join(lines)
+
+
+func config_text() -> String:
+	var lines: Array[String] = (["HEXY CONFIG & IDENTITY"] as Array[String])
+	lines.append("node: %s" % _who)
+	lines.append("mesh fabric: %s" % ("lan" if _wmn != null and bool(_wmn.force_lan) else "nearby"))
+	lines.append("peers connected: %d" % _peer_count())
+	lines.append("geometry: %s" % _geometry_word())
+	lines.append("mnn tier: %s" % _tier_phrase())
+	lines.append("sense period: %d ms" % (int(_senses.period_ms) if _senses != null else 0))
+	lines.append("enhanced 3d: %s" % ("enabled" if _enhanced else "disabled"))
+	return "\n".join(lines)
+
+
+func _on_configure_pressed() -> void:
+	var at: Vector2 = _point_in_root(status_panel, status_panel.size - Vector2(24.0, -10.0))
+	bubble.open_large(config_text(), at)
 
 
 ## What the model is, and what it is allowed to be on this phone.
