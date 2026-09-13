@@ -108,10 +108,28 @@ func figure() -> Dictionary:
 	return Cast.room_cast(all_bits(), all_ids())
 
 
-## The shape HexyStore.set_room takes.
+## THE ROOM'S OWN LINE-BY-LINE VOTE over the HEAD figures, ties to yang.
+## Cast.room_cast reads a tie off the id set, which is right for a cast; a
+## majority is the plainer question -- how many of us are carrying this line.
+func majority() -> int:
+	var rows: Array[int] = all_bits()
+	if rows.is_empty():
+		return 0
+	var out: int = 0
+	for b in range(6):
+		var yang: int = 0
+		for bits in rows:
+			yang += (bits >> b) & 1
+		if yang * 2 >= rows.size():
+			out |= 1 << b
+	return out
+
+
+## The shape HexyStore.set_room takes. `bits` is the majority; `moving` stays
+## the room cast's, because a line nobody agrees on is the line that moves.
 func as_store_room() -> Dictionary:
 	var f := figure()
-	return {"bits": int(f["bits"]), "moving": int(f["moving"]), "peers": peer_count()}
+	return {"bits": majority(), "moving": int(f["moving"]), "peers": peer_count()}
 
 
 ## Peers further than DRIFT_HOPS from the room's figure. Self is never listed:

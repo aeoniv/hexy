@@ -25,6 +25,7 @@ func _init() -> void:
 	_test_lattice()
 	_test_describe()
 	_test_store()
+	_test_two_figures()
 
 	if failures == 0:
 		print("--- ALL CORE ICHING TESTS PASSED PERFECTLY ---\n")
@@ -288,3 +289,98 @@ func _test_store() -> void:
 	check(int(other.machine["trigram"]) == 2 and int(other.room["peers"]) == 3, "load_dump restores the families and the room")
 	store.free()
 	other.free()
+
+
+# --- the two figures ---------------------------------------------------------
+
+func _test_two_figures() -> void:
+	var store: Node = HexyStoreScript.new()
+	var head_hits: Array[int] = [0]
+	var body_hits: Array[int] = [0]
+	var hex_hits: Array[int] = [0]
+	var flip_hits: Array[int] = [0]
+	var order: Array[String] = ([] as Array[String])
+	store.head_changed.connect(func(_h: Dictionary) -> void: head_hits[0] += 1)
+	store.body_changed.connect(func(_b: Dictionary) -> void:
+		body_hits[0] += 1
+		order.append("body"))
+	store.hexagram_changed.connect(func(_h: Dictionary) -> void:
+		hex_hits[0] += 1
+		order.append("hexagram"))
+	store.flipped.connect(func(_f: Dictionary) -> void: flip_hits[0] += 1)
+
+	# THE HEAD IS THE USER'S AND NOBODY ELSE HEARS IT.
+	check(store.set_head({"bits": 0b101010, "moving": 1, "when": 5}), "set_head takes")
+	check(head_hits[0] == 1, "head_changed fired once")
+	check(hex_hits[0] == 0, "set_head does NOT emit hexagram_changed")
+	check(body_hits[0] == 0, "and does not move the body")
+	check(not store.set_head({"bits": 0b101010, "moving": 1, "when": 5}),
+		"a repeated head is not a change")
+	check(store.head_bits() == 0b101010, "head_bits reads the head")
+
+	# THE BODY IS THE HEXAGRAM, under both names and both signals.
+	check(store.set_body({"bits": 0b000111, "moving": 2, "when": 6}), "set_body takes")
+	check(body_hits[0] == 1 and hex_hits[0] == 1, "set_body emits BOTH signals")
+	check(order == ["body", "hexagram"], "body_changed comes first (got %s)" % str(order))
+	check(store.body_bits() == 0b000111, "body_bits reads the body")
+	check(store.hexagram == store.body, "store.hexagram IS store.body")
+	check(store.primary() == 0b000111, "primary is the body")
+	check(store.transformed() == 0b000101, "transformed is the body's bits ^ moving")
+
+	# The old setter is the new one under its old name.
+	store.set_hexagram({"bits": 0b111000, "moving": 0, "when": 7})
+	check(store.body_bits() == 0b111000, "set_hexagram still writes the body")
+	check(store.head_bits() == 0b101010, "and never touches the head")
+	store.hexagram = {"bits": 0b000001, "moving": 0, "when": 8}
+	check(store.body_bits() == 0b000001, "assigning store.hexagram writes the body too")
+
+	# THE SEAT ON THE WHEEL, derived when nobody said.
+	var head_seq: int = int(store.head["seq_index"])
+	var want_head: int = HuohoutuData.find_head_index_by_id(
+		int(HuohoutuData.get_by_bits(0b101010).get("id", 1)))
+	check(head_seq == want_head,
+		"the head's seq_index is its seat on HEAD_SEQUENCE (%d vs %d)" % [head_seq, want_head])
+	var want_body: int = HuohoutuData.find_body_index_by_id(
+		int(HuohoutuData.get_by_bits(0b000001).get("id", 1)))
+	check(int(store.body["seq_index"]) == want_body,
+		"the body's seat is read off BODY_SEQUENCE, a different wheel")
+	check(HuohoutuData.HEAD_SEQUENCE[0] == 41 and HuohoutuData.BODY_SEQUENCE[0] == 1,
+		"the head wheel starts at 41 and the body wheel at 1")
+	store.set_body({"bits": 0b000001, "moving": 0, "when": 9, "seq_index": 99})
+	check(int(store.body["seq_index"]) == 63, "a given seq_index is clamped to 0..63")
+
+	# THE LAST LINE THAT TURNED.
+	check(store.set_last_flip({"line": 2, "to_yang": true, "reason": "breath", "when": 11}),
+		"set_last_flip takes")
+	check(flip_hits[0] == 1, "flipped fired once")
+	check(not store.set_last_flip({"line": 2, "to_yang": true, "reason": "breath", "when": 11}),
+		"the same flip is not a second flip")
+	check(int(store.last_flip["line"]) == 2 and bool(store.last_flip["to_yang"]),
+		"the flip remembers its line and its direction")
+	store.set_last_flip({"line": 9, "to_yang": false, "reason": "x", "when": 12})
+	check(int(store.last_flip["line"]) == 5, "a line out of range is clamped to 0..5")
+
+	# THE ROUND TRIP carries both figures and the flip.
+	store.set_machine({"trigram": 2, "score": 0.5, "sentence": "water"})
+	var d: Dictionary = store.dump()
+	var other: Node = HexyStoreScript.new()
+	other.load_dump(d)
+	check(other.dump() == d, "dump and load_dump round trip the whole store")
+	check(other.head_bits() == store.head_bits(), "load_dump restores the head")
+	check(other.body_bits() == store.body_bits(), "load_dump restores the body")
+	check(other.last_flip == store.last_flip, "load_dump restores the last flip")
+
+	# A dump from before there were two figures still loads as a body.
+	var old: Node = HexyStoreScript.new()
+	old.load_dump({"hexagram": {"bits": 0b010101, "moving": 0}})
+	check(old.body_bits() == 0b010101, "an old dump's hexagram loads into the body")
+	check(old.head_bits() == 0, "and leaves the head where it was")
+
+	store.reset()
+	check(store.head_bits() == 0 and store.body_bits() == 0
+		and String(store.last_flip["reason"]) == "",
+		"reset empties the head, the body and the flip")
+
+	store.free()
+	other.free()
+	old.free()

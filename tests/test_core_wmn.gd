@@ -220,6 +220,19 @@ func _test_room() -> void:
 	_check(int(store_room["bits"]) == 0b000111 and int(store_room["peers"]) == 4,
 		"as_store_room is the shape HexyStore takes")
 
+	# THE MAJORITY IS A HEAD COUNT, line by line, and a tie goes to yang.
+	var maj := Room.new()
+	maj.set_peer("a", 0b000111, 0, 1000)
+	maj.set_peer("b", 0b000101, 0, 1000)
+	maj.set_peer("c", 0b000001, 0, 1000)
+	_check(maj.majority() == 0b000101,
+		"a line more than half the room carries is yang (got %d)" % maj.majority())
+	var tie := Room.new()
+	tie.set_peer("a", 0b111000, 0, 1000)
+	tie.set_peer("b", 0b000111, 0, 1000)
+	_check(tie.majority() == 0b111111, "a tied line goes to yang")
+	_check(Room.new().majority() == 0, "an empty room is the Receptive")
+
 	var gone := r2.expire(1000 + Room.EXPIRY_MS + 1)
 	_check(gone == ["a", "b", "c", "far"], "peers unheard for 30 s expire")
 	_check(r2.has(Room.SELF_KEY), "we never expire ourselves")
@@ -306,22 +319,29 @@ func _test_loopback() -> void:
 	# tie, and a tie is now read off the id set rather than off whoever the
 	# local phone happens to list first -- so disagreement is exactly the
 	# state worth proving: both phones must still hold the SAME room.
-	var h := {"bits": 0b101101, "moving": 0b000100,
+	# BYTE 0 IS THE HEAD; the body rides in the payload beside it.
+	store_a.set_head({"bits": 0b101101, "moving": 0b000100})
+	var h := {"bits": 0b010010, "moving": 0b000100,
 		"throws": [7, 8, 9, 7, 8, 7], "when": 1700000000000,
 		"who": "alpha", "source": "tap", "sig": ""}
 	store_a.set_hexagram(h)
-	var hb := {"bits": 0b100101, "moving": 0b000001,
+	store_b.set_head({"bits": 0b100101, "moving": 0b000001})
+	var hb := {"bits": 0b001001, "moving": 0b000001,
 		"throws": [9, 8, 7, 8, 8, 7], "when": 1700000000001,
 		"who": "beta", "source": "tap", "sig": ""}
 	store_b.set_hexagram(hb)
 
-	await _wait(6.0, func(): return not heard_a.is_empty() and not heard_b.is_empty())
+	# Two broadcasts leave each phone: the head moving, then the body. Wait for
+	# the one that carries both.
+	await _wait(6.0, func(): return heard_a.size() >= 2 and heard_b.size() >= 2)
 	_check(not heard_b.is_empty(), "beta hears alpha figure")
 	_check(not heard_a.is_empty(), "alpha hears beta figure")
 	if not heard_b.is_empty():
-		var got: Dictionary = heard_b[0]
+		var got: Dictionary = heard_b[heard_b.size() - 1]
 		_check(int(got["bits"]) == 0b101101 and int(got["moving"]) == 0b000100,
-			"the figure arrives unchanged, bits and moving")
+			"byte 0 is alpha's HEAD, unchanged (got %d)" % int(got["bits"]))
+		_check(int(got["body"]) == 0b010010 and int(got["body_moving"]) == 0b000100,
+			"the payload carries alpha's BODY (got %d)" % int(got["body"]))
 		_check(got["throws"] == [7, 8, 9, 7, 8, 7] and int(got["when"]) == 1700000000000,
 			"the payload carries throws and when")
 		_check(String(got["who"]) == "alpha" and String(got["source"]) == "tap",
@@ -330,12 +350,10 @@ func _test_loopback() -> void:
 	await _wait(3.0, func(): return int(store_a.room["peers"]) == 1 and int(store_b.room["peers"]) == 1)
 	_check(store_a.room == store_b.room,
 		"both stores hold the IDENTICAL room (a=%s b=%s)" % [str(store_a.room), str(store_b.room)])
-	var ids: Array[String] = [a.fabric_id(), b.fabric_id()]
-	ids.sort()
-	var expect_bits: int = 0b101101 if ids[0] == a.fabric_id() else 0b100101
-	_check(int(store_a.room["bits"]) == expect_bits,
-		"the tied line is read from the smallest fabric id (want %d, got %d)"
-			% [expect_bits, int(store_a.room["bits"])])
+	# Two heads, one line apart: the majority ties on it, and a tie is yang.
+	_check(int(store_a.room["bits"]) == 0b101101,
+		"the room's bits are the per-line majority over the HEADS (got %d)"
+			% int(store_a.room["bits"]))
 	_check(int(store_a.room["moving"]) == (0b101101 ^ 0b100101),
 		"the one line the two disagree on is the one that moves (got %d)"
 			% int(store_a.room["moving"]))
@@ -344,6 +362,9 @@ func _test_loopback() -> void:
 	_check(row.size() == 1 and String(row[0]["who"]) == b.fabric_id()
 		and int(row[0]["rssi"]) == -1 and String(row[0]["band"]) == "here",
 		"peers() names the peer, admits no rssi, and bands it here")
+	_check(row.size() == 1 and int(row[0]["bits"]) == 0b100101
+		and int(row[0]["body"]) == 0b001001,
+		"a peer row carries their head AND their body")
 	_check(a.ledger.size() >= 2, "the ledger kept our cast and the one we heard")
 
 	# The chirps have been flying at 2 Hz since start(); by now the clock has
@@ -354,8 +375,9 @@ func _test_loopback() -> void:
 
 	# The network-free door, proving the same path a datagram takes.
 	var before: int = b.peer_count()
-	b.ingest("ghost-peer", {"e6": Envelope6.to_wire(Envelope6.KIND_FIGURE, 0b010010,
-		{"moving": 0, "throws": [7, 7, 7, 7, 7, 7], "when": 1, "who": "ghost",
+	b.ingest("ghost-peer", {"e6": Envelope6.to_wire(Envelope6.KIND_FIGURE, 0b011010,
+		{"moving": 0, "body": 0b000001, "body_moving": 0,
+		"throws": [7, 7, 7, 7, 7, 7], "when": 1, "who": "ghost",
 		"source": "room", "sig": ""})})
 	_check(b.peer_count() == before + 1, "an injected figure joins the room")
 	_check(b.room.drifting().has("ghost-peer"),

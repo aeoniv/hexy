@@ -8,6 +8,13 @@ extends Node
 ## them is handed its neighbours through a bind() and nothing reaches sideways
 ## for a singleton. That is why the import wall test can be short.
 ##
+## THE ALCHEMY IS THE EIGHTH OBJECT, AND IT IS NOT THE GLASS'S. The head and
+## the body are two figures now, and the thing that turns one line of the body
+## when a person has been still long enough lives in the core beside the senses
+## that feed it. The app builds it, binds it, and ticks it right after the
+## sixteen, which is the only place it can be ticked without the glass having
+## an opinion about pacing.
+##
 ## THE BOOT LINE IS THE CONTRACT. One ASCII line, printed once, saying whether
 ## a model is really on the device, which fabric the mesh came up on, and that
 ## the sixteen are all there. A person reading a logcat should learn the three
@@ -19,10 +26,19 @@ var qwen: Qwen = null
 var wmn: Wmn = null
 var senses: Senses = null
 var creature: Creature = null
-## The surface is the OWNER'S HUD, bridged to the core -- not the sixteen-seat
-## ring that scripts/glass/glass.gd draws. That file stays on disk, and the
-## import wall still keeps it honest, but nothing boots it any more.
-var hud: HudBridge = null
+## The surface is the THIRD GLASS: five bands, three dials, one bubble.
+## scripts/glass/glass.gd and scripts/glass/hud_bridge.gd both stay on disk,
+## and the import wall still keeps them honest, but nothing boots them.
+var hud: Hud3 = null
+
+## THE ALCHEMY, LOADED RATHER THAN NAMED. It belongs to the core and the core
+## may land after the glass does; naming the class outright would stop the
+## whole app from parsing on a tree where the file is not there yet, and an app
+## that cannot boot teaches nobody anything. When it is on disk it is built,
+## bound and ticked; when it is not, the body simply does not walk.
+const ALCHEMY_PATH: String = "res://scripts/core/alchemy.gd"
+
+var alchemy: Node = null
 
 var _ticker: Timer = null
 var _boot_line: String = ""
@@ -50,7 +66,12 @@ func _ready() -> void:
 	senses.period_changed.connect(_on_period_changed)
 	add_child(senses)
 
-	hud = HudBridge.new()
+	alchemy = _build_alchemy()
+	if alchemy != null:
+		alchemy.name = "Alchemy"
+		add_child(alchemy)
+
+	hud = Hud3.new()
 	hud.name = "Hud"
 	add_child(hud)
 
@@ -60,9 +81,13 @@ func _ready() -> void:
 	qwen.bind(store, mnn)
 	senses.bind(store)
 	wmn.bind(store)
+	if alchemy != null and alchemy.has_method("bind"):
+		alchemy.bind(store, senses)
+
 	hud.bind(store, qwen, mnn, wmn)
 	hud.set_senses(senses)
 	hud.set_creature(creature)
+	hud.set_alchemy(alchemy)
 	creature.bind(store)
 	creature.set_senses(senses)
 
@@ -103,7 +128,18 @@ func _on_period_changed(_ms: int) -> void:
 
 
 func _on_tick() -> void:
-	senses.tick(wmn.now_ms(), senses.telemetry_from_input())
+	var now: int = wmn.now_ms()
+	senses.tick(now, senses.telemetry_from_input())
+	if alchemy != null and alchemy.has_method("tick"):
+		alchemy.tick(now)
+
+
+## The alchemy, if the core has landed. One load, no stub, no substitute.
+static func _build_alchemy() -> Node:
+	if not ResourceLoader.exists(ALCHEMY_PATH):
+		return null
+	var script: Script = load(ALCHEMY_PATH) as Script
+	return (script.new() as Node) if script != null else null
 
 
 func _on_token(_t: String) -> void:

@@ -62,6 +62,9 @@ var _started := false
 var _self_h: Dictionary = {}
 ## fabric src id -> {s: their last send (their clock), r: our recv (our clock)}
 var _heard := {}
+## fabric src id -> their BODY bits, the half of a peer the room does not vote
+## with but a glass may still want to draw.
+var _peer_body := {}
 var _store: Node = null
 var _binding := false
 
@@ -130,23 +133,26 @@ static func _mint_fabric_id(who: String) -> String:
 
 ## -- SPEAKING ----------------------------------------------------------------
 
-## Send a figure. `h` is a HexyStore.hexagram: byte 0 of the datagram becomes
-## h.bits exactly, and everything else rides behind it.
-func broadcast_figure(h: Dictionary) -> Dictionary:
+## Send both figures. BYTE 0 OF THE WIRE IS THE HEAD -- the oracle a person
+## threw is the one thing a room is entitled to read at a glance, and it is the
+## head the room votes over. The body rides in the payload beside it.
+func broadcast(head: Dictionary, body: Dictionary) -> Dictionary:
 	if not _started:
 		return {}
-	var bits := int(h.get("bits", 0)) & 63
-	var moving := int(h.get("moving", 0)) & 63
-	var when := int(h.get("when", 0))
+	var bits := int(head.get("bits", 0)) & 63
+	var moving := int(head.get("moving", 0)) & 63
+	var when := int(body.get("when", 0))
 	if when <= 0:
 		when = now_ms()
 	var payload := {
 		"moving": moving,
-		"throws": _throws_of(h, bits, moving),
+		"body": int(body.get("bits", 0)) & 63,
+		"body_moving": int(body.get("moving", 0)) & 63,
+		"throws": _throws_of(body, bits, moving),
 		"when": when,
-		"who": String(h.get("who", _who)),
-		"source": String(h.get("source", "tap")),
-		"sig": String(h.get("sig", "")),
+		"who": String(body.get("who", _who)),
+		"source": String(body.get("source", "tap")),
+		"sig": String(body.get("sig", "")),
 	}
 	_self_h = _figure_from(fabric.fabric_id, bits, payload)
 	room.set_self(bits, moving, now_ms(), fabric.fabric_id)
@@ -159,6 +165,15 @@ func broadcast_figure(h: Dictionary) -> Dictionary:
 		FIGURE_TTL)
 	_publish_room()
 	return _self_h
+
+
+## The old name: "the body changed". The head is taken from the bound store,
+## because the head is not this call's to invent.
+func broadcast_figure(h: Dictionary) -> Dictionary:
+	var head: Dictionary = {"bits": 0, "moving": 0}
+	if _store != null:
+		head = {"bits": _store.head_bits(), "moving": int(_store.head.get("moving", 0))}
+	return broadcast(head, h)
 
 
 ## Vouch for a figure somebody else cast. Provenance, never a score.
@@ -217,9 +232,11 @@ func ingest(src: String, body: Dictionary) -> void:
 
 func _take_figure(src: String, bits: int, payload: Dictionary) -> void:
 	var h := _figure_from(src, bits, payload)
+	# The room is a room of HEADS: byte 0 is what everyone votes with.
 	room.set_peer(src, bits, int(h["moving"]), now_ms())
 	if keep_ledger:
 		ledger.append(h, [fabric_id()])
+	_peer_body[src] = int(h["body"])
 	peer_figure.emit(src, h)
 	_publish_room()
 
@@ -263,6 +280,7 @@ func peers() -> Array:
 			"who": who,
 			"bits": int(p["bits"]),
 			"moving": int(p["moving"]),
+			"body": int(_peer_body.get(who, 0)) & 63,
 			"last_seen_ms": int(p["seen"]),
 			# The LAN backend has no radio and therefore no signal strength.
 			# -1 is the honest answer; a made-up number would be worse than
@@ -306,14 +324,18 @@ func bind(store: Node) -> void:
 		return
 	if not store.hexagram_changed.is_connected(_on_store_hexagram):
 		store.hexagram_changed.connect(_on_store_hexagram)
+	if store.has_signal("head_changed") and not store.head_changed.is_connected(_on_store_head):
+		store.head_changed.connect(_on_store_head)
 	var h: Dictionary = store.hexagram
-	if int(h.get("bits", 0)) != 0 or int(h.get("moving", 0)) != 0:
+	if int(h.get("bits", 0)) != 0 or int(h.get("moving", 0)) != 0 or store.head_bits() != 0:
 		broadcast_figure(h)
 
 
 func unbind() -> void:
 	if _store != null and _store.hexagram_changed.is_connected(_on_store_hexagram):
 		_store.hexagram_changed.disconnect(_on_store_hexagram)
+	if _store != null and _store.head_changed.is_connected(_on_store_head):
+		_store.head_changed.disconnect(_on_store_head)
 	_store = null
 
 
@@ -321,6 +343,14 @@ func _on_store_hexagram(h: Dictionary) -> void:
 	if _binding:
 		return
 	broadcast_figure(h)
+
+
+## The head moved, so the byte the room votes with moved. The body goes out
+## beside it unchanged.
+func _on_store_head(h: Dictionary) -> void:
+	if _binding or _store == null:
+		return
+	broadcast(h, _store.body)
 
 
 ## -- THE BEAT ----------------------------------------------------------------
@@ -332,6 +362,7 @@ func _process(_delta: float) -> void:
 	var gone := room.expire(now)
 	for who in gone:
 		_heard.erase(who)
+		_peer_body.erase(who)
 		peer_gone.emit(who)
 	if not gone.is_empty():
 		_publish_room()
@@ -376,6 +407,8 @@ static func _figure_from(who_src: String, bits: int, payload: Dictionary) -> Dic
 	return {
 		"bits": bits & 63,
 		"moving": moving,
+		"body": int(payload.get("body", 0)) & 63,
+		"body_moving": int(payload.get("body_moving", 0)) & 63,
 		"throws": throws,
 		"when": int(payload.get("when", 0)),
 		"who": String(payload.get("who", who_src)),
@@ -387,6 +420,8 @@ static func _figure_from(who_src: String, bits: int, payload: Dictionary) -> Dic
 static func _payload_of(h: Dictionary) -> Dictionary:
 	return {
 		"moving": int(h.get("moving", 0)) & 63,
+		"body": int(h.get("body", 0)) & 63,
+		"body_moving": int(h.get("body_moving", 0)) & 63,
 		"throws": h.get("throws", []),
 		"when": int(h.get("when", 0)),
 		"who": String(h.get("who", "")),

@@ -63,44 +63,63 @@ func label(bits: int) -> String:
 # --- the prompt -------------------------------------------------------------
 
 ## Everything the model needs about this moment, in about 120 tokens.
-func ground(figure_desc: Dictionary, machine_sentence: String, human_sentence: String,
-		neighbourhood: Array[String] = ([] as Array[String])) -> String:
-	var near: Array[String] = neighbourhood.duplicate()
-	if near.is_empty():
-		var raw: Variant = figure_desc.get("neighbors_names", [])
-		if raw is Array:
-			for n in (raw as Array):
-				near.append(String(n))
-	var shown: Array[String] = ([] as Array[String])
-	for i in range(mini(near.size(), MAX_NEIGHBOURS)):
-		shown.append(near[i])
-	var line: String = "figure %d %s (%s), lower trigram %s, upper %s, becomes %d %s" % [
-		int(figure_desc.get("number", 1)),
-		String(figure_desc.get("name", "")),
-		String(figure_desc.get("pinyin", "")),
-		String(figure_desc.get("lower", "")),
-		String(figure_desc.get("upper", "")),
-		int(figure_desc.get("transformed_number", 1)),
-		String(figure_desc.get("transformed_name", "")),
-	]
+##
+## TWO FIGURES, NAMED SEPARATELY. The head is the oracle the person threw; the
+## body is the one their senses are walking. A prompt that folded them into one
+## figure would be describing a moment nobody is in.
+func ground(head_desc: Dictionary, body_desc: Dictionary, machine_sentence: String,
+		human_sentence: String, last_flip: Dictionary = {}) -> String:
 	var parts: Array[String] = ([] as Array[String])
 	parts.append(SYSTEM_LINE)
-	parts.append(line)
-	if not shown.is_empty():
-		parts.append("neighbours: " + ", ".join(shown))
+	parts.append("head " + _figure_line(head_desc))
+	parts.append("body " + _figure_line(body_desc))
 	parts.append("machine: " + machine_sentence)
 	parts.append("human: " + human_sentence)
+	parts.append("last line: " + _flip_line(last_flip))
 	return "; ".join(parts)
 
 
-## The prompt for the figure currently in the store, plus a question.
+## One figure, in one clause.
+static func _figure_line(desc: Dictionary) -> String:
+	return "figure %d %s (%s), lower trigram %s, upper %s, becomes %d %s" % [
+		int(desc.get("number", 1)),
+		String(desc.get("name", "")),
+		String(desc.get("pinyin", "")),
+		String(desc.get("lower", "")),
+		String(desc.get("upper", "")),
+		int(desc.get("transformed_number", 1)),
+		String(desc.get("transformed_name", "")),
+	]
+
+
+## The line that turned last, in the fire's own words when it has any.
+static func _flip_line(last_flip: Dictionary) -> String:
+	var reason: String = String(last_flip.get("reason", ""))
+	if last_flip.is_empty() or (reason == "" and int(last_flip.get("when", 0)) <= 0):
+		return "no line has turned yet"
+	if reason != "":
+		return reason
+	var line: int = clampi(int(last_flip.get("line", 0)), 0, 5)
+	var word: String = "turned to yang" if bool(last_flip.get("to_yang", false)) else "turned to yin"
+	return "line %d (%s) %s" % [line + 1, Pacing.LINE_NAMES[line], word]
+
+
+## The prompt for the two figures currently in the store, plus a question.
 func prompt_now(question: String) -> String:
-	var bits: int = _store.primary() if _store != null else 0
-	var moving: int = int(_store.hexagram.get("moving", 0)) if _store != null else 0
-	var desc: Dictionary = IChing.describe(bits, moving)
-	var m: String = String(_store.machine.get("sentence", "")) if _store != null else ""
-	var h: String = String(_store.human.get("sentence", "")) if _store != null else ""
-	var body: String = ground(desc, m, h)
+	var head_desc: Dictionary = IChing.describe(0, 0)
+	var body_desc: Dictionary = IChing.describe(0, 0)
+	var m: String = ""
+	var h: String = ""
+	var flip: Dictionary = {}
+	if _store != null:
+		head_desc = IChing.describe(
+			_store.head_bits(), int(_store.head.get("moving", 0)))
+		body_desc = IChing.describe(
+			_store.body_bits(), int(_store.body.get("moving", 0)))
+		m = String(_store.machine.get("sentence", ""))
+		h = String(_store.human.get("sentence", ""))
+		flip = _store.last_flip
+	var body: String = ground(head_desc, body_desc, m, h, flip)
 	return body + "; question: " + question
 
 

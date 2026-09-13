@@ -26,6 +26,7 @@ func _init() -> void:
 	_test_negative_states()
 	_test_election()
 	_test_tap_blocks_figure()
+	_test_motion()
 	_test_lattice_spike()
 	_test_tools()
 
@@ -257,8 +258,9 @@ func _test_election() -> void:
 
 	check(store.machine["trigram"] == 2, "machine elects 2 (Water, battery)")
 	check(store.human["trigram"] == 5, "human elects 5 (Fire, gaze)")
-	check(store.hexagram["bits"] == 42, "two elections make bits 42")
-	check(String(store.hexagram["source"]) == "senses", "the figure's source is senses")
+	check(rig.target_bits() == 42, "two elections ask for bits 42")
+	check(store.hexagram["bits"] == 0,
+		"the senses do NOT write the figure; only Alchemy turns a line")
 	check(store.machine["score"] > 0.6 and store.machine["sentence"] != "",
 		"machine dict carries a score and a sentence")
 	check(store.human["score"] > 0.6 and store.human["sentence"] != "",
@@ -268,7 +270,7 @@ func _test_election() -> void:
 	store.free()
 
 
-# -- 4. a tap holds the figure, not the lines --------------------------------
+# -- 4. the senses ask, they do not write ------------------------------------
 
 func _test_tap_blocks_figure() -> void:
 	var store: HexyStore = HexyStoreScript.new() as HexyStore
@@ -283,22 +285,52 @@ func _test_tap_blocks_figure() -> void:
 	rig.tick(now, election_telemetry())
 	rig.tick(now + 4000, election_telemetry())
 
-	check(store.hexagram["bits"] == 63, "a tap 1 minute old keeps its figure")
+	check(store.hexagram["bits"] == 63, "a tap's figure survives any number of ticks")
 	check(String(store.hexagram["source"]) == "tap", "the tap keeps its source")
 	check(store.machine["trigram"] == 2 and store.human["trigram"] == 5,
-		"machine and human lines keep updating under a fresh tap")
-
-	# Six minutes on, the tap has lapsed and the senses may speak again.
-	store.set_hexagram({
-		"bits": 63, "moving": 0, "throws": [], "when": now - 360000,
-		"who": "me", "source": "tap", "sig": "",
-	})
-	rig.tick(now + 8000, election_telemetry())
-	check(store.hexagram["bits"] == 42 and String(store.hexagram["source"]) == "senses",
-		"a tap 6 minutes old no longer blocks the senses")
+		"machine and human lines keep updating under a tap")
+	check(rig.target_bits() == 42, "the senses go on asking for 42 underneath")
 
 	rig.free()
 	store.free()
+
+
+# -- 4b. stillness and excitation --------------------------------------------
+
+func _test_motion() -> void:
+	var rig: Senses = new_senses()
+
+	# No motion keys at all: an absent sensor is not a still one, so the
+	# filters keep whatever they had -- which at boot is perfect stillness.
+	rig.tick(0, {})
+	check(is_equal_approx(rig.stillness(), 1.0), "no telemetry reads as still")
+	check(is_equal_approx(rig.excitation(), 0.0), "no telemetry excites nothing")
+
+	# A walk: accel far from gravity, and a turning gyroscope.
+	var shaken: Dictionary = {
+		"accel": Vector3(0, 9.8, 0) + Vector3(6, 0, 6),
+		"gravity": Vector3(0, 9.8, 0),
+		"gyro": Vector3(1.5, 1.5, 0),
+	}
+	for i in range(12):
+		rig.tick(4000 * (i + 1), shaken)
+	check(rig.stillness() < 0.2, "a shaken phone is not still (got %f)" % rig.stillness())
+	check(rig.excitation() > 0.5, "a shaken phone excites (got %f)" % rig.excitation())
+
+	# Put it down again.
+	var quiet: Dictionary = {
+		"accel": Vector3(0, 9.8, 0), "gravity": Vector3(0, 9.8, 0),
+		"gyro": Vector3(0.001, 0.0, 0.0),
+	}
+	for i in range(20):
+		rig.tick(100000 + 4000 * i, quiet)
+	check(rig.stillness() > 0.9, "a phone set down is still again (got %f)" % rig.stillness())
+	check(rig.excitation() < 0.05, "and the excitation drains (got %f)" % rig.excitation())
+
+	rig.reset()
+	check(rig.target_bits() == 0 and rig.excitation() == 0.0,
+		"reset empties the target and the fire")
+	rig.free()
 
 
 # -- 5. one tick of anything is not a figure ---------------------------------
@@ -310,12 +342,12 @@ func _test_lattice_spike() -> void:
 
 	rig.tick(0, election_telemetry())
 	rig.tick(4000, election_telemetry())
-	check(store.hexagram["bits"] == 42, "the figure settles at 42")
+	check(rig.target_bits() == 42, "the asked-for figure settles at 42")
 
 	# One tick of blazing light and a walk. Neither may take the seat.
 	var spike: Dictionary = {"lux": 20000.0, "steps_per_min": 140.0}
 	rig.tick(8000, spike)
-	check(store.hexagram["bits"] == 42, "a one-tick spike does not change the figure")
+	check(rig.target_bits() == 42, "a one-tick spike does not change the target")
 	check(store.machine["trigram"] == 2 and store.human["trigram"] == 5,
 		"a one-tick spike does not change either trigram")
 

@@ -42,6 +42,46 @@ func score_of(trigram: int) -> float:
 	return float(scores[t]) if t < scores.size() else 0.0
 
 
+## The centre and the radius, worked out from the size the ring was given.
+## The base only sets these while DRAWING, so a ring laid out but not yet
+## painted would answer every tap at its top-left corner.
+func _measure() -> void:
+	dial_center = size * 0.5
+	dial_radius = min(size.x, size.y) * 0.46
+
+
+## Where a machine diamond sits on the glass, for a bubble that points at it.
+func station_position(trigram: int) -> Vector2:
+	_measure()
+	for station in MACHINE_STATIONS:
+		if int(station["trigram"]) == clampi(trigram, 0, 7):
+			var ang: float = float(station["angle"])
+			return dial_center + Vector2(cos(ang), sin(ang)) * (dial_radius * 0.78)
+	return dial_center
+
+
+## The body slot this ring is showing, 0..63.
+func body_slot() -> int:
+	return current_hex_index
+
+
+## Turn the sixty-four graduations to a slot of HuohoutuData.BODY_SEQUENCE.
+## Both angles are set: the base lerps toward the target every frame and this
+## subclass does not, so leaving one behind would show two different figures.
+func set_body_slot(slot: int) -> void:
+	current_hex_index = posmod(slot, HuohoutuData.BODY_SEQUENCE.size())
+	current_hex_id = HuohoutuData.BODY_SEQUENCE[current_hex_index]
+	dial_angle = -float(current_hex_index) * (TAU / 64.0)
+	target_dial_angle = dial_angle
+	queue_redraw()
+
+
+## The same turn, said in bits, which is how the store says it.
+func set_body_bits(bits: int) -> void:
+	var id: int = int(HuohoutuData.get_by_bits(bits & 63).get("id", 1))
+	set_body_slot(HuohoutuData.find_body_index_by_id(id))
+
+
 func _draw() -> void:
 	super()
 	if scores.is_empty():
@@ -62,6 +102,7 @@ func _draw() -> void:
 func _gui_input(event: InputEvent) -> void:
 	if not _is_release(event):
 		return
+	_measure()
 	var pos: Vector2 = event.position
 	for station in MACHINE_STATIONS:
 		var ang: float = float(station["angle"])

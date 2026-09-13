@@ -11,7 +11,7 @@ extends Node
 ##
 ## THE DEBOUNCE IS NOT OPTIONAL. A raw argmax over sixteen noisy readings
 ## changes its mind constantly, and a figure that flickers is not a reading, it
-## is a strobe. Each family has its own Lattice: a challenger must lead for two
+## is a strobe. Each family has its own Debounce: a challenger must lead for two
 ## consecutive ticks before it may take the seat. So the one-tick spike that
 ## every real sensor produces never reaches the glass.
 ##
@@ -48,12 +48,28 @@ signal period_changed(ms: int)
 var machine: Array[Sense] = ([] as Array[Sense])
 var human: Array[Sense] = ([] as Array[Sense])
 
-var machine_lattice: Lattice = null
-var human_lattice: Lattice = null
+## The member names are the old ones on purpose; only the type moved.
+var machine_lattice: Debounce = null
+var human_lattice: Debounce = null
 
 var _store: HexyStore = null
 var _last_tick_ms: int = -1
 var _prev_bits: int = -1
+
+## The figure the senses are asking for: (human << 3) | machine.
+var _target: int = 0
+## Smoothed body motion, kept from tick to tick. An ABSENT telemetry key means
+## no change, never an invented zero: a phone with no gyroscope is not a phone
+## lying perfectly still.
+var _filtered_jerk: float = 0.0
+var _gyro_len: float = 0.0
+## How far each family's seated winner leads its nearest rival, 0..1. A wide
+## margin is an election nobody is arguing about.
+var _machine_margin: float = 0.0
+var _human_margin: float = 0.0
+## Kinetic excitation, 0..1: it rises while the flux is above 0.25 and decays
+## otherwise. Ported from SensorOracle._update_habit_line_strains.
+var _excitation: float = 0.0
 
 ## Whether the app has the screen. THE ONLY HONEST ANSWER GODOT HAS: there is
 ## no engine API for "is the display lit", and DisplayServer.window_get_mode
@@ -87,8 +103,8 @@ func _init() -> void:
 		SenseBreath.new(),
 		SensePosture.new(),
 	] as Array[Sense])
-	machine_lattice = Lattice.new(0)
-	human_lattice = Lattice.new(0)
+	machine_lattice = Debounce.new(0)
+	human_lattice = Debounce.new(0)
 
 
 ## The screen, tracked rather than guessed. These two notifications reach every
@@ -118,9 +134,13 @@ func bind(store: HexyStore) -> void:
 ## call that arrives before `period_ms` has passed is a no-op, so a host may
 ## call this every frame without thinking about it.
 func tick(now_ms: int, telemetry: Dictionary) -> bool:
-	if _last_tick_ms >= 0 and (now_ms - _last_tick_ms) < period_ms:
-		return false
+	var delta_s: float = 0.0
+	if _last_tick_ms >= 0:
+		if (now_ms - _last_tick_ms) < period_ms:
+			return false
+		delta_s = minf(1.0, float(now_ms - _last_tick_ms) / 1000.0)
 	_last_tick_ms = now_ms
+	_update_motion(delta_s, telemetry)
 
 	for s in machine:
 		s.tick(now_ms, telemetry)
@@ -132,6 +152,9 @@ func tick(now_ms: int, telemetry: Dictionary) -> bool:
 
 	var m_win: int = machine_lattice.push(m_scores)
 	var h_win: int = human_lattice.push(h_scores)
+	_target = ((h_win << 3) | m_win) & 63
+	_machine_margin = _margin_of(m_scores, m_win)
+	_human_margin = _margin_of(h_scores, h_win)
 
 	if _store == null:
 		return true
@@ -147,26 +170,71 @@ func tick(now_ms: int, telemetry: Dictionary) -> bool:
 		"sentence": human[h_win].sentence(),
 	})
 
-	if _tap_is_fresh(now_ms):
-		return true
-
-	# The election is already decided; the one-hot arrays hand Cast the LATTICE
-	# winners rather than the raw argmax it would find for itself, so the
-	# debounce is not quietly undone one line after it was applied.
-	var cast: Dictionary = Cast.sense_cast(
-		_one_hot(m_win), _one_hot(h_win), _prev_bits)
-	var bits: int = int(cast.get("bits", 0)) & 63
-	_store.set_hexagram({
-		"bits": bits,
-		"moving": int(cast.get("moving", 0)),
-		"throws": cast.get("throws", []),
-		"when": now_ms,
-		"who": "",
-		"source": "senses",
-		"sig": "",
-	})
-	_prev_bits = bits
+	# THE SENSES NO LONGER WRITE THE FIGURE. They elect two trigrams and stop;
+	# Alchemy alone turns the body's lines, one at a time, at the pace the fire
+	# allows. A sense that wrote the whole figure would jump six lines at once.
+	_prev_bits = _target
 	return true
+
+
+# -- what the body is doing, for the fire ------------------------------------
+
+## The figure the two elections are asking for: (human << 3) | machine.
+func target_bits() -> int:
+	return _target & 63
+
+
+## How far the machine's seated trigram leads the runner-up, 0..1.
+func machine_margin() -> float:
+	return _machine_margin
+
+
+## How far the human's seated trigram leads the runner-up, 0..1.
+func human_margin() -> float:
+	return _human_margin
+
+
+## The lead of the seat-holder over the best of the rest, clamped to 0..1. The
+## seat-holder is not always the leader -- the debounce may still be holding a
+## challenger off -- and a seat being out-scored is a margin of nothing.
+static func _margin_of(scores: Array[float], seat: int) -> float:
+	if scores.is_empty() or seat < 0 or seat >= scores.size():
+		return 0.0
+	var rival: float = -1.0
+	for i in range(scores.size()):
+		if i != seat and scores[i] > rival:
+			rival = scores[i]
+	return clampf(scores[seat] - rival, 0.0, 1.0)
+
+
+## How still the body is, 0..1. One is a phone on a table; zero is a walk.
+func stillness() -> float:
+	return clampf(1.0 - (_filtered_jerk / 1.6 + _gyro_len / 1.2), 0.0, 1.0)
+
+
+## How shaken the body is, 0..1. At MARTIAL_THRESHOLD the martial fire takes a
+## line whether the stillness ever came or not.
+func excitation() -> float:
+	return clampf(_excitation, 0.0, 1.0)
+
+
+## The motion filter. Jerk is the accelerometer minus gravity -- what is left
+## after the planet has been subtracted is what the person did.
+func _update_motion(delta_s: float, telemetry: Dictionary) -> void:
+	if telemetry.has("accel"):
+		var acc: Vector3 = telemetry["accel"]
+		var grav: Vector3 = telemetry.get("gravity", Vector3.ZERO)
+		var jerk: float = (acc - grav).length()
+		_filtered_jerk = lerpf(_filtered_jerk, jerk, clampf(delta_s * 3.0, 0.05, 1.0))
+	if telemetry.has("gyro"):
+		var gyro: Vector3 = telemetry["gyro"]
+		_gyro_len = lerpf(_gyro_len, gyro.length(), clampf(delta_s * 4.0, 0.05, 1.0))
+	var flux: float = (clampf(_filtered_jerk / 6.0, 0.0, 1.0)
+		+ clampf(_gyro_len / 2.0, 0.0, 1.0)) * 0.4
+	if flux > 0.25:
+		_excitation = minf(1.0, _excitation + flux * delta_s * 0.45)
+	else:
+		_excitation = maxf(0.0, _excitation - delta_s * 0.40)
 
 
 ## Whether a person's own cast still holds the figure.
@@ -224,6 +292,12 @@ func reset() -> void:
 	human_lattice.reset(0)
 	_last_tick_ms = -1
 	_prev_bits = -1
+	_target = 0
+	_filtered_jerk = 0.0
+	_gyro_len = 0.0
+	_excitation = 0.0
+	_machine_margin = 0.0
+	_human_margin = 0.0
 
 
 static func _scores_of(row: Array[Sense]) -> Array[float]:
