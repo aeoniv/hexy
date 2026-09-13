@@ -23,6 +23,7 @@ func _init() -> void:
 
 	_test_absent()
 	_test_crafted()
+	_test_negative_states()
 	_test_election()
 	_test_tap_blocks_figure()
 	_test_lattice_spike()
@@ -70,11 +71,31 @@ func _test_absent() -> void:
 		var name: String = row[0]
 		var s: Sense = row[1]
 		s.tick(1000, empty)
-		if s.present() or s.score() != 0.0 or s.sentence() != Sense.NOT_SENSED:
+		# A sense that can name what it lacks says so; one that cannot falls
+		# back to "not sensed". Both are absence, neither is a zero reading.
+		var want: String = Sense.NOT_SENSED
+		if s.needs() != "":
+			want = "needs %s" % s.needs()
+		if s.present() or s.score() != 0.0 or s.sentence() != want:
 			bad += 1
 			print("  absent-mismatch: ", name, " present=", s.present(),
 				" score=", s.score(), " sentence=", s.sentence())
 	check(bad == 0, "all 16 senses with empty telemetry are not sensed, score 0")
+
+	var named: int = 0
+	for row in each_sense(rig):
+		var s2: Sense = row[1]
+		if s2.needs() != "" and s2.sentence() == ("needs %s" % s2.needs()):
+			named += 1
+	check(named >= 8, "senses that want a plugin say needs <x>, not not sensed")
+	check(rig.sense(Sense.MACHINE, 2).sentence() == "needs android battery",
+		"battery with no key says needs android battery")
+	check(rig.sense(Sense.MACHINE, 3).sentence() == "needs ixvoice",
+		"acoustic with no key says needs ixvoice")
+	check(rig.sense(Sense.MACHINE, 0).sentence() == "needs ixloc",
+		"sanctuary with no key says needs ixloc")
+	check(rig.sense(Sense.HUMAN, 7).sentence() == "needs ixbody",
+		"posture with no key says needs ixbody")
 
 	var families_ok: bool = true
 	for i in range(8):
@@ -107,8 +128,8 @@ func crafted() -> Array:
 			"accel": Vector3(0, -9.8, 0), "screen_on": false}]]],
 		["locomotion", Sense.HUMAN, 1, [[0, {"steps_per_min": 110.0}]]],
 		["hydration", Sense.HUMAN, 2, [[20000000, {"last_drink_ms": 8000000.0}]]],
-		["grip", Sense.HUMAN, 3, [[0, {"accel": Vector3(0, 0, 10.15), "touch_rate": 1.0}]]],
-		["deep_work", Sense.HUMAN, 4, [[0, {"gravity": Vector3(0, 0, -9.8), "screen_on": false}]]],
+		["grip", Sense.HUMAN, 3, [[0, {"accel": Vector3(0, -9.5, 3.58), "touch_rate": 1.0}]]],
+		["deep_work", Sense.HUMAN, 4, [[0, {"gravity": Vector3(0, 0, 9.8), "screen_on": false}]]],
 		["gaze", Sense.HUMAN, 5, [[0, {"face_on": true, "touch_rate": 2.0}]]],
 		["breath", Sense.HUMAN, 6, [[0, {"accel": Vector3(0, 0, 9.92)}]]],
 		["posture", Sense.HUMAN, 7, [[0, {"pose_upright": 1.0, "gravity": Vector3(0, -9.8, 0)}]]],
@@ -140,6 +161,81 @@ func _test_crafted() -> void:
 	loco.tick(600000, {"steps_per_min": 110.0})
 	check(loco.score() > floor_score,
 		"a held window lifts the reading above its first-tick floor")
+	rig.free()
+
+
+# -- 2b. a present sense that reads NO says NO ------------------------------
+
+## THE DESK AT 13:07. Every reading below was taken from a Samsung A22 lying
+## flat, face up, screen on, at one in the afternoon. The old sixteen answered
+## it with "night, dark and still", "face down, screen off" and "held in a
+## hand" -- three sentences about a phone that was none of those things.
+func _test_negative_states() -> void:
+	var rig: Senses = new_senses()
+	var desk: Dictionary = {
+		"local_hour": 13.116,
+		"gravity": Vector3(0.05, 0.1, -9.79),
+		"accel": Vector3(0.05, 0.1, -9.79),
+		"screen_on": true,
+		"touch_rate": 0.0,
+	}
+
+	var sleep: Sense = rig.sense(Sense.HUMAN, 0)
+	sleep.tick(0, desk)
+	check(sleep.present(), "sleep is present: the clock is there")
+	check(sleep.score() == 0.0, "daytime with the screen on scores sleep 0")
+	check(sleep.sentence() == "day, screen on",
+		"sleep says day, screen on -- got: %s" % sleep.sentence())
+
+	var deep: Sense = rig.sense(Sense.HUMAN, 4)
+	deep.tick(0, desk)
+	check(deep.score() == 0.0, "face up with the screen on scores deep work 0")
+	check(deep.sentence() == "face up, screen on",
+		"deep work says face up, screen on -- got: %s" % deep.sentence())
+
+	var grip: Sense = rig.sense(Sense.HUMAN, 3)
+	grip.tick(0, desk)
+	check(grip.score() == 0.0, "a phone flat on a desk is not held")
+	check(grip.sentence() == "not held, flat on a surface",
+		"grip says not held -- got: %s" % grip.sentence())
+
+	var desk_rest: Sense = rig.sense(Sense.MACHINE, 4)
+	desk_rest.tick(0, desk)
+	check(desk_rest.score() > 0.6, "the same phone IS flat on a surface")
+	check(grip.score() == 0.0 or desk_rest.score() == 0.0,
+		"grip and desk rest are never both true")
+
+	# Night, screen off, still: the same sense says the opposite thing.
+	var night: Dictionary = {
+		"local_hour": 2.0, "screen_on": false, "accel": Vector3(0, -9.8, 0),
+	}
+	sleep.reset()
+	sleep.tick(0, night)
+	check(sleep.score() > 0.6 and sleep.sentence() == "night, dark and still",
+		"night with the screen off still reads as sleep")
+
+	# Turned over, screen off: deep work, with the corrected sign.
+	var over: Dictionary = {"gravity": Vector3(0, 0, 9.79), "screen_on": false}
+	deep.reset()
+	deep.tick(0, over)
+	check(deep.score() > 0.6 and deep.sentence() == "face down, screen off",
+		"face down (gravity.z positive) with the screen off is deep work")
+
+	# A hand: not flat, and jittering.
+	var hand: Dictionary = {"accel": Vector3(0.2, -9.4, 3.6), "touch_rate": 1.0}
+	grip.reset()
+	grip.tick(0, hand)
+	check(grip.score() > 0.6 and grip.sentence().begins_with("held in a hand"),
+		"a tilted, touched phone is held -- got: %s" % grip.sentence())
+
+	# Not flat, but no jitter and no finger: still not a hand.
+	var shelf: Dictionary = {"accel": Vector3(0.0, -9.8, 0.0), "touch_rate": 0.0}
+	grip.reset()
+	grip.tick(0, shelf)
+	grip.tick(4000, shelf)
+	grip.tick(8000, shelf)
+	check(grip.score() == 0.0, "upright and perfectly still is furniture, not a hand")
+
 	rig.free()
 
 

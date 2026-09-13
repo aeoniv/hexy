@@ -87,6 +87,21 @@ func _run() -> void:
 	await process_frame
 	check(glass.answer_text() != "", "the answer line on the glass is not empty")
 
+	# -- the answer line holds its three thoughts apart -----------------------
+	store.set_machine({"trigram": 4, "score": 0.9, "sentence": "flat on a surface, untouched"})
+	store.set_human({"trigram": 0, "score": 0.0, "sentence": "day, screen on"})
+	await process_frame
+	store.set_answer("Keeping Still. flat on a surface, untouched day, screen on")
+	await process_frame
+	print("answer: ", glass.answer_text())
+	check(glass.answer_text() ==
+		"Keeping Still. | flat on a surface, untouched | day, screen on",
+		"the answer line joins judgement and the two sentences with a bar")
+	store.set_answer("Keeping Still.")
+	await process_frame
+	check(glass.answer_text() == "Keeping Still.",
+		"an answer carrying no sentences is left alone")
+
 	# -- the sheet -----------------------------------------------------------
 	check(not glass.sheet_open(), "the sheet is shut until it is asked for")
 	glass.plus_button().emit_signal("pressed")
@@ -94,6 +109,10 @@ func _run() -> void:
 	check(glass.sheet_open(), "the plus opens the sheet")
 	check(glass.sheet_row_count() == 16,
 		"the sheet lists eight machine rows and eight human ones (got %d)" % glass.sheet_row_count())
+	var skin: StyleBox = glass.get_node("Sheet").get_theme_stylebox("panel")
+	check(skin is StyleBoxFlat, "the sheet carries a ground of its own")
+	check((skin as StyleBoxFlat).bg_color.a > 0.95,
+		"the sheet is opaque enough to read text on (alpha %f)" % (skin as StyleBoxFlat).bg_color.a)
 	glass.close_sheet()
 	check(not glass.sheet_open(), "the sheet shuts again")
 

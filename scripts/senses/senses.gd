@@ -55,6 +55,16 @@ var _store: HexyStore = null
 var _last_tick_ms: int = -1
 var _prev_bits: int = -1
 
+## Whether the app has the screen. THE ONLY HONEST ANSWER GODOT HAS: there is
+## no engine API for "is the display lit", and DisplayServer.window_get_mode
+## answers MODE_FULLSCREEN on Android whether the phone is on a desk face down
+## or in a hand -- which is how a face-up A22 came to be called deep work.
+## Focus is the thing the engine really knows: the window loses it when the
+## screen goes off, when the app is backgrounded, and when another app comes
+## forward, and all three mean the same thing to a sense. It starts true
+## because an app that is running has just been looked at.
+var _focused: bool = true
+
 
 func _init() -> void:
 	machine = ([
@@ -79,6 +89,25 @@ func _init() -> void:
 	] as Array[Sense])
 	machine_lattice = Lattice.new(0)
 	human_lattice = Lattice.new(0)
+
+
+## The screen, tracked rather than guessed. These two notifications reach every
+## Node in the tree, so a Senses that was added to the tree is told; one built
+## bare in a test is not, and reads as focused, which is what a test wants.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		_focused = true
+	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_focused = false
+
+
+## Whether the host believes the glass is lit. Tests may set this by hand.
+func screen_on() -> bool:
+	return _focused
+
+
+func set_screen_on(on: bool) -> void:
+	_focused = on
 
 
 func bind(store: HexyStore) -> void:
@@ -237,13 +266,15 @@ func telemetry_from_input() -> Dictionary:
 	t["local_hour"] = float(clock.get("hour", 12)) + float(clock.get("minute", 0)) / 60.0
 	t["offset_ms"] = 0.0
 
+	# BATTERY IS NOT IN THE ENGINE. Godot 4 removed OS.get_power_percent_left
+	# and offers nothing in its place, so the key is LEFT OUT and the battery
+	# and thermal senses say "needs android battery" rather than inventing a
+	# hundred per cent. The guard stays in case a host patches one in.
 	if OS.has_method("get_power_percent_left"):
 		var pct: int = int(OS.call("get_power_percent_left"))
 		if pct >= 0:
 			t["battery_pct"] = float(pct)
 
-	if DisplayServer.has_method("window_get_mode"):
-		var mode: int = int(DisplayServer.window_get_mode(0))
-		t["screen_on"] = mode != DisplayServer.WINDOW_MODE_MINIMIZED
+	t["screen_on"] = _focused
 
 	return t

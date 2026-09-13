@@ -16,6 +16,7 @@ var _has_temp: bool = false
 
 func _init() -> void:
 	super(Sense.MACHINE, 1, "thermal")
+	_needs = "android battery"
 
 
 func _has(t: Dictionary) -> bool:
@@ -33,12 +34,18 @@ func _read(_now_ms: int, t: Dictionary) -> float:
 	return maxf(heat, wire)
 
 
-func _say() -> String:
+func _high() -> String:
 	if _charging and _has_temp:
 		return "charging, cell at %d c" % int(round(_temp_c))
 	if _charging:
 		return "charging, current running in"
 	return "cell at %d c" % int(round(_temp_c))
+
+
+func _low() -> String:
+	if _has_temp:
+		return "not charging, cell at %d c" % int(round(_temp_c))
+	return "not charging, no heat"
 
 
 func _forget() -> void:

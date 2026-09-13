@@ -14,6 +14,7 @@ var _lux: float = 0.0
 
 func _init() -> void:
 	super(Sense.MACHINE, 5, "light")
+	_needs = "ixbody"
 
 
 func _has(t: Dictionary) -> bool:
@@ -28,12 +29,16 @@ func _read(_now_ms: int, t: Dictionary) -> float:
 	return Sense.ramp(decades, lo, hi)
 
 
-func _say() -> String:
+func _high() -> String:
 	if _lux < 20.0:
 		return "almost no light, %d lux" % int(round(_lux))
 	if _lux > 3500.0:
 		return "full daylight, %d lux" % int(round(_lux))
 	return "light at %d lux" % int(round(_lux))
+
+
+func _low() -> String:
+	return "almost no light, %d lux" % int(round(_lux))
 
 
 func _forget() -> void:

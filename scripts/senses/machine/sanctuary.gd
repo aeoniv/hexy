@@ -23,6 +23,7 @@ var _minutes: int = 0
 func _init() -> void:
 	super(Sense.MACHINE, 0, "sanctuary")
 	_needs_consent = true
+	_needs = "ixloc"
 
 
 func _has(t: Dictionary) -> bool:
@@ -55,10 +56,14 @@ func _stillness(t: Dictionary) -> float:
 	return clampf(1.0 - dev / 1.5, 0.0, 1.0)
 
 
-func _say() -> String:
+func _high() -> String:
 	if _minutes < 1:
 		return "settled in one place"
 	return "same place for %d minutes" % _minutes
+
+
+func _low() -> String:
+	return "moving, no room to call this"
 
 
 func _forget() -> void:

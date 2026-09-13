@@ -34,8 +34,15 @@ const TRIGRAMS: Array[String] = [
 ## The exponential mean's weight on the newest reading.
 const ALPHA: float = 0.3
 
-## What a sense says when its telemetry is not there at all.
+## What a sense says when its telemetry is not there at all and it cannot
+## name what it would need.
 const NOT_SENSED: String = "not sensed"
+
+## Below this score the sense is present but says NO. A sense that is being
+## read and is reading nothing must describe the negative state: "day, screen
+## on" is a reading, "night, dark and still" printed over an empty bar is a
+## lie the bar cannot shout down.
+const LOW_SCORE: float = 0.15
 
 ## Windowed senses never read zero on their first tick: the window is a
 ## confirmation, not a precondition. base * (FLOOR + RISE * dwell_fraction).
@@ -48,6 +55,12 @@ var _label: String = ""
 
 ## True for senses that read something a person must permit (place, mic, face).
 var _needs_consent: bool = false
+
+## What this sense would need in order to be sensed at all: a plugin name
+## ("ixvoice", "ixbody", "ixloc", "android battery") or a piece of hardware.
+## "not sensed" and "needs ixbody" are different facts: one says the reading
+## failed, the other says the reading was never wired.
+var _needs: String = ""
 
 var _present: bool = false
 var _raw: float = 0.0
@@ -91,10 +104,18 @@ func score() -> float:
 	return clampf(_ema, 0.0, 1.0)
 
 
+## What this sense would need to be sensed at all. "" when nothing is missing
+## that can be named.
+func needs() -> String:
+	return _needs
+
+
 func sentence() -> String:
 	if not _present:
-		return NOT_SENSED
-	return _say()
+		if _needs == "":
+			return NOT_SENSED
+		return "needs %s" % _needs
+	return _say(score())
 
 
 func tools() -> Array:
@@ -150,9 +171,23 @@ func _read(_now_ms: int, _t: Dictionary) -> float:
 	return 0.0
 
 
-## The line. ASCII, 60 characters or fewer.
-func _say() -> String:
+## The line, picked by the score. A subclass answers two sentences and never
+## chooses between them: the gate lives here so no sense can forget it.
+## ASCII, 60 characters or fewer, both of them.
+func _say(p_score: float) -> String:
+	if p_score < LOW_SCORE:
+		return _low()
+	return _high()
+
+
+## The line when this sense reads YES.
+func _high() -> String:
 	return ""
+
+
+## The line when this sense is present and reads NO.
+func _low() -> String:
+	return _high()
 
 
 ## Drop rolling state when the sense goes absent.

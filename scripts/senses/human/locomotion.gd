@@ -17,6 +17,7 @@ var _minutes: int = 0
 
 func _init() -> void:
 	super(Sense.HUMAN, 1, "locomotion")
+	_needs = "ixbody"
 
 
 func _has(t: Dictionary) -> bool:
@@ -31,12 +32,14 @@ func _read(now_ms: int, t: Dictionary) -> float:
 	return Sense.windowed(base, frac)
 
 
-func _say() -> String:
-	if _spm < WALKING:
-		return "not walking, %d steps a minute" % int(round(_spm))
+func _high() -> String:
 	if _minutes >= 1:
 		return "walking %d a minute for %d minutes" % [int(round(_spm)), _minutes]
 	return "walking, %d steps a minute" % int(round(_spm))
+
+
+func _low() -> String:
+	return "not walking, %d steps a minute" % int(round(_spm))
 
 
 func _forget() -> void:

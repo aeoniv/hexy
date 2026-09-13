@@ -20,6 +20,7 @@ var _first: bool = true
 
 func _init() -> void:
 	super(Sense.MACHINE, 6, "geomagnetic")
+	_needs = "magnetometer"
 
 
 func _has(t: Dictionary) -> bool:
@@ -47,10 +48,16 @@ func _read(_now_ms: int, t: Dictionary) -> float:
 	return 0.5 * strength + 0.5 * steady
 
 
-func _say() -> String:
+func _high() -> String:
 	if not _has_heading:
 		return "field at %d microtesla" % int(round(_field))
 	return "holding %d degrees, field %d ut" % [int(round(_heading)), int(round(_field))]
+
+
+func _low() -> String:
+	if not _has_heading:
+		return "weak field, %d microtesla" % int(round(_field))
+	return "heading wandering, field %d ut" % int(round(_field))
 
 
 func _forget() -> void:

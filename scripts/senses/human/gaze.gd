@@ -18,6 +18,7 @@ var _rate: float = 0.0
 func _init() -> void:
 	super(Sense.HUMAN, 5, "gaze")
 	_needs_consent = true
+	_needs = "ixbody"
 
 
 func _has(t: Dictionary) -> bool:
@@ -34,12 +35,14 @@ func _read(_now_ms: int, t: Dictionary) -> float:
 	return clampf(looking + tapping, 0.0, 1.0)
 
 
-func _say() -> String:
-	if not _face:
-		return "no face on the glass"
+func _high() -> String:
 	if _rate > 0.05:
 		return "looking at the glass, hands on it"
 	return "looking at the glass"
+
+
+func _low() -> String:
+	return "no face on the glass"
 
 
 func _forget() -> void:

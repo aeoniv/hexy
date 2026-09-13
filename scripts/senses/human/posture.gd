@@ -16,6 +16,7 @@ var _tilt: float = 1.0
 
 func _init() -> void:
 	super(Sense.HUMAN, 7, "posture")
+	_needs = "ixbody"
 
 
 func _has(t: Dictionary) -> bool:
@@ -31,11 +32,13 @@ func _read(_now_ms: int, t: Dictionary) -> float:
 	return _upright * (0.7 + 0.3 * _tilt)
 
 
-func _say() -> String:
+func _high() -> String:
 	if _upright > 0.66:
 		return "sitting up, spine against gravity"
-	if _upright > 0.33:
-		return "half upright, leaning"
+	return "half upright, leaning"
+
+
+func _low() -> String:
 	return "slumped, spine given up"
 
 

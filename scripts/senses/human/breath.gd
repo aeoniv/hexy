@@ -24,6 +24,7 @@ var _speaking: bool = false
 
 func _init() -> void:
 	super(Sense.HUMAN, 6, "breath")
+	_needs = "accelerometer"
 
 
 func _has(t: Dictionary) -> bool:
@@ -59,12 +60,16 @@ func _sameness() -> float:
 	return clampf(1.0 - spread / SPREAD_FULL, 0.0, 1.0)
 
 
-func _say() -> String:
+func _high() -> String:
 	if _speaking:
 		return "breathing slowly, speaking"
 	if _regular > 0.7:
 		return "breathing evenly, small steady motion"
 	return "breathing, motion uneven"
+
+
+func _low() -> String:
+	return "no breath in this motion"
 
 
 func _forget() -> void:

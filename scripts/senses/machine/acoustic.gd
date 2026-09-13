@@ -16,6 +16,7 @@ var _speech: bool = false
 func _init() -> void:
 	super(Sense.MACHINE, 3, "acoustic")
 	_needs_consent = true
+	_needs = "ixvoice"
 
 
 func _has(t: Dictionary) -> bool:
@@ -29,10 +30,14 @@ func _read(_now_ms: int, t: Dictionary) -> float:
 	return loud * (SPEECH_DUCK if _speech else 1.0)
 
 
-func _say() -> String:
+func _high() -> String:
 	if _speech:
 		return "room at %d db, a voice in it" % int(round(_db))
 	return "room at %d db, no voice" % int(round(_db))
+
+
+func _low() -> String:
+	return "room quiet, %d db" % int(round(_db))
 
 
 func _forget() -> void:

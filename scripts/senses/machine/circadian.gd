@@ -30,10 +30,18 @@ func _read(_now_ms: int, t: Dictionary) -> float:
 	return clampf(1.0 - away / HALF_DAY, 0.0, 1.0)
 
 
-func _say() -> String:
+func _high() -> String:
+	return "local hour %s, near solar noon" % _clock()
+
+
+func _low() -> String:
+	return "local hour %s, far from noon" % _clock()
+
+
+func _clock() -> String:
 	var h: int = int(_hour)
 	var m: int = int(floor((_hour - float(h)) * 60.0))
-	return "local hour %02d:%02d, near solar noon" % [h, m]
+	return "%02d:%02d" % [h, m]
 
 
 func _forget() -> void:

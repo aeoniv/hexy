@@ -18,6 +18,7 @@ var _has_drink: bool = false
 
 func _init() -> void:
 	super(Sense.HUMAN, 2, "hydration")
+	_needs = "the water tool"
 
 
 func _has(t: Dictionary) -> bool:
@@ -32,12 +33,18 @@ func _read(now_ms: int, t: Dictionary) -> float:
 	return clampf(since / DRY_MS, 0.0, 1.0)
 
 
-func _say() -> String:
+func _high() -> String:
 	if not _has_drink:
 		return "no water logged yet"
 	if _hours < 1.0:
-		return "water %d minutes ago" % int(round(_hours * 60.0))
-	return "water %d hours ago" % int(_hours)
+		return "thirsty, water %d minutes ago" % int(round(_hours * 60.0))
+	return "thirsty, water %d hours ago" % int(_hours)
+
+
+func _low() -> String:
+	if not _has_drink:
+		return "no water logged yet"
+	return "water %d minutes ago" % int(round(_hours * 60.0))
 
 
 func tools() -> Array:

@@ -47,6 +47,15 @@ var _top: Button = null
 ## does not change; only the scale it is drawn at does.
 const STAGE_PX: int = 640
 
+## The sheet's ground: the project's own default clear colour, so the one dark
+## in this app is the one dark on the sheet.
+const SHEET_DARK: Color = Color(0.09, 0.1, 0.13, 1.0)
+const SHEET_ALPHA: float = 0.96
+
+## What holds the judgement and the two sentences apart on the answer line. A
+## space let three sentences run together into one long unreadable ribbon.
+const JOIN: String = " | "
+
 var _center: Control = null
 var _svc: SubViewportContainer = null
 var _view: SubViewport = null
@@ -262,6 +271,22 @@ func _build_sheet() -> void:
 	_sheet.offset_right = -16.0
 	_sheet.offset_bottom = -16.0
 	_sheet.visible = false
+	# THE SHEET IS NOT A WINDOW. A PanelContainer with the default theme is
+	# see-through enough that the creature swims behind the sixteen rows and
+	# the text becomes unreadable on a phone. The ground is the project's own
+	# clear colour at alpha 0.96 -- not 1.0, so the sheet still reads as glass
+	# laid ON the app rather than a second app.
+	var skin := StyleBoxFlat.new()
+	skin.bg_color = Color(SHEET_DARK.r, SHEET_DARK.g, SHEET_DARK.b, SHEET_ALPHA)
+	skin.corner_radius_top_left = 12
+	skin.corner_radius_top_right = 12
+	skin.corner_radius_bottom_left = 12
+	skin.corner_radius_bottom_right = 12
+	skin.content_margin_left = 12.0
+	skin.content_margin_right = 12.0
+	skin.content_margin_top = 12.0
+	skin.content_margin_bottom = 12.0
+	_sheet.add_theme_stylebox_override("panel", skin)
 	add_child(_sheet)
 
 	var scroll := ScrollContainer.new()
@@ -581,13 +606,13 @@ func _on_family_changed(_f: Dictionary) -> void:
 func _on_answer_changed(a: String) -> void:
 	_stream = ""
 	if Time.get_ticks_msec() >= _flash_until:
-		_answer.text = a
+		_answer.text = _joined(a)
 
 
 func _on_token(t: String) -> void:
 	_stream += t
 	if Time.get_ticks_msec() >= _flash_until:
-		_answer.text = _stream
+		_answer.text = _joined(_stream)
 
 
 func _on_tier_chosen(index: int) -> void:
@@ -607,7 +632,7 @@ func _process(_delta: float) -> void:
 	var now: int = Time.get_ticks_msec()
 	if _flash_until > 0 and now >= _flash_until:
 		_flash_until = 0
-		_answer.text = String(_store.answer) if _store != null else ""
+		_answer.text = _joined(String(_store.answer)) if _store != null else ""
 	if _preview_until > 0 and now >= _preview_until:
 		_preview_until = 0
 		_preview_bits = -1
@@ -770,6 +795,41 @@ func _sentence_of(family: int, index: int) -> String:
 	if int(f.get("trigram", -1)) == index:
 		return String(f.get("sentence", "not sensed"))
 	return "not sensed"
+
+
+## The answer, its machine sentence and its human sentence, held apart.
+##
+## The model is handed the two sentences and hands them back glued to the
+## judgement with spaces, which on a phone is one ribbon of prose with three
+## unrelated thoughts in it. Rather than reach into the model's prompt, the
+## two sentences are recognised where they are -- at the tail, in order -- and
+## the seams between them are widened to [constant JOIN]. An answer that never
+## carried them is returned untouched.
+func _joined(text: String) -> String:
+	var line: String = text.strip_edges()
+	if line == "":
+		return line
+	var tail: Array[String] = ([] as Array[String])
+	for family in [1, 0]:
+		var said: String = _family_sentence(family)
+		if said == "" or not line.ends_with(said):
+			continue
+		var cut: String = line.substr(0, line.length() - said.length())
+		if cut.strip_edges() == "":
+			continue
+		line = cut.strip_edges()
+		tail.push_front(said)
+	if tail.is_empty():
+		return line
+	return line + JOIN + JOIN.join(tail)
+
+
+## The sentence the store is currently showing for one family, "" when none.
+func _family_sentence(family: int) -> String:
+	if _store == null:
+		return ""
+	var f: Dictionary = _store.machine if family == 0 else _store.human
+	return String(f.get("sentence", "")).strip_edges()
 
 
 func _seat_label(family: int, index: int) -> String:

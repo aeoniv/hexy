@@ -11,6 +11,7 @@ var _pct: float = 100.0
 
 func _init() -> void:
 	super(Sense.MACHINE, 2, "battery")
+	_needs = "android battery"
 
 
 func _has(t: Dictionary) -> bool:
@@ -22,10 +23,14 @@ func _read(_now_ms: int, t: Dictionary) -> float:
 	return clampf(1.0 - _pct / 100.0, 0.0, 1.0)
 
 
-func _say() -> String:
+func _high() -> String:
 	if _pct < 25.0:
 		return "battery %d percent, deep reserve" % int(round(_pct))
 	return "battery %d percent" % int(round(_pct))
+
+
+func _low() -> String:
+	return "battery %d percent, the well is full" % int(round(_pct))
 
 
 func _forget() -> void:
