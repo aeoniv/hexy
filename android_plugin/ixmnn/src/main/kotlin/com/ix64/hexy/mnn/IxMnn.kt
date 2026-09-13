@@ -10,6 +10,13 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.util.Log
 import org.godotengine.godot.Godot
 import org.godotengine.godot.plugin.GodotPlugin
@@ -31,6 +38,10 @@ class IxMnn(godot: Godot) : GodotPlugin(godot), SensorEventListener {
 	private companion object {
 		const val TAG = "IxMnn"
 		const val MAX_NEW_TOKENS = 192
+		const val MIC_NO_ENGINE = -1
+		const val MIC_NO_PERMISSION = -2
+		const val MIC_FAILED = -3
+		const val MIC_PERMISSION_REQUEST = 6401
 	}
 
 	private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "ixmnn").apply { isDaemon = true } }
@@ -49,7 +60,12 @@ class IxMnn(godot: Godot) : GodotPlugin(godot), SensorEventListener {
 	override fun getPluginSignals(): Set<SignalInfo> = setOf(
 		SignalInfo("chat_token", String::class.java),
 		SignalInfo("chat_done", String::class.java),
-		SignalInfo("chat_fault", String::class.java)
+		SignalInfo("chat_fault", String::class.java),
+		SignalInfo("mic_partial", String::class.java),
+		SignalInfo("mic_result", String::class.java),
+		SignalInfo("mic_error", Integer::class.java, String::class.java),
+		SignalInfo("mic_level", java.lang.Float::class.java),
+		SignalInfo("mic_state", String::class.java)
 	)
 
 	private fun <T> onWorker(default: T, body: () -> T): T = try {
@@ -327,6 +343,201 @@ class IxMnn(godot: Godot) : GodotPlugin(godot), SensorEventListener {
 		}
 	}
 
+	// --- THE MIC: Android's own recogniser, on the device, on the main thread --
+	//
+	// No network service and no second model. SpeechRecognizer is asked to
+	// prefer offline, and on API 31+ we ask for the strictly on-device engine
+	// first and fall back to the ordinary one when the phone has none. The
+	// recogniser is a main-thread object: every touch of it is posted to the UI
+	// thread, and every answer leaves as a Godot signal.
+
+	@Volatile private var recognizer: SpeechRecognizer? = null
+	@Volatile private var listening = false
+	private var micLang: String = "en-US"
+
+	private fun ui(body: () -> Unit) {
+		val act = activity ?: return
+		act.runOnUiThread {
+			try {
+				body()
+			} catch (t: Throwable) {
+				Log.e(TAG, "mic main-thread call failed", t)
+				emitSignal("mic_error", MIC_FAILED, t.message ?: t.javaClass.simpleName)
+			}
+		}
+	}
+
+	@UsedByGodot
+	fun mic_available(): Boolean {
+		val act = activity ?: return false
+		return try {
+			SpeechRecognizer.isRecognitionAvailable(act)
+		} catch (t: Throwable) {
+			Log.w(TAG, "mic_available", t)
+			false
+		}
+	}
+
+	/** "granted", "denied" or "unknown" -- and a request is fired when denied. */
+	@UsedByGodot
+	fun mic_permission(): String {
+		val act = activity ?: return "unknown"
+		return try {
+			val have = act.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+				PackageManager.PERMISSION_GRANTED
+			if (have) {
+				"granted"
+			} else {
+				ui {
+					act.requestPermissions(
+						arrayOf(Manifest.permission.RECORD_AUDIO), MIC_PERMISSION_REQUEST)
+					emitSignal("mic_state", "permission")
+				}
+				"denied"
+			}
+		} catch (t: Throwable) {
+			Log.w(TAG, "mic_permission", t)
+			"unknown"
+		}
+	}
+
+	@UsedByGodot
+	fun mic_listening(): Boolean = listening
+
+	@UsedByGodot
+	fun mic_start(lang: String) {
+		if (listening) return
+		val act = activity ?: return
+		if (!mic_available()) {
+			emitSignal("mic_error", MIC_NO_ENGINE, "no recognition engine on this device")
+			return
+		}
+		if (mic_permission() != "granted") {
+			emitSignal("mic_error", MIC_NO_PERMISSION, "RECORD_AUDIO not granted")
+			return
+		}
+		micLang = if (lang.isBlank()) "en-US" else lang
+		ui {
+			val rec = recognizer ?: newRecognizer(act) ?: return@ui
+			val intent = android.content.Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+				putExtra(
+					RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+					RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+				putExtra(RecognizerIntent.EXTRA_LANGUAGE, micLang)
+				putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+				putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+				putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, act.packageName)
+			}
+			listening = true
+			rec.startListening(intent)
+			emitSignal("mic_state", "listening")
+		}
+	}
+
+	@UsedByGodot
+	fun mic_stop() {
+		if (!listening) return
+		ui { recognizer?.stopListening() }
+	}
+
+	@UsedByGodot
+	fun mic_cancel() {
+		ui {
+			recognizer?.cancel()
+			if (listening) {
+				listening = false
+				emitSignal("mic_state", "stopped")
+			}
+		}
+	}
+
+	/** Main thread only. On-device first on API 31+, ordinary engine after. */
+	private fun newRecognizer(act: android.app.Activity): SpeechRecognizer? {
+		var rec: SpeechRecognizer? = null
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+			rec = try {
+				if (SpeechRecognizer.isOnDeviceRecognitionAvailable(act))
+					SpeechRecognizer.createOnDeviceSpeechRecognizer(act) else null
+			} catch (t: Throwable) {
+				Log.w(TAG, "on-device recogniser unavailable", t)
+				null
+			}
+		}
+		if (rec == null) {
+			rec = try {
+				SpeechRecognizer.createSpeechRecognizer(act)
+			} catch (t: Throwable) {
+				Log.e(TAG, "no recogniser", t)
+				emitSignal("mic_error", MIC_NO_ENGINE, t.message ?: "no recogniser")
+				null
+			}
+		}
+		rec?.setRecognitionListener(micListener)
+		recognizer = rec
+		return rec
+	}
+
+	private fun firstOf(results: Bundle?): String {
+		val list = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+		return if (list.isNullOrEmpty()) "" else list[0]
+	}
+
+	private val micListener = object : RecognitionListener {
+		override fun onReadyForSpeech(params: Bundle?) {}
+		override fun onBeginningOfSpeech() {}
+
+		override fun onRmsChanged(rmsdB: Float) {
+			emitSignal("mic_level", rmsdB)
+		}
+
+		override fun onBufferReceived(buffer: ByteArray?) {}
+
+		override fun onEndOfSpeech() {}
+
+		override fun onError(error: Int) {
+			listening = false
+			emitSignal("mic_error", error, micErrorText(error))
+			emitSignal("mic_state", "stopped")
+		}
+
+		override fun onResults(results: Bundle?) {
+			listening = false
+			emitSignal("mic_result", firstOf(results))
+			emitSignal("mic_state", "stopped")
+		}
+
+		override fun onPartialResults(partialResults: Bundle?) {
+			val text = firstOf(partialResults)
+			if (text.isNotEmpty()) emitSignal("mic_partial", text)
+		}
+
+		override fun onEvent(eventType: Int, params: Bundle?) {}
+	}
+
+	private fun micErrorText(code: Int): String = when (code) {
+		SpeechRecognizer.ERROR_AUDIO -> "audio recording error"
+		SpeechRecognizer.ERROR_CLIENT -> "client side error"
+		SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "no microphone permission"
+		SpeechRecognizer.ERROR_NETWORK -> "network error"
+		SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "network timeout"
+		SpeechRecognizer.ERROR_NO_MATCH -> "heard nothing it knows"
+		SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "recogniser busy"
+		SpeechRecognizer.ERROR_SERVER -> "server error"
+		SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "no speech"
+		else -> "speech error " + code
+	}
+
+	private fun micRelease() {
+		val rec = recognizer ?: return
+		recognizer = null
+		listening = false
+		try {
+			rec.destroy()
+		} catch (t: Throwable) {
+			Log.w(TAG, "mic release", t)
+		}
+	}
+
 	@UsedByGodot
 	fun release(): Unit = onWorker(Unit) {
 		if (embedHandle != 0L) IxMnnNative.nativeEmbeddingRelease(embedHandle)
@@ -337,6 +548,7 @@ class IxMnn(godot: Godot) : GodotPlugin(godot), SensorEventListener {
 	}
 
 	override fun onMainDestroy() {
+		micRelease()
 		sensorManager?.unregisterListener(this)
 		release()
 		worker.shutdown()

@@ -26,6 +26,8 @@ var qwen: Qwen = null
 var wmn: Wmn = null
 var senses: Senses = null
 var creature: Creature = null
+## THE MIC: Android's own recogniser on the phone, a mock everywhere else.
+var mic: Mic = null
 ## The surface is the THIRD GLASS: five bands, three dials, one bubble.
 ## scripts/glass/glass.gd and scripts/glass/hud_bridge.gd both stay on disk,
 ## and the import wall still keeps them honest, but nothing boots them.
@@ -71,6 +73,10 @@ func _ready() -> void:
 		alchemy.name = "Alchemy"
 		add_child(alchemy)
 
+	mic = Mic.new()
+	mic.name = "Mic"
+	add_child(mic)
+
 	hud = Hud3.new()
 	hud.name = "Hud"
 	add_child(hud)
@@ -88,6 +94,11 @@ func _ready() -> void:
 	hud.set_senses(senses)
 	hud.set_creature(creature)
 	hud.set_alchemy(alchemy)
+	## THE GLASS MAY NOT HAVE ITS MIC BUTTON YET. The core node is built either
+	## way, because the test that walks the mock does not need a surface, and an
+	## app that will not boot against a slightly older glass teaches nobody.
+	if hud.has_method("set_mic"):
+		hud.set_mic(mic)
 	creature.bind(store)
 	creature.set_senses(senses)
 

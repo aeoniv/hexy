@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+	<!-- The MIC in the composer: Android's own on-device SpeechRecognizer. -->
+	<uses-permission android:name="android.permission.RECORD_AUDIO" />
+
 	<application>
 		<!-- See ixmesh's manifest: this meta-data is the only thing that makes
 		     Engine.has_singleton("IxMnn") true. -->
