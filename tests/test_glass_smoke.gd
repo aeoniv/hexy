@@ -109,6 +109,17 @@ func _run() -> void:
 	await process_frame
 	check(hud.answer_text() != "", "the thought bubble is not empty")
 
+	# -- a long thought wraps instead of running off the glass ---------------
+	var bubble: Label = hud.hud.get_node("ThoughtBubble/Margin/ThoughtLabel") as Label
+	check(bubble != null, "the ThoughtLabel is where the HUD says it is")
+	check(bubble != null and bubble.autowrap_mode == TextServer.AUTOWRAP_WORD_SMART,
+		"the ThoughtLabel wraps word-smart")
+	check(bubble != null and bubble.max_lines_visible == 4,
+		"the bubble grows to at most four lines")
+	check(bubble != null
+		and bubble.text_overrun_behavior == TextServer.OVERRUN_TRIM_WORD_ELLIPSIS,
+		"anything past four lines ends in an ellipsis")
+
 	# -- the answer line holds its three thoughts apart -----------------------
 	store.set_machine({"trigram": 4, "score": 0.9, "sentence": "flat on a surface, untouched"})
 	store.set_human({"trigram": 0, "score": 0.0, "sentence": "day, screen on"})

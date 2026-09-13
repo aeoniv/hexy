@@ -657,14 +657,22 @@ func _joined(text: String) -> String:
 		var said: String = _family_sentence(family)
 		if said == "" or not line.ends_with(said):
 			continue
-		var cut: String = line.substr(0, line.length() - said.length())
-		if cut.strip_edges() == "":
+		var cut: String = _unbar(line.substr(0, line.length() - said.length()))
+		if cut == "":
 			continue
-		line = cut.strip_edges()
+		line = cut
 		tail.push_front(said)
 	if tail.is_empty():
 		return line
 	return line + JOIN + JOIN.join(tail)
+
+
+## A seam the model already widened is not widened twice: drop a trailing bar.
+func _unbar(text: String) -> String:
+	var out: String = text.strip_edges()
+	while out.ends_with("|"):
+		out = out.substr(0, out.length() - 1).strip_edges()
+	return out
 
 
 func _family_sentence(family: int) -> String:

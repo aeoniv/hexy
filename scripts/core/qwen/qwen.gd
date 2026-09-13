@@ -26,6 +26,9 @@ var _busy: bool = false
 var _owed: bool = false
 ## The figure the last thought was actually about, as bits | moving << 6.
 var _spoken_key: int = -1
+## The stream as it arrives, concatenated RAW. Tokens carry their own spacing,
+## so gluing them with anything of our own would double it or lose it.
+var _stream: String = ""
 
 
 func bind(store: HexyStore, mnn: Mnn) -> void:
@@ -33,6 +36,8 @@ func bind(store: HexyStore, mnn: Mnn) -> void:
 	_mnn = mnn
 	if _mnn != null and not _mnn.done.is_connected(_on_done):
 		_mnn.done.connect(_on_done)
+	if _mnn != null and not _mnn.token.is_connected(_on_token):
+		_mnn.token.connect(_on_token)
 	if _store != null and not _store.hexagram_changed.is_connected(_on_hexagram_changed):
 		_store.hexagram_changed.connect(_on_hexagram_changed)
 
@@ -104,6 +109,7 @@ func prompt_now(question: String) -> String:
 ## Ask one question about this moment. The answer lands in store.answer.
 func ask(question: String) -> Signal:
 	_busy = true
+	_stream = ""
 	var prompt: String = prompt_now(question)
 	return _mnn.generate(prompt, MAX_TOKENS)
 
@@ -167,9 +173,15 @@ func _on_hexagram_changed(_h: Dictionary) -> void:
 	thought()
 
 
+func _on_token(t: String) -> void:
+	_stream += t
+
+
 func _on_done(text: String) -> void:
 	_busy = false
 	var out: String = text.strip_edges()
+	if out == "":
+		out = _stream.strip_edges()
 	if out == "":
 		out = Judgements.for_bits(_store.primary() if _store != null else 0)
 	if _store != null:

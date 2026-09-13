@@ -88,6 +88,12 @@ func _test_ask() -> void:
 	check(text.length() > 0, "ask returns text through the mock")
 	check(store.answer == text, "store.answer holds the answer")
 	check(seen.size() == 1, "answer_changed fired once")
+	# A stream is not a heap of words: the spaces have to survive the wire.
+	check(text.contains(" "), "the answer has spaces between its words")
+	check(not text.contains("  "), "no word was glued twice")
+	check(text.contains(" | "), "judgement, machine and human are parted by ' | '")
+	check(text.contains("the room is still"), "the machine sentence came back whole")
+	check(text.contains("the breath is slow"), "the human sentence came back whole")
 	store.queue_free()
 	parts[1].queue_free()
 	qwen.queue_free()

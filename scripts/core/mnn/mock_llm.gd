@@ -13,6 +13,9 @@ signal done(text: String)
 
 const TOKEN_SECONDS: float = 0.01
 
+## What stands between the judgement, the machine sentence and the human one.
+const SEPARATOR: String = " | "
+
 var token_seconds: float = TOKEN_SECONDS
 
 var _queue: PackedStringArray = PackedStringArray()
@@ -36,7 +39,7 @@ func reply(prompt: String, max_tokens: int = 80) -> String:
 		parts.append(m)
 	if h != "":
 		parts.append(h)
-	var text: String = " ".join(parts)
+	var text: String = SEPARATOR.join(parts)
 	var words: PackedStringArray = text.split(" ", false)
 	if max_tokens > 0 and words.size() > max_tokens:
 		var cut: PackedStringArray = PackedStringArray()
@@ -50,7 +53,7 @@ func reply(prompt: String, max_tokens: int = 80) -> String:
 func start(prompt: String, max_tokens: int = 80) -> void:
 	cancel()
 	var text: String = reply(prompt, max_tokens)
-	_queue = text.split(" ", false)
+	_queue = _tokenize(text)
 	_spoken = ""
 	_busy = true
 	if not is_inside_tree():
@@ -65,6 +68,16 @@ func start(prompt: String, max_tokens: int = 80) -> void:
 		_timer.timeout.connect(_on_tick)
 	_timer.wait_time = maxf(0.001, token_seconds)
 	_timer.start()
+
+
+## Cut `text` the way a real tokenizer would: every piece but the first
+## carries its own leading space, so a caller that simply concatenates the
+## stream gets the sentence back with its spaces intact.
+static func _tokenize(text: String) -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	for w in text.split(" ", false):
+		out.append(w if out.is_empty() else " " + w)
+	return out
 
 
 func cancel() -> void:
@@ -82,7 +95,7 @@ func _on_tick() -> void:
 		return
 	var w: String = _queue[0]
 	_queue.remove_at(0)
-	_spoken += (" " if _spoken != "" else "") + w
+	_spoken += w
 	token.emit(w)
 	if _queue.is_empty():
 		_finish()
@@ -90,7 +103,7 @@ func _on_tick() -> void:
 
 func _flush() -> void:
 	for w in _queue:
-		_spoken += (" " if _spoken != "" else "") + w
+		_spoken += w
 		token.emit(w)
 	_queue = PackedStringArray()
 	_finish()
