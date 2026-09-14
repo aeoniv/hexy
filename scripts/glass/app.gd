@@ -25,6 +25,12 @@ var mnn: Mnn = null
 var qwen: Qwen = null
 var wmn: Wmn = null
 var senses: Senses = null
+## THE ORACLE: the phone's raw accelerometer, gyro and light, filtered into
+## the sample the fly brain eats sixty times a second. The sixteen senses elect
+## trigrams at the ticker's pace; the oracle feeds the organism every frame.
+## Without it the fly is built and never fed: the radar stands still, the
+## ball never turns its head, and the habit memory never sees a context.
+var oracle: SensorOracle = null
 var creature: Creature = null
 ## THE MIC: Android's own recogniser on the phone, a mock everywhere else.
 var mic: Mic = null
@@ -73,6 +79,10 @@ func _ready() -> void:
 		alchemy.name = "Alchemy"
 		add_child(alchemy)
 
+	oracle = SensorOracle.new()
+	oracle.name = "Oracle"
+	add_child(oracle)
+
 	mic = Mic.new()
 	mic.name = "Mic"
 	add_child(mic)
@@ -86,6 +96,7 @@ func _ready() -> void:
 
 	qwen.bind(store, mnn)
 	senses.bind(store)
+	oracle.bind(store)
 	wmn.bind(store)
 	if alchemy != null and alchemy.has_method("bind"):
 		alchemy.bind(store, senses)
@@ -141,6 +152,12 @@ func _on_period_changed(_ms: int) -> void:
 func _on_tick() -> void:
 	var now: int = wmn.now_ms()
 	senses.tick(now, senses.telemetry_from_input())
+	## THE HOMEOSTAT DECAYS ON THE SAME CLOCK. Needs fall, the conductance
+	## matrix couples them, and lines open or close; the oracle feeds the fly
+	## between these ticks, this is the metabolic beat.
+	var ch: Variant = store.get_character()
+	if ch != null and ch.has_method("tick"):
+		ch.tick(now)
 	if alchemy != null and alchemy.has_method("tick"):
 		alchemy.tick(now)
 
