@@ -109,6 +109,20 @@ func _run() -> void:
 	check((snap.get("fires", {}) as Dictionary).has("dwell_needed_s"),
 		"the fires panel read the civil breath from alchemy")
 	check((snap.get("mesh", {}) as Dictionary).has("fabric"), "the mesh panel named the fabric")
+
+	# -- the PEERS door: one row answers who / where / which-way ------------
+	check(dash._trigram_of(null) == "·", "no bio pulse draws no trigram, not a guessed one")
+	var wedge0: String = dash._trigram_of(0.0)
+	var wedge_pi: String = dash._trigram_of(PI)
+	check(wedge0 != "" and wedge_pi != "" and wedge0 != wedge_pi,
+		"a heading in radians resolves to a trigram glyph (%s at 0, %s at pi)"
+			% [wedge0, wedge_pi])
+	var fake_peers: Array = [{"who": "peerid1234abcd", "bits": 0, "moving": 0,
+		"body": 0, "last_seen_ms": 0, "rssi": -1, "band": "here",
+		"cls": "touch", "heading_rad": 1.57}]
+	var fake_row: Dictionary = fake_peers[0]
+	check(fake_row.has("cls") and fake_row.has("heading_rad"),
+		"a peers() row carries cls and heading_rad for the door to draw")
 	var eng: Dictionary = snap.get("engine", {}) as Dictionary
 	for cast_key in ["q6_cast_version", "q6_prior_weight", "q6_prior_mismatches"]:
 		check(eng.has(cast_key), "the figures panel reads %s from Mnn.info()" % cast_key)

@@ -95,6 +95,21 @@ static func trigram_glyph(t: int) -> String:
 	return String.chr(0x2630 + TRIGRAM_GLYPH_OFFSET[clampi(t, 0, 7)])
 
 
+## The eight wedges of the fly's ellipsoid-body radar, in the order they sit
+## round the dial (坤 艮 坎 巽 震 离 兑 乾), as trigram codes above. One table so
+## the radar and the peers door name a heading with the same glyph.
+const WEDGE_TRIGRAM: Array[int] = [0, 4, 2, 6, 1, 5, 3, 7]
+
+
+## Which wedge a heading in radians falls in: round(heading / (TAU/8)) mod 8.
+static func wedge_of(heading_rad: float) -> int:
+	return posmod(int(round(heading_rad / (TAU / 8.0))), 8)
+
+
+static func heading_glyph(heading_rad: float) -> String:
+	return trigram_glyph(WEDGE_TRIGRAM[wedge_of(heading_rad)])
+
+
 static func lines(bits: int) -> Array[int]:
 	## Bottom line first.
 	var out: Array[int] = ([] as Array[int])

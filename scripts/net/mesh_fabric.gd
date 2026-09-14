@@ -228,10 +228,16 @@ func _learn_peer_src(peer_id: String, src_id: String) -> void:
 
 
 func _on_transport_peer_lost(id: String) -> void:
+	# READ THE BRIDGE BEFORE BURNING IT. `_peer_src` is the only map from this
+	# transport id to the fabric id a heading/bio pulse was ever filed under;
+	# erase it first and `fid` is always "", which used to leave a gone peer's
+	# heading sitting in peer_headings forever -- exactly the stale entry
+	# `peer_proximity_by_src` must never resurrect on the cls side either, so
+	# both erasures happen off the same captured id.
+	var fid: String = String(_peer_src.get(id, ""))
 	_peer_src.erase(id)
 	_peer_cls.erase(id)
 	_peer_names.erase(id)
-	var fid: String = String(_peer_src.get(id, ""))
 	if fid != "":
 		peer_headings.erase(fid)
 		peer_respirations.erase(fid)

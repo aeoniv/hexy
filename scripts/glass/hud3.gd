@@ -38,11 +38,11 @@ const PACING_PATH: String = "res://scripts/core/iching/pacing.gd"
 const GROUND: Color = Color(0.0588235, 0.0823529, 0.12549, 1.0)
 
 ## The fixed bands, in pixels of the band's own height. The body takes the rest.
-const STATUS_H: float = 52.0
+const STATUS_H: float = 70.0
 const HEAD_H: float = 270.0
 const EARTH_H: float = 270.0
-const COMPOSER_H: float = 54.0
-const BAND_GAP: int = 12
+const COMPOSER_H: float = 72.0
+const BAND_GAP: int = 16
 ## The left column the radar takes on a fold that is open, in pixels, and the
 ## two sizes the radar itself is given in its two placements.
 const RADAR_PANE_W: float = 300.0
@@ -222,6 +222,9 @@ var _wmn: Node = null
 var _senses: Node = null
 var _creature: Node = null
 var _alchemy: Node = null
+## THE COMPASS. `scripts/core/heading.gd`, built by the app, read once a frame
+## in `_feed_radar` and never reached for anywhere else.
+var _heading: Node = null
 var _mic: Node = null
 var _mic_listening: bool = false
 
@@ -380,8 +383,39 @@ func _build_radar() -> void:
 
 	radar = FlyCalciumRadar2D.new()
 	radar.name = "CalciumRadar"
-	radar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	## A STOP FILTER, BECAUSE A BLIP IS A THING YOU TAP. The disc is the only
+	## part of this Control that answers: `_on_radar_input` measures the finger
+	## against `disc_center()` and lets anything outside fall straight through to
+	## the glass behind, so the six neuromodulator bars under the dial are not a
+	## dead zone the size of the pane.
+	radar.mouse_filter = Control.MOUSE_FILTER_STOP
+	radar.gui_input.connect(_on_radar_input)
 	_apply_radar_layout()
+
+
+## A TAP ON A BLIP PICKS SOMEBODY TO WALK TOWARD. Tapping again lets them go --
+## one gesture in, the same gesture out, which is the radar's own rule and this
+## file only routes it.
+func _on_radar_input(event: InputEvent) -> void:
+	if radar == null:
+		return
+	var at: Vector2 = Vector2.ZERO
+	if event is InputEventMouseButton:
+		var mb: InputEventMouseButton = event
+		if not (mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT):
+			return
+		at = mb.position
+	elif event is InputEventScreenTouch:
+		var st: InputEventScreenTouch = event
+		if not st.pressed:
+			return
+		at = st.position
+	else:
+		return
+	if at.distance_to(radar.disc_center()) > radar.field_radius():
+		return
+	radar.tap(at)
+	radar.accept_event()
 
 
 ## WHERE THE RADAR STANDS, asked of DeviceProfile and nobody else. A fold open
@@ -463,8 +497,8 @@ func _build_status() -> void:
 	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	status_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	status_label.add_theme_font_size_override("font_size", 11)
-	status_label.add_theme_color_override("font_color", Color(0.68, 0.82, 0.92, 1.0))
+	status_label.add_theme_font_size_override("font_size", 15)
+	status_label.add_theme_color_override("font_color", Color(0.78, 0.88, 0.98, 1.0))
 	status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hbox.add_child(status_label)
 	status_label.text = "waking"
@@ -473,7 +507,8 @@ func _build_status() -> void:
 	btn_config.name = "ConfigBtn"
 	btn_config.text = "⚙"
 	btn_config.flat = true
-	btn_config.add_theme_font_size_override("font_size", 16)
+	btn_config.custom_minimum_size = Vector2(48.0, 48.0)
+	btn_config.add_theme_font_size_override("font_size", 24)
 	btn_config.add_theme_color_override("font_color", Color(0.75, 0.88, 1.0, 0.9))
 	btn_config.mouse_filter = Control.MOUSE_FILTER_STOP
 	btn_config.pressed.connect(_on_configure_pressed)
@@ -634,7 +669,8 @@ func _build_composer() -> void:
 	ask_field.name = "Ask"
 	ask_field.placeholder_text = "ask"
 	ask_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	ask_field.add_theme_font_size_override("font_size", 14)
+	ask_field.custom_minimum_size = Vector2(0.0, 46.0)
+	ask_field.add_theme_font_size_override("font_size", 16)
 	ask_field.text_submitted.connect(_on_submitted)
 	row.add_child(ask_field)
 
@@ -642,7 +678,8 @@ func _build_composer() -> void:
 	btn_mic.name = "Mic"
 	btn_mic.text = MIC_IDLE
 	btn_mic.disabled = true
-	btn_mic.add_theme_font_size_override("font_size", 13)
+	btn_mic.custom_minimum_size = Vector2(64.0, 46.0)
+	btn_mic.add_theme_font_size_override("font_size", 15)
 	btn_mic.pressed.connect(_on_mic_pressed)
 	row.add_child(btn_mic)
 
@@ -663,7 +700,8 @@ func _build_composer() -> void:
 	btn_send = Button.new()
 	btn_send.name = "Send"
 	btn_send.text = "SEND"
-	btn_send.add_theme_font_size_override("font_size", 13)
+	btn_send.custom_minimum_size = Vector2(74.0, 46.0)
+	btn_send.add_theme_font_size_override("font_size", 15)
 	btn_send.pressed.connect(_on_send_pressed)
 	row.add_child(btn_send)
 
@@ -692,8 +730,26 @@ func bind(store: Node, qwen: Node, mnn: Node, wmn: Node) -> void:
 		_join(_store, "room_changed", _on_room_changed)
 		_join(_store, "answer_changed", _on_answer_changed)
 	_join(_mnn, "token", _on_token)
+	## A PEER THAT STOPS SHOUTING LEAVES THE DIAL. `_feed_radar` only ever adds
+	## what the fabric currently holds, and a heading dictionary that keeps a
+	## dead entry would keep drawing a blip for somebody who walked out. The
+	## fabric's own timeout is the authority on who is gone; the glass just
+	## forwards the word.
+	_join(_wmn, "peer_gone", _on_peer_gone)
 	_build_dashboard()
 	_refresh_dials()
+
+
+func _on_peer_gone(who: String) -> void:
+	if radar != null:
+		radar.drop_peer(who)
+
+
+## THE COMPASS NODE, HANDED IN BY THE APP. Duck-typed and optional: the app that
+## boots without one (headless, or a phone with no magnetometer) draws exactly
+## the allocentric dial it drew before this existed.
+func set_heading(h: Node) -> void:
+	_heading = h
 
 
 func set_senses(senses: Node) -> void:
@@ -1190,6 +1246,20 @@ func _feed_radar() -> void:
 		radar.set_peer_headings(_wmn.peer_headings() as Dictionary)
 	if _wmn != null and _wmn.has_method("peer_proximity"):
 		radar.set_peer_proximity(_wmn.peer_proximity() as Dictionary)
+	## AND THE COMPASS, WHICH IS GODOT'S OWN AND NOBODY'S PLUGIN. Seven facts a
+	## frame, pushed rather than pulled, so the radar never reaches for a sensor
+	## and the app can boot with no Heading at all -- which is exactly what
+	## headless is. Duck-typed like everything else the glass is handed.
+	if _heading != null and _heading.has_method("heading_rad"):
+		radar.set_compass({
+			"heading_rad": _heading.heading_rad(),
+			"accuracy": _heading.accuracy(),
+			"pose": _heading.pose(),
+			"live": _heading.live(),
+			"seen": _heading.seen(),
+			"true_north": _heading.true_north(),
+			"declination": _heading.declination(),
+		})
 
 
 func _refresh_dials() -> void:

@@ -365,6 +365,12 @@ func _test_loopback() -> void:
 	_check(row.size() == 1 and int(row[0]["bits"]) == 0b100101
 		and int(row[0]["body"]) == 0b001001,
 		"a peer row carries their head AND their body")
+	_check(row.size() == 1 and row[0].has("cls") and row[0].has("heading_rad"),
+		"a peer row also carries cls and heading_rad -- who/where/which-way in one place")
+	_check(String(row[0]["cls"]) in ["", "touch", "room", "far"],
+		"cls is empty (unplaced) or one of touch/room/far (got %s)" % String(row[0]["cls"]))
+	_check(row[0]["heading_rad"] == null or row[0]["heading_rad"] is float,
+		"heading_rad is null (no bio pulse yet) or a float, never a guess")
 	_check(a.ledger.size() >= 2, "the ledger kept our cast and the one we heard")
 
 	# The chirps have been flying at 2 Hz since start(); by now the clock has
@@ -382,6 +388,18 @@ func _test_loopback() -> void:
 	_check(b.peer_count() == before + 1, "an injected figure joins the room")
 	_check(b.room.drifting().has("ghost-peer"),
 		"a figure six hops out is drifting (got %s)" % str(b.room.drifting()))
+
+	# Silence, not a goodbye, is what drops a peer -- expire() is the only
+	# door, and peer_gone is Wmn's own signal for a radar to hang drop_peer off.
+	var went_gone: Array[String] = []
+	b.peer_gone.connect(func(who): went_gone.append(who))
+	var ghost_before: int = b.peer_count()
+	b.room.peers["ghost-peer"]["seen"] = b.now_ms() - Room.EXPIRY_MS - 1000
+	b._process(0.0)
+	_check(b.peer_count() == ghost_before - 1, "an unheard peer expires out of the room")
+	_check(went_gone.has("ghost-peer"), "peer_gone names the one who went quiet")
+	_check(not b.peers().any(func(p): return String(p["who"]) == "ghost-peer"),
+		"a gone peer no longer has a row")
 
 	a.stop()
 	b.stop()

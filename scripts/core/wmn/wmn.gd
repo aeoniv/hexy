@@ -289,6 +289,8 @@ func _on_transport_lost(_transport_id: String) -> void:
 
 func peers() -> Array:
 	var now := now_ms()
+	var cls_by_who: Dictionary = peer_proximity()
+	var headings: Dictionary = peer_headings()
 	var out: Array = []
 	for who in room.names():
 		var p: Dictionary = room.peers[who]
@@ -303,6 +305,11 @@ func peers() -> Array:
 			# none. See LanMesh.peer_proximity for the same ruling.
 			"rssi": -1,
 			"band": Presence.band(now - int(p["seen"]), -1),
+			# touch/room/far, or "" when the fabric has not placed this peer
+			# yet -- see MeshFabric.peer_proximity_by_src.
+			"cls": String(cls_by_who.get(who, "")),
+			# radians, or null when no bio pulse has been heard from them.
+			"heading_rad": headings.get(who, null),
 		})
 	return out
 

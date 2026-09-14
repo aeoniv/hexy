@@ -26,6 +26,10 @@ extends Control
 
 ## The one skin, borrowed from the bubble so there is only one look.
 const SKIN := preload("res://scripts/glass/bubble.gd")
+## The one place a `hexy-xxxx` name is spelled, and the one place a heading in
+## radians becomes a trigram glyph -- KingWen.heading_glyph carries the radar's
+## wedge order, so the glass reads it without reaching into the brain.
+const IdentityScript := preload("res://scripts/social/identity.gd")
 
 ## The seven panels, in the order they are read, top to bottom.
 const PANELS: Array[String] = [
@@ -1211,10 +1215,22 @@ func _paint_mesh(g: Control) -> void:
 		_line(g, Vector2(136.0, y), "solo · no peer heard", DIM, 11)
 	for i in range(mini(6, peers.size())):
 		var p: Dictionary = peers[i] as Dictionary
-		_line(g, Vector2(136.0, y), "%s  %s  %d ms" % [
-			String(p.get("who", "?")).substr(0, 12), String(p.get("band", "")),
+		var short := IdentityScript.short_name(String(p.get("who", "")))
+		var cls := String(p.get("cls", ""))
+		_line(g, Vector2(136.0, y), "%s  %s  %s  %s  %d ms" % [
+			short, String(p.get("band", "")), cls if cls != "" else "?",
+			_trigram_of(p.get("heading_rad", null)),
 			int(p.get("last_seen_ms", 0))], DIM, 10)
 		y += 15.0
+
+
+## A peer's heading, as the trigram glyph of the radar wedge it falls in.
+## `null` (no bio pulse heard yet) draws no glyph rather than guessing a
+## direction nobody sent.
+func _trigram_of(heading_rad: Variant) -> String:
+	if heading_rad == null:
+		return "·"
+	return KingWen.heading_glyph(float(heading_rad))
 
 
 # -- the geometry primitives -------------------------------------------------

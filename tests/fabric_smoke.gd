@@ -105,7 +105,20 @@ func _initialize() -> void:
 		"charlie received the same witnessed event")
 	_check(got_a[0]["src"] == b.fabric_id, "witness names bravo as origin")
 
+	# A LOST PEER LEAVES NO PROXIMITY BEHIND. Bravo's link to alpha's transport
+	# goes down; the fabric id it was filed under must fall out of
+	# peer_proximity_by_src too, or a radar polling it would keep drawing a
+	# blip for someone who is no longer there.
+	var alpha_fid: String = a.fabric_id
+	_check(b.peer_proximity_by_src().has(alpha_fid),
+		"bravo has alpha's proximity class before the link drops")
 	a.stop()
+	await _wait(12.0, func(): return not b.peer_proximity_by_src().has(alpha_fid))
+	_check(not b.peer_proximity_by_src().has(alpha_fid),
+		"a lost peer's proximity class is gone, not resurrected under its fabric id")
+	_check(not b.peer_headings.has(alpha_fid) and not b.peer_bio.has(alpha_fid),
+		"a lost peer's heading and bio pulse are gone too")
+
 	b.stop()
 	c.stop()
 	print("checks: ", _checks, " (floor ", MIN_CHECKS, ")")

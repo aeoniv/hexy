@@ -34,6 +34,13 @@ var oracle: SensorOracle = null
 var creature: Creature = null
 ## THE MIC: Android's own recogniser on the phone, a mock everywhere else.
 var mic: Mic = null
+## THE COMPASS, AND IT IS GODOT'S OWN. `Input.get_magnetometer()` and
+## `Input.get_gravity()` are engine API: base, no plugin, no door. Headless and
+## on a phone with no magnetometer this node simply never goes live, and the
+## radar draws the allocentric disc it drew before. GPS is NOT here and will not
+## be: a position is a future add-on's gift, handed in through
+## `Heading.set_fix()`.
+var heading: Heading = null
 ## The surface is the THIRD GLASS: five bands, three dials, one bubble.
 ## scripts/glass/glass.gd and scripts/glass/hud_bridge.gd both stay on disk,
 ## and the import wall still keeps them honest, but nothing boots them.
@@ -92,6 +99,10 @@ func _ready() -> void:
 	mic.name = "Mic"
 	add_child(mic)
 
+	heading = Heading.new()
+	heading.name = "Heading"
+	add_child(heading)
+
 	hud = Hud3.new()
 	hud.name = "Hud"
 	add_child(hud)
@@ -115,6 +126,8 @@ func _ready() -> void:
 	## app that will not boot against a slightly older glass teaches nobody.
 	if hud.has_method("set_mic"):
 		hud.set_mic(mic)
+	if hud.has_method("set_heading"):
+		hud.set_heading(heading)
 	creature.bind(store)
 	creature.set_senses(senses)
 
