@@ -29,6 +29,7 @@ func _initialize() -> void:
 	_test_q6_limit()
 	_test_q6_is_not_decorative()
 	_test_pacing_rides_one_cube()
+	_test_journal()
 
 	if failures == 0:
 		print("--- ALL CORE PACING TESTS PASSED PERFECTLY ---\n")
@@ -421,6 +422,65 @@ func _test_pacing_rides_one_cube() -> void:
 	Q6Core.set_prior_weight(0.7)
 	check(is_equal_approx(Q6Core.prior_weight(), 0.0),
 		"and setting it changes nothing there is nothing to set")
+
+
+# -- 10. the replay log -------------------------------------------------------
+
+## Reset, inject, then a civil-fire walk to a target one line away: the
+## journal should hold the reset, the inject, at least one step, and exactly
+## one flip, in a monotone clock, and the flip's bits_after should be the
+## bits Pacing actually settled on.
+func _test_journal() -> void:
+	var p: Pacing = Pacing.new()
+	p.reset(0b000000, 0)
+	p.inject(0b000001, 10)
+	var target: int = 0b000011
+	still_walk(p, 100, 4000, target)
+
+	var j: Array[Dictionary] = p.journal_snapshot()
+	check(not j.is_empty(), "the journal is not empty")
+
+	var ops: Array[String] = ([] as Array[String])
+	for e in j:
+		ops.append(String(e["op"]))
+	check(ops.count("reset") == 1, "exactly one reset entry (got %d)" % ops.count("reset"))
+	check(ops.count("inject") == 1, "exactly one inject entry (got %d)" % ops.count("inject"))
+	check(ops.count("step") >= 1, "at least one step entry (got %d)" % ops.count("step"))
+	check(ops.count("flip") == 1, "exactly one flip entry (got %d)" % ops.count("flip"))
+
+	var t_ms: Array[int] = ([] as Array[int])
+	for e in j:
+		t_ms.append(int(e["t_ms"]))
+	var monotone: bool = true
+	for i in range(1, t_ms.size()):
+		if t_ms[i] < t_ms[i - 1]:
+			monotone = false
+	check(monotone, "the journal's clock never runs backward (got %s)" % str(t_ms))
+
+	var flip_entry: Dictionary = {}
+	for e in j:
+		if String(e["op"]) == "flip":
+			flip_entry = e
+	check(not flip_entry.is_empty(), "there is a flip entry to check")
+	check(int(flip_entry.get("bits_after", -1)) == p.bits,
+		"the flip's bits_after matches where Pacing actually settled (got %d, p.bits %d)"
+			% [int(flip_entry.get("bits_after", -1)), p.bits])
+	check(String(flip_entry.get("kind", "")) == "civil", "and it was the civil fire")
+	check(flip_entry.has("line") and flip_entry.has("to_yang") and flip_entry.has("reason"),
+		"a flip entry carries line, to_yang and reason")
+
+	# journal_snapshot is a duplicate: clearing the live journal must not
+	# touch the snapshot already taken.
+	var before_clear: int = j.size()
+	p.journal_clear()
+	check(p.journal.is_empty(), "journal_clear empties the live journal")
+	check(j.size() == before_clear, "but not a snapshot already taken")
+
+	# replay re-drives reset/inject/flip and lands on the same bits.
+	var q: Pacing = Pacing.new()
+	q.replay(j)
+	check(q.bits == p.bits, "replay lands on the same figure the journal recorded (got %d, want %d)"
+		% [q.bits, p.bits])
 
 
 static func _sum(v: PackedFloat64Array) -> float:

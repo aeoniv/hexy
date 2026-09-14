@@ -115,8 +115,52 @@ const MARTIAL_THRESHOLD: float = 0.85
 ## The strip is composed four times a second, not sixty.
 const STATUS_PERIOD_MS: int = 250
 
+## THE SIX DRAWER KEYS THIS GLASS OBEYS. Every one of them is pulled once at
+## boot and again the moment the drawer says it moved, so a person turning a
+## switch in the dashboard sees the glass change under their finger rather than
+## on the next restart.
+const KEY_DWELL_RING: String = "hud.dwell_ring"
+const KEY_LINE_FLASH: String = "hud.line_flash"
+const KEY_EARTH_MODE: String = "hud.earth_mode"
+const KEY_STATUS_MODE: String = "hud.status_mode"
+const KEY_ROOM_HIGHLIGHT: String = "hud.room_highlight"
+const KEY_BREATHE: String = "creature.breathe_with_dwell"
+
+## How long the tick of a line that just turned stays lit, in milliseconds.
+const FLASH_MS: int = 600
+
+## How many journal entries the status bubble carries.
+const JOURNAL_TAIL: int = 12
+
+## A day, in milliseconds, for counting the journal's own days.
+const DAY_MS: int = 86400000
+
+## The dwell arc's two colours: the civil fire banking, and the martial fire
+## taking over. They are the body dial's own cyan and the Huohoutu orange.
+const COL_DWELL: Color = Color(0.25, 0.80, 1.0, 0.9)
+const COL_FIRE: Color = Color(1.0, 0.45, 0.12, 0.95)
+const COL_FLASH: Color = Color(1.0, 0.92, 0.55, 0.98)
+## The second colour a head tick wears when somebody else in the room is
+## standing on the same figure.
+const COL_ROOM: Color = Color(0.35, 1.0, 0.65, 0.95)
+
 var _status_at: int = 0
 var _pacing_consts: Dictionary = {}
+
+## The live answers to the six keys, cached so `_process` reads a bool and not
+## a dictionary sixty times a second.
+var _cfg_dwell_ring: bool = true
+var _cfg_line_flash: bool = true
+var _cfg_earth_mode: String = "lines"
+var _cfg_status_mode: String = "day"
+var _cfg_room_highlight: bool = true
+var _cfg_breathe: bool = true
+
+## The line that just turned and how long it stays lit.
+var _flash_line: int = -1
+var _flash_until_ms: int = 0
+## Which earth line the last tap moved, so an answer can be anchored on it.
+var _last_moved_line: int = -1
 
 var layer: CanvasLayer = null
 var root: Control = null
@@ -130,6 +174,15 @@ var head: MandalaDialTap = null
 var body_band: Control = null
 var body: BodyDialTap = null
 var earth: EarthDial2D = null
+## THE EARTH BAND'S OTHER FACE. Both dials are built and both stay in the band;
+## only one of them is ever visible, because rebuilding a Control on a config
+## change is how a signal ends up connected twice.
+var earth_lines: EarthLinesDial = null
+
+## The two thin overlays: the dwell arc and the flashing line over the body
+## dial, and the room mark over the head dial. Neither takes a tap.
+var dwell_ring: Control = null
+var room_mark: Control = null
 
 ## THE CALCIUM RADAR, the fly's own ellipsoid body drawn where a person can
 ## see it. It is fed one `get_fly_state()` dictionary a frame and nothing else,
@@ -235,7 +288,77 @@ func _ready() -> void:
 	bubble = GlassBubble.new()
 	root.add_child(bubble)
 
+	_watch_config()
 	set_process(true)
+
+
+# -- the drawer --------------------------------------------------------------
+
+## PULLED ONCE, THEN FOLLOWED. `peek` and never `instance`, so a headless test
+## that never asked for a drawer keeps the defaults written above and does not
+## have one built underneath it.
+func _watch_config() -> void:
+	var cfg: HexyConfig = HexyConfig.peek()
+	if cfg == null:
+		_apply_config()
+		return
+	_cfg_dwell_ring = bool(cfg.get_value(KEY_DWELL_RING))
+	_cfg_line_flash = bool(cfg.get_value(KEY_LINE_FLASH))
+	_cfg_earth_mode = String(cfg.get_value(KEY_EARTH_MODE))
+	_cfg_status_mode = String(cfg.get_value(KEY_STATUS_MODE))
+	_cfg_room_highlight = bool(cfg.get_value(KEY_ROOM_HIGHLIGHT))
+	_cfg_breathe = bool(cfg.get_value(KEY_BREATHE))
+	if not cfg.changed.is_connected(_on_config_changed):
+		cfg.changed.connect(_on_config_changed)
+	_apply_config()
+
+
+func _on_config_changed(key: String, value: Variant) -> void:
+	match key:
+		KEY_DWELL_RING: _cfg_dwell_ring = bool(value)
+		KEY_LINE_FLASH: _cfg_line_flash = bool(value)
+		KEY_EARTH_MODE: _cfg_earth_mode = String(value)
+		KEY_STATUS_MODE: _cfg_status_mode = String(value)
+		KEY_ROOM_HIGHLIGHT: _cfg_room_highlight = bool(value)
+		KEY_BREATHE: _cfg_breathe = bool(value)
+		_: return
+	_apply_config()
+
+
+## What the six answers mean on the glass, applied in one place so a live
+## change and a boot take exactly the same path.
+func _apply_config() -> void:
+	if dwell_ring != null:
+		dwell_ring.visible = _cfg_dwell_ring
+	if room_mark != null:
+		room_mark.visible = _cfg_room_highlight
+	_apply_earth_mode()
+	_refresh_status_strip(true)
+
+
+## Which face the earth band wears. Nothing is rebuilt: one is shown, the other
+## is hidden, and the hidden one stops answering fingers with it.
+func _apply_earth_mode() -> void:
+	var lines_on: bool = _cfg_earth_mode == "lines"
+	if earth != null:
+		earth.visible = not lines_on
+		earth.mouse_filter = Control.MOUSE_FILTER_IGNORE if lines_on else Control.MOUSE_FILTER_STOP
+		earth.custom_minimum_size = Vector2(0.0, 0.0 if lines_on else EARTH_H)
+	if earth_lines != null:
+		earth_lines.visible = lines_on
+		earth_lines.mouse_filter = Control.MOUSE_FILTER_STOP if lines_on else Control.MOUSE_FILTER_IGNORE
+		earth_lines.custom_minimum_size = Vector2(0.0, EARTH_H if lines_on else 0.0)
+		_refresh_earth_lines()
+
+
+## The earth band's mode, as a word.
+func earth_mode() -> String:
+	return _cfg_earth_mode
+
+
+func _refresh_earth_lines() -> void:
+	if earth_lines != null:
+		earth_lines.set_figures(_body_bits(), _head_bits())
 
 
 ## THE RADAR AND ITS LEFT PANE. The pane is a container of its own so the
@@ -306,7 +429,12 @@ func _build_status() -> void:
 	status_panel.name = "Status"
 	status_panel.custom_minimum_size = Vector2(0.0, STATUS_H)
 	status_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	status_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	## THE STRIP ANSWERS A FINGER NOW. It is the shortest sentence the app has
+	## about the day, and the journal behind it is the longest, so the one opens
+	## the other. The gear button is still a child with its own STOP filter and
+	## keeps its own tap.
+	status_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	status_panel.gui_input.connect(_on_status_input)
 	status_panel.add_theme_stylebox_override("panel", SKIN.skin())
 	bands.add_child(status_panel)
 
@@ -359,6 +487,9 @@ func _build_head() -> void:
 	head.human_station_clicked.connect(_on_human_dot_tapped)
 	head.center_hub_clicked.connect(_on_head_hub_tapped)
 
+	room_mark = RoomMark.new(self)
+	head.add_child(room_mark)
+
 
 ## 3. THE BODY DIAL, BIG, DRAWN AROUND THE CREATURE. The ring is the whole
 ## band; the solid stands in a square in the middle of it; and the square is
@@ -378,6 +509,12 @@ func _build_body() -> void:
 	body.center_clicked.connect(_on_body_center_tapped)
 	body.dial_dragged.connect(_on_body_dial_dragged)
 	body.ring_slot_tapped.connect(_on_body_ring_tapped)
+
+	## THE DWELL ARC LIES OVER THE RIM, not in the dial. The body dial is a
+	## family member with two subclasses and eight other readers; an arc that is
+	## only ever the glass's opinion of the senses has no business inside it.
+	dwell_ring = DwellRing.new(self)
+	body_band.add_child(dwell_ring)
 
 	creature_field = Control.new()
 	creature_field.name = "CreatureField"
@@ -459,6 +596,15 @@ func _build_earth() -> void:
 	earth.hub_tapped.connect(_on_earth_hub_tapped)
 	earth.ring_slot_tapped.connect(_on_earth_ring_tapped)
 
+	earth_lines = EarthLinesDial.new()
+	earth_lines.name = "EarthLines"
+	earth_lines.custom_minimum_size = Vector2(0.0, EARTH_H)
+	earth_lines.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	bands.add_child(earth_lines)
+	earth_lines.line_tapped.connect(_on_earth_line_tapped)
+	earth_lines.hub_tapped.connect(_on_earth_hub_tapped)
+	_apply_earth_mode()
+
 
 ## 5. THE COMPOSER: ask, a mic that is honest about being a stub, and send.
 func _build_composer() -> void:
@@ -531,7 +677,12 @@ func bind(store: Node, qwen: Node, mnn: Node, wmn: Node) -> void:
 		_join(_store, "body_changed", _on_body_changed)
 		_join(_store, "earth_changed", _on_earth_changed)
 		_join(_store, "flipped", _on_flipped)
-		_join(_store, "hexagram_changed", _on_body_changed)
+		## ONE OF THE TWO, NEVER BOTH. `hexagram_changed` is the old name of
+		## `body_changed` and the store fires both on every body write; joining
+		## both would redraw the dial twice for one move. The old name is kept
+		## for the readers written before there were two figures.
+		if not _store.has_signal("body_changed"):
+			_join(_store, "hexagram_changed", _on_body_changed)
 		_join(_store, "machine_changed", _on_family_changed)
 		_join(_store, "human_changed", _on_family_changed)
 		_join(_store, "room_changed", _on_room_changed)
@@ -643,7 +794,15 @@ func body_rect() -> Rect2:
 
 
 func earth_rect() -> Rect2:
-	return earth.get_global_rect()
+	return _earth_control().get_global_rect()
+
+
+## Whichever face of the earth band is standing. Every point and every rect the
+## glass asks for comes through here, so nothing has to know which mode is on.
+func _earth_control() -> Control:
+	if earth_lines != null and earth_lines.visible:
+		return earth_lines
+	return earth
 
 
 ## A question, sent the way the send button sends one.
@@ -688,58 +847,135 @@ func _on_machine_diamond_tapped(trigram: int) -> void:
 		_creature.tap(_to_stage(at))
 
 
-## The twelve earth stations, in the order they are drawn.
+## The twelve earth stations, in the order they are drawn. EVERY ONE OF THEM IS
+## NOW A METHOD, not a branch: the stations are evicted from the band the moment
+## `hud.earth_mode` is "lines", and an action that only exists inside a `match`
+## on a Control that is no longer drawn is an action a person has lost. The
+## dashboard reaches these by name; this handler is one of its callers, not the
+## owner of the behaviour.
 func _on_earth_station_tapped(index: int) -> void:
 	var at: Vector2 = _point_in_root(earth, earth.station_position(index))
 	match index:
 		0:
-			_cast_earth()
+			cast_earth()
 			bubble.say("CAST ALTAR: %s" % _figure_word(_earth_bits()), at)
 		1:
-			_walk_earth(earth.earth_slot() - 1, "tap")
+			walk_earth(-1)
 			bubble.say("earth %s" % _figure_word(_earth_bits()), at)
 		2:
-			_walk_earth(earth.earth_slot() + 1, "tap")
+			walk_earth(1)
 			bubble.say("earth %s" % _figure_word(_earth_bits()), at)
 		3:
-			_enhanced = not _enhanced
-			stage.visible = _enhanced
-			bubble.say("ENHANCED 3D" if _enhanced else "PURE 2D", at)
+			bubble.say("ENHANCED 3D" if toggle_enhanced() else "PURE 2D", at)
 		4:
-			_cycle_geometry()
-			bubble.say("geometry: %s" % _geometry_word(), at)
+			bubble.say("geometry: %s" % cycle_geometry(), at)
 		5:
 			bubble.open_large(telemetry_text(), at)
 		6:
 			bubble.open_large(brain_text(), at)
 		7:
-			bubble.say("sense period %d ms" % _cycle_period(), at)
+			bubble.say("sense period %d ms" % cycle_sense_period(), at)
 		8:
-			if _wmn != null and _wmn.has_method("broadcast"):
-				_wmn.broadcast(_head_dict(), _body_dict())
-				bubble.say("mesh broadcast: %d peers" % _peer_count(), at)
-			else:
-				bubble.say("mesh beacon: solo mode", at)
+			var peers: int = mesh_broadcast()
+			var word: String = "mesh beacon: solo mode"
+			if peers >= 0:
+				word = "mesh broadcast: %d peers" % peers
+			bubble.say(word, at)
 		9:
-			if _creature != null and _creature.has_method("reset_orientation"):
-				_creature.reset_orientation()
+			camera_reset()
 			bubble.say("camera reset", at)
 		10:
-			if _senses != null and _senses.has_method("toggle_freeze"):
-				var frz: bool = bool(_senses.toggle_freeze())
-				bubble.say("sensors " + ("FROZEN" if frz else "ACTIVE"), at)
-			else:
-				bubble.say("sensors active", at)
+			bubble.say("sensors " + ("FROZEN" if toggle_sensor_freeze() else "ACTIVE"), at)
 		11:
 			bubble.open_large(config_text(), at)
 		_:
 			pass
 
 
+# -- the evicted twelve, as methods ------------------------------------------
+
+## The 3D stage, shown or hidden. Returns whether it now stands.
+func toggle_enhanced() -> bool:
+	_enhanced = not _enhanced
+	if stage != null:
+		stage.visible = _enhanced
+	return _enhanced
+
+
+## The solid turns to its next geometry. Returns the name it landed on.
+func cycle_geometry() -> String:
+	_cycle_geometry()
+	return _geometry_word()
+
+
+## The sixteen are read on the next of four beats. Returns the new period in ms.
+func cycle_sense_period() -> int:
+	return _cycle_period()
+
+
+## Both figures go on the air. Returns the peer count, or -1 when there is no
+## mesh at all to put them on.
+func mesh_broadcast() -> int:
+	if _wmn == null or not _wmn.has_method("broadcast"):
+		return -1
+	_wmn.broadcast(_head_dict(), _body_dict())
+	return _peer_count()
+
+
+## The eye goes back where it started.
+func camera_reset() -> void:
+	if _creature != null and _creature.has_method("reset_orientation"):
+		_creature.reset_orientation()
+
+
+## The sixteen are held, or let go. Returns whether they are now frozen.
+func toggle_sensor_freeze() -> bool:
+	if _senses == null or not _senses.has_method("toggle_freeze"):
+		return false
+	return bool(_senses.toggle_freeze())
+
+
+## Six coins on the altar. Returns the earth seat as the store now holds it.
+func cast_earth() -> Dictionary:
+	_cast_earth()
+	return _earth_dict()
+
+
+## The altar walks `delta` seats along the head's wheel.
+func walk_earth(delta: int) -> void:
+	var from: int = earth.earth_slot() if earth != null else 0
+	_walk_earth(from + delta, "tap")
+
+
+## A line of the earth ring, touched: that one line of the BODY is chosen as the
+## moving line and the altar is seated on the figure it makes. The event is the
+## same shape `_write_earth` builds for a cast, because the seat bus has one
+## shape and a tap is not a special case of it.
+func _on_earth_line_tapped(i: int) -> void:
+	var line: int = clampi(i, 0, 5)
+	var bits: int = (_body_bits() ^ (1 << line)) & 63
+	var id: int = int(HuohoutuData.get_by_bits(bits).get("id", 1))
+	_last_moved_line = line
+	_write_earth(bits, ([] as Array[int]), "tap",
+		HuohoutuData.find_head_index_by_id(id), 1 << line)
+	_refresh_earth_lines()
+	bubble.say("%s %s -> %s" % [
+		earth_lines.line_name(line), earth_lines.line_state(line), _figure_word(bits),
+	], _earth_line_point(line))
+
+
+## Where a line of the earth ring is, in the bubble's own coordinates.
+func _earth_line_point(i: int) -> Vector2:
+	if earth_lines == null or not earth_lines.visible:
+		return _hub_point(composer)
+	return _point_in_root(earth_lines, earth_lines.line_position(clampi(i, 0, 5)))
+
+
 ## The earth hub: Master Casting Altar and mesh broadcast.
 func _on_earth_hub_tapped() -> void:
-	var at: Vector2 = _hub_point(earth)
+	var at: Vector2 = _hub_point(_earth_control())
 	_cast_earth()
+	_refresh_earth_lines()
 	bubble.say("CAST ALTAR (EARTH)\nThrew 6 coins -> %s\nBroadcasting to %d peers" % [
 		_figure_word(_earth_bits()), _peer_count()], at)
 
@@ -831,21 +1067,32 @@ func _on_submitted(text: String) -> void:
 
 func _on_head_changed(_h: Dictionary) -> void:
 	head.set_head_bits(_head_bits())
+	_refresh_earth_lines()
 
 
 func _on_earth_changed(_e: Dictionary) -> void:
 	if earth != null:
 		earth.set_hexagram(_earth_bits())
+	_refresh_earth_lines()
 
 
 func _on_body_changed(_b: Dictionary) -> void:
 	body.set_body_bits(_body_bits())
+	_refresh_earth_lines()
 
 
-## A flip is not drawn: it is the newest sentence the status line has, and the
-## status line reads it off the store every frame.
-func _on_flipped(_f: Dictionary) -> void:
-	pass
+## A FLIP IS THE ONE EVENT ON THIS GLASS THAT IS WORTH INTERRUPTING FOR. It
+## still writes no text -- the status line reads the store for that -- but the
+## tick of the line that turned is lit for six hundred milliseconds and the
+## creature is given one flare, so a person who was not reading the strip still
+## sees their own body move.
+func _on_flipped(f: Dictionary) -> void:
+	if not _cfg_line_flash:
+		return
+	_flash_line = clampi(int(f.get("line", 0)), 0, 5)
+	_flash_until_ms = Time.get_ticks_msec() + FLASH_MS
+	if _creature != null and _creature.has_method("pulse"):
+		_creature.pulse()
 
 
 func _on_family_changed(_f: Dictionary) -> void:
@@ -863,8 +1110,17 @@ func _on_answer_changed(a: String) -> void:
 	if bubble.visible and not bubble.large():
 		bubble.stream(a)
 	elif _awaiting:
-		bubble.say(a, _hub_point(head))
+		bubble.say(a, _answer_point())
 	_awaiting = false
+
+
+## WHERE AN ANSWER LANDS. In lines mode the last line a finger moved is the
+## thing the question was about, so the answer arrives beside it; with no line
+## moved yet, and in stations mode, it arrives at the composer that asked.
+func _answer_point() -> Vector2:
+	if _cfg_earth_mode == "lines" and _last_moved_line >= 0 and earth_lines != null:
+		return _earth_line_point(_last_moved_line)
+	return _hub_point(composer)
 
 
 func _on_token(t: String) -> void:
@@ -878,6 +1134,16 @@ func _on_token(t: String) -> void:
 func _process(_delta: float) -> void:
 	_refresh_status_strip()
 	_feed_radar()
+	_feed_breath()
+
+
+## THE CREATURE BREATHES WITH THE DWELL, when the drawer says it may. One float
+## a frame, pushed rather than pulled, so the creature stays a thing that knows
+## nothing about senses or pacing.
+func _feed_breath() -> void:
+	if not _cfg_breathe or _creature == null or not _creature.has_method("set_breath_rate"):
+		return
+	_creature.set_breath_rate(dwell_fraction())
 
 
 ## THE STRIP IS NOT A FRAME-RATE COUNTER FOR THE RENDERER TO CHASE. The strip
@@ -925,6 +1191,7 @@ func _refresh_dials() -> void:
 		var rows: Dictionary = _senses.scores()
 		body.set_scores(rows.get("machine", []) as Array)
 		head.set_scores(rows.get("human", []) as Array)
+	_refresh_earth_lines()
 	_refresh_room()
 
 
@@ -1008,6 +1275,12 @@ func _to_stage(p: Vector2) -> Vector2:
 ## old surface set in the biggest type it had -- would have been shown almost
 ## never. What a person is holding outranks what just happened to it.
 func _status_line() -> String:
+	## THE DAY DISPLACES THE STATE, NOT THE FIGURES. The rule written above
+	## holds for this mode too: what a person is HOLDING keeps the top line, and
+	## the day's one sentence takes the line the fabric and the frame rate used
+	## to have. `day_line` is the sentence on its own, for whoever wants it.
+	if _cfg_status_mode == "day":
+		return _figures_phrase() + "\n" + day_line()
 	if _mic_listening:
 		return _figures_phrase() + "
 " + MIC_PHRASE
@@ -1020,6 +1293,167 @@ func _status_line() -> String:
 ## news that displaces it is the core's own words and is left as it is spoken.
 func status_summary() -> String:
 	return _figures_phrase() + "\n" + _state_phrase()
+
+
+## THE DAY, IN ONE SENTENCE: "Day 3 · Breath opens". Which day of the journal a
+## person is on, which of the six habits is the one currently turning, and which
+## way it is turning. This is the strip a person who has never read a hexagram
+## can still act on, which is why it is the default and telemetry is the option.
+##
+## WHICH LINE IS MOVING is the difference between where the body stands and
+## where the altar is pointing -- the LOWEST line of `earth ^ body`, because
+## that is the line the fire turns next. With nothing between them the last
+## flip the store recorded still has something to say, and with neither the
+## sentence honestly says the day is holding.
+func day_line() -> String:
+	var i: int = moving_line()
+	if i < 0:
+		return "Day %d · holding" % day_count()
+	return "Day %d · %s %s" % [day_count(), _line_name(i), _line_verb(i)]
+
+
+## The line that is currently turning, 0..5, or -1 when nothing is.
+func moving_line() -> int:
+	var diff: int = (_earth_bits() ^ _body_bits()) & 63
+	for b in range(6):
+		if ((diff >> b) & 1) == 1:
+			return b
+	if _store != null and ("last_flip" in _store):
+		var f: Dictionary = _store.last_flip
+		if int(f.get("when", 0)) > 0:
+			return clampi(int(f.get("line", 0)), 0, 5)
+	return -1
+
+
+## Whether that line is opening into yang or closing into yin. The altar is the
+## one being asked for, so the altar's own bit is the answer; with no altar to
+## differ from, the last flip's direction stands.
+func _line_verb(i: int) -> String:
+	var diff: int = (_earth_bits() ^ _body_bits()) & 63
+	if ((diff >> i) & 1) == 1:
+		return "opens" if ((_earth_bits() >> i) & 1) == 1 else "closes"
+	if _store != null and ("last_flip" in _store):
+		return "opens" if bool((_store.last_flip as Dictionary).get("to_yang", false)) else "closes"
+	return "closes"
+
+
+## One of Pacing's six names, read off Pacing when it is on disk and off the
+## dial's own copy when it is not.
+func _line_name(i: int) -> String:
+	var idx: int = clampi(i, 0, 5)
+	if _pacing != null:
+		if _pacing_consts.is_empty():
+			_pacing_consts = _pacing.get_script_constant_map()
+		var names: Array = _pacing_consts.get("LINE_NAMES", []) as Array
+		if idx < names.size():
+			return String(names[idx])
+	return EarthLinesDial.LINE_NAMES[idx]
+
+
+## WHICH DAY THIS IS, counted off the pacing journal rather than a calendar the
+## app does not keep: the number of distinct days the journal's own clock has
+## entries on, and never less than one, because a body that has run at all has
+## run for a day.
+func day_count() -> int:
+	var j: Array = _journal()
+	if j.is_empty():
+		return 1
+	var seen: Dictionary = {}
+	for e in j:
+		seen[int(int((e as Dictionary).get("t_ms", 0)) / DAY_MS)] = true
+	return maxi(1, seen.size())
+
+
+## The pacing journal, when Alchemy is bound and carrying one.
+func _journal() -> Array:
+	if _alchemy == null or not ("pacing" in _alchemy) or _alchemy.pacing == null:
+		return []
+	return _alchemy.pacing.journal as Array
+
+
+## THE LAST TWELVE THINGS THE FIRE DID, one per line. This is what the status
+## strip opens into: the sentence is the day, and this is the day's working.
+func journal_text() -> String:
+	var lines: Array[String] = (["DAY %d · JOURNAL" % day_count()] as Array[String])
+	var j: Array = _journal()
+	if j.is_empty():
+		lines.append("the fire has not been lit")
+		return "\n".join(lines)
+	var from: int = maxi(0, j.size() - JOURNAL_TAIL)
+	for k in range(from, j.size()):
+		var e: Dictionary = j[k] as Dictionary
+		var op: String = String(e.get("op", ""))
+		var row: String = "%8d %-6s %s" % [
+			int(e.get("t_ms", 0)), op, _figure_word(int(e.get("bits_after", 0)))]
+		if op == "flip":
+			row += "  L%d %s" % [
+				int(e.get("line", 0)) + 1,
+				"yang" if bool(e.get("to_yang", false)) else "yin"]
+		lines.append(row)
+	return "\n".join(lines)
+
+
+## A finger on the strip opens the journal behind it.
+func _on_status_input(event: InputEvent) -> void:
+	if not GlassBubble._is_release(event):
+		return
+	status_panel.accept_event()
+	bubble.open_large(journal_text(), _hub_point(status_panel))
+
+
+# -- the dwell ---------------------------------------------------------------
+
+## HOW FULL THE CIVIL FIRE IS, 0..1: the stillness the senses are reporting over
+## the seconds of it Pacing wants. Pacing's own live number is used when Alchemy
+## is bound -- a person moving the slider in the dashboard must see the ring
+## fill faster -- and the const stands in when it is not.
+func dwell_fraction() -> float:
+	var span: float = civil_fire_s()
+	if span <= 0.0 or _senses == null or not _senses.has_method("stillness"):
+		return 0.0
+	return clampf(float(_senses.stillness()) / span, 0.0, 1.0)
+
+
+## The seconds of stillness the civil fire wants, live from Pacing when it is
+## bound and from the const when it is not.
+func civil_fire_s() -> float:
+	if _alchemy != null and ("pacing" in _alchemy) and _alchemy.pacing != null:
+		return float(_alchemy.pacing.civil_fire_s)
+	return _threshold("CIVIL_FIRE_THRESHOLD", CIVIL_FIRE_THRESHOLD)
+
+
+## The excitation at which the martial fire takes the ring's colour.
+func martial_threshold() -> float:
+	if _alchemy != null and ("pacing" in _alchemy) and _alchemy.pacing != null:
+		return float(_alchemy.pacing.martial_threshold)
+	return _threshold("MARTIAL_THRESHOLD", MARTIAL_THRESHOLD)
+
+
+## Whether the martial fire is the one burning right now.
+func martial_now() -> bool:
+	if _senses == null or not _senses.has_method("excitation"):
+		return false
+	return float(_senses.excitation()) >= martial_threshold()
+
+
+## The line that is flashing, 0..5, or -1. The overlay reads this and nothing
+## else, so the flash has exactly one clock.
+func flash_line() -> int:
+	if _flash_line < 0 or Time.get_ticks_msec() >= _flash_until_ms:
+		return -1
+	return _flash_line
+
+
+## WHETHER SOMEBODY ELSE IS STANDING WHERE WE ARE. Minimal on purpose: one pass
+## over the room the mesh reports, looking for a head on our own bits.
+func room_echo() -> bool:
+	if not _cfg_room_highlight or _wmn == null or not _wmn.has_method("peers"):
+		return false
+	var mine: int = _head_bits()
+	for p in (_wmn.peers() as Array):
+		if (int((p as Dictionary).get("bits", -1)) & 63) == mine:
+			return true
+	return false
 
 
 ## The two figures, marked with the owner's moon and sun.
@@ -1261,23 +1695,28 @@ func _walk_head(slot: int, why: String) -> void:
 	bubble.say("🌙 HEAD: %s" % _figure_word(bits), at)
 
 
-func _walk_body(slot: int, why: String) -> void:
+## A WALK OF THE WHEEL, and it says so: the finger picked a seat, it did not
+## throw coins, and the journal must be able to tell the two apart. Nothing is
+## moving in a walk, so the moving mask is honestly zero.
+func _walk_body(slot: int, _why: String) -> void:
 	var idx: int = posmod(slot, HuohoutuData.BODY_SEQUENCE.size())
 	var hex: Dictionary = HuohoutuData.get_body_hex(idx)
 	var bits: int = int(hex.get("bits", 0))
-	_write_body(bits, ([] as Array[int]), why, idx)
+	_write_body(bits, ([] as Array[int]), "wheel", idx, 0)
 	var at: Vector2 = _hub_point(body)
 	bubble.say("☀️ BODY: %s" % _figure_word(bits), at)
 
 
-func _write_body(bits: int, throws: Array[int], why: String, slot: int) -> void:
+## The body is ANNOUNCED, never written: Alchemy alone writes it, so a walk of
+## the wheel re-anchors the cube instead of being wiped by the next senses tick.
+func _write_body(bits: int, throws: Array[int], why: String, slot: int, moving: int = 0) -> void:
 	if body != null:
 		body.set_body_slot(slot)
-	if _store == null or not _store.has_method("set_body"):
+	if _store == null or not _store.has_method("note_seat"):
 		return
-	_store.set_body({
+	_store.note_seat(HexyStore.Seat.BODY, {
 		"bits": bits,
-		"moving": 0,
+		"moving": moving & 63,
 		"throws": throws,
 		"when": _now_ms(),
 		"who": _who,
@@ -1295,16 +1734,19 @@ func _cast_head() -> void:
 	for v in (cast.get("throws", []) as Array):
 		throws.append(int(v))
 	var id: int = int(HuohoutuData.get_by_bits(bits).get("id", 1))
-	_write_head(bits, throws, "tap", HuohoutuData.find_head_index_by_id(id))
+	_write_head(bits, throws, "tap", HuohoutuData.find_head_index_by_id(id),
+		int(cast.get("moving", 0)) & 63)
 
 
-func _write_head(bits: int, throws: Array[int], why: String, slot: int) -> void:
+## The head is announced on the same bus as every other seat, so all three have
+## one event shape; the store stays the head's writer and no cube is touched.
+func _write_head(bits: int, throws: Array[int], why: String, slot: int, moving: int = 0) -> void:
 	head.set_head_slot(slot)
-	if _store == null or not _store.has_method("set_head"):
+	if _store == null or not _store.has_method("note_seat"):
 		return
-	_store.set_head({
+	_store.note_seat(HexyStore.Seat.HEAD, {
 		"bits": bits,
-		"moving": 0,
+		"moving": moving & 63,
 		"throws": throws,
 		"when": _now_ms(),
 		"who": _who,
@@ -1399,7 +1841,7 @@ func _walk_earth(slot: int, why: String) -> void:
 	var hex: Dictionary = HuohoutuData.get_head_hex(idx)
 	var bits: int = int(hex.get("bits", 2))
 	_write_earth(bits, ([] as Array[int]), why, idx)
-	var at: Vector2 = _hub_point(earth)
+	var at: Vector2 = _hub_point(_earth_control())
 	bubble.say("EARTH: %s" % _figure_word(bits), at)
 
 
@@ -1411,26 +1853,36 @@ func _cast_earth() -> void:
 	for v in (cast.get("throws", []) as Array):
 		throws.append(int(v))
 	var id: int = int(HuohoutuData.get_by_bits(bits).get("id", 1))
-	_write_earth(bits, throws, "tap", HuohoutuData.find_head_index_by_id(id))
+	_write_earth(bits, throws, "tap", HuohoutuData.find_head_index_by_id(id),
+		int(cast.get("moving", 0)) & 63)
 
 
-func _write_earth(bits: int, throws: Array[int], why: String, slot: int) -> void:
+## THE ALTAR WALKS THE HEAD'S WHEEL. `_cast_earth` and `_walk_earth` both seat
+## it by `find_head_index_by_id`, so the seat is passed explicitly and the
+## store never falls back to the BODY wheel to guess where the altar sits.
+func _write_earth(bits: int, throws: Array[int], why: String, slot: int, moving: int = 0) -> void:
 	if earth != null:
 		earth.set_earth_slot(slot)
-	if _store == null or not _store.has_method("set_earth"):
+	if _store == null or not _store.has_method("note_seat"):
 		return
-	_store.set_earth({
+	_store.note_seat(HexyStore.Seat.EARTH, {
 		"bits": bits,
-		"moving": 0,
+		"moving": moving & 63,
 		"throws": throws,
 		"when": _now_ms(),
 		"who": _who,
 		"source": why,
+		"sig": "",
+		"seq_index": slot,
 	})
+	# One arg on purpose: the earth is the altar, not the body, so this cast is
+	# a reward only -- it must not be announced on the BODY seat for injection.
 	if _store.has_method("note_cast"):
 		_store.note_cast("cast_confirmed")
+	## THE ROOM VOTES ON HEADS. The altar rides along as its own optional
+	## field; it is never passed off as this hexy's head.
 	if _wmn != null and _wmn.has_method("broadcast"):
-		_wmn.broadcast(_earth_dict(), _body_dict())
+		_wmn.broadcast(_head_dict(), _body_dict(), _earth_dict())
 
 
 func _earth_bits() -> int:
@@ -1443,6 +1895,77 @@ func _earth_dict() -> Dictionary:
 	if _store != null and _store.get("earth") is Dictionary:
 		return _store.earth as Dictionary
 	return {}
+
+
+## THE DWELL ARC AND THE FLASHING LINE, drawn on a Control of their own laid
+## over the body band. It answers no finger and holds no state: every number it
+## draws is asked of the hud on the frame it draws it, so there is exactly one
+## copy of "how full is the fire" in this app and it is not in here.
+class DwellRing extends Control:
+	var _hud: Node = null
+
+	func _init(h: Node) -> void:
+		_hud = h
+		name = "DwellRing"
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	func _process(_delta: float) -> void:
+		queue_redraw()
+
+	func _draw() -> void:
+		if _hud == null or size.x < 8.0 or size.y < 8.0:
+			return
+		var mid: Vector2 = size * 0.5
+		var r: float = minf(size.x, size.y) * 0.46 + 7.0
+		var frac: float = float(_hud.call("dwell_fraction"))
+		var hot: bool = bool(_hud.call("martial_now"))
+		var col: Color = Hud3.COL_FIRE if hot else Hud3.COL_DWELL
+
+		## The empty track first, so an arc at zero still says there is one.
+		draw_arc(mid, r, 0.0, TAU, 96, Color(col, 0.14), 3.0, true)
+		if frac > 0.001:
+			## From twelve o'clock, clockwise, the way a thing that is filling
+			## up reads.
+			draw_arc(mid, r, -PI * 0.5, -PI * 0.5 + TAU * frac, 96, col, 3.5, true)
+
+		var line: int = int(_hud.call("flash_line"))
+		if line >= 0:
+			## SIX SPOKES, ONE PER LINE, line 1 at the bottom and climbing
+			## counter-clockwise -- the same six the earth band names.
+			var ang: float = PI * 0.5 - float(line) * (TAU / 6.0)
+			var dir := Vector2(cos(ang), sin(ang))
+			draw_line(mid + dir * (r - 22.0), mid + dir * (r + 6.0), Hud3.COL_FLASH, 4.0)
+
+
+## ONE MARK ON THE HEAD RIM when somebody else in the room is holding the same
+## figure we are. Minimal by instruction and by taste: a second colour on the
+## tick the head is already standing on, and nothing else.
+class RoomMark extends Control:
+	var _hud: Node = null
+
+	func _init(h: Node) -> void:
+		_hud = h
+		name = "RoomMark"
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	func _process(_delta: float) -> void:
+		queue_redraw()
+
+	func _draw() -> void:
+		if _hud == null or size.x < 8.0 or size.y < 8.0:
+			return
+		if not bool(_hud.call("room_echo")):
+			return
+		var dial: Control = _hud.get("head")
+		if dial == null:
+			return
+		var mid: Vector2 = size * 0.5
+		var r: float = minf(size.x, size.y) * 0.44
+		var ang: float = float(dial.get("dial_angle")) + float(int(dial.call("head_slot"))) * (TAU / 64.0)
+		var dir := Vector2(cos(ang), sin(ang))
+		draw_line(mid + dir * (r * 0.86), mid + dir * (r * 1.06), Hud3.COL_ROOM, 3.0)
 
 
 class AxisSpine extends Control:

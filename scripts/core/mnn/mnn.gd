@@ -154,6 +154,12 @@ func tier() -> String:
 func info() -> Dictionary:
 	var out: Dictionary = _runtime.model_info().duplicate()
 	out["q6_prior_weight"] = Q6Core.prior_weight()
+	## The warm-state stamp the next prompt will carry, the stamp the native
+	## side last saw with its figure words, and how often the decode loop had
+	## to throw a stale warm cache away. Off device: 0 mismatches, version -1.
+	out["q6_cast_version"] = Q6Core.cast_version()
+	out["q6_figure_version"] = Q6Core.native_figure_version()
+	out["q6_prior_mismatches"] = Q6Core.prior_mismatches()
 	return out
 
 
@@ -203,7 +209,7 @@ func generate(prompt: String, max_tokens: int = 80) -> Signal:
 			load_tier(_tier if _tier != "" else TIER_FLOOR)
 		if _loaded:
 			_live = true
-			_runtime.chat_stream(prompt)
+			_runtime.chat_stream(prompt, Q6Core.cast_version())
 			return done
 	_live = false
 	_mock.start(prompt, max_tokens)

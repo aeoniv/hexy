@@ -40,12 +40,38 @@ const TITLES: Dictionary = {
 	"fires": "5 · FIRES & PACING",
 	"fly": "6 · FLY ORGANISM",
 	"mesh": "7 · MESH",
+	"tunables": "8 · TUNABLES",
+	"controls": "9 · CONTROLS",
 }
+
+## The two panels that are WIDGETS, not paintings. A gauge shows you a number;
+## these two let you MOVE one, which no _draw can do. They stand on the same
+## column, under the seven, and are built out of real Controls.
+const WIDGET_PANELS: Array[String] = ["tunables", "controls"]
+
+## The twelve app controls that used to live on the earth dial, in the order a
+## thumb should meet them. `kind` says what the button does with what it gets
+## back: "" throws it away, "text" writes it into the panel's readout, and
+## "walk" hands the method its own `arg`.
+const CONTROL_ROWS: Array[Dictionary] = [
+	{"method": "toggle_enhanced", "label": "ENHANCED", "kind": "flag"},
+	{"method": "cycle_geometry", "label": "GEOMETRY", "kind": "text"},
+	{"method": "telemetry_text", "label": "TELEMETRY", "kind": "text"},
+	{"method": "brain_text", "label": "BRAIN", "kind": "text"},
+	{"method": "config_text", "label": "CONFIG", "kind": "text"},
+	{"method": "cycle_sense_period", "label": "SENSE PERIOD", "kind": "flag"},
+	{"method": "mesh_broadcast", "label": "BROADCAST", "kind": "flag"},
+	{"method": "camera_reset", "label": "CAMERA RESET", "kind": ""},
+	{"method": "toggle_sensor_freeze", "label": "FREEZE SENSORS", "kind": "flag"},
+	{"method": "cast_earth", "label": "CAST EARTH", "kind": "flag"},
+	{"method": "walk_earth", "label": "◀ PREV", "kind": "walk", "arg": -1},
+	{"method": "walk_earth", "label": "NEXT ▶", "kind": "walk", "arg": 1},
+]
 
 const HEIGHTS: Dictionary = {
 	"identity": 210.0,
 	"engine": 150.0,
-	"figures": 168.0,
+	"figures": 196.0,
 	"senses": 330.0,
 	"fires": 170.0,
 	"fly": 210.0,
@@ -117,6 +143,22 @@ var _beat: Timer = null
 var _fps: PackedFloat32Array = PackedFloat32Array()
 var _snap: Dictionary = {}
 
+## key -> the one Control that edits it, and key -> the Label that reads it
+## back. A panel that has to reflect an OUTSIDE write needs both.
+var _tunable_controls: Dictionary = {}
+var _tunable_labels: Dictionary = {}
+
+## True while the panel is writing a control's value from the registry. Every
+## signal handler leaves at once while this stands, which is the whole of the
+## feedback-loop defence: a slider moved by code must not write back.
+var _applying: bool = false
+
+## method name -> the Button that calls it. `walk_earth` has two, so they are
+## keyed by method plus the direction they walk.
+var _control_buttons: Dictionary = {}
+var _control_readout: RichTextLabel = null
+var _config: HexyConfig = null
+
 
 # -- building ----------------------------------------------------------------
 
@@ -171,6 +213,8 @@ func _ready() -> void:
 
 	for kind in PANELS:
 		column.add_child(_build_panel(kind))
+	for kind in WIDGET_PANELS:
+		column.add_child(_build_panel(kind))
 
 	stack.add_child(_build_footer())
 
@@ -213,6 +257,15 @@ func _build_panel(kind: String) -> PanelContainer:
 	geom.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	geom.custom_minimum_size = Vector2(0.0, float(HEIGHTS.get(kind, 140.0)))
 	geom.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	if kind == "tunables":
+		_build_tunables(box)
+		_panels[kind] = panel
+		return panel
+	if kind == "controls":
+		_build_controls(box)
+		_panels[kind] = panel
+		return panel
 
 	if kind == "fly":
 		## The fly panel carries the creature's own radar beside its bars: the
@@ -260,6 +313,302 @@ func _build_footer() -> Control:
 	return row
 
 
+# -- panel 8: the tunables ---------------------------------------------------
+
+## EVERY KEY IN THE REGISTRY, AS SOMETHING A THUMB CAN MOVE.
+##
+## The rows are not written here -- they are read from [method HexyConfig.schema],
+## which is the only place a tunable exists. Add a key to the schema and a row
+## appears on this panel with the right control, the right bounds and the right
+## default, and nothing in this file has to be told about it.
+func _build_tunables(box: VBoxContainer) -> void:
+	_config = HexyConfig.instance()
+
+	var tools := HBoxContainer.new()
+	tools.name = "Tools"
+	tools.add_theme_constant_override("separation", 6)
+	box.add_child(tools)
+	tools.add_child(_tool_button("ResetAll", "RESET ALL", _on_reset_all))
+	tools.add_child(_tool_button("CopyJson", "COPY JSON", _on_copy_json))
+	tools.add_child(_tool_button("PasteJson", "PASTE JSON", _on_paste_json))
+
+	var note := Label.new()
+	note.name = "Note"
+	note.text = "clipboard is the bridge to tools/visualizer"
+	note.add_theme_font_size_override("font_size", 10)
+	note.add_theme_color_override("font_color", DIM)
+	box.add_child(note)
+
+	var seen: Dictionary = {}
+	for row in _config.schema():
+		var group: String = String(row["group"])
+		if not seen.has(group):
+			seen[group] = true
+			var head := Label.new()
+			head.name = "Group" + group.capitalize()
+			head.text = "— " + group.to_upper()
+			head.add_theme_font_size_override("font_size", 11)
+			head.add_theme_color_override("font_color", MACHINE)
+			box.add_child(head)
+		box.add_child(_build_tunable_row(row))
+
+	if not _config.changed.is_connected(_on_config_changed):
+		_config.changed.connect(_on_config_changed)
+
+
+func _tool_button(node_name: String, text: String, handler: Callable) -> Button:
+	var b := Button.new()
+	b.name = node_name
+	b.text = text
+	b.custom_minimum_size = Vector2(0.0, 34.0)
+	b.add_theme_font_size_override("font_size", 11)
+	b.pressed.connect(handler)
+	return b
+
+
+## ONE KEY, ONE LINE: its name, the control that moves it, what it reads now,
+## and the arrow that puts it back where it started.
+func _build_tunable_row(row: Dictionary) -> Control:
+	var key: String = String(row["key"])
+	var line := HBoxContainer.new()
+	line.name = "Row:" + key
+	line.add_theme_constant_override("separation", 6)
+
+	var name_label := Label.new()
+	name_label.name = "Name"
+	name_label.text = key.get_slice(".", 1)
+	name_label.tooltip_text = String(row.get("doc", ""))
+	name_label.custom_minimum_size = Vector2(150.0, 0.0)
+	name_label.add_theme_font_size_override("font_size", 11)
+	name_label.add_theme_color_override("font_color", INK)
+	line.add_child(name_label)
+
+	var value: Variant = _config.get_value(key)
+	var kind: String = String(row["type"])
+	var control: Control = null
+	match kind:
+		"bool":
+			var check := CheckButton.new()
+			check.button_pressed = bool(value)
+			check.toggled.connect(_on_tunable_bool.bind(key))
+			control = check
+		"enum":
+			var opt := OptionButton.new()
+			var options: Array = row["options"]
+			for i in range(options.size()):
+				opt.add_item(String(options[i]), i)
+			opt.selected = maxi(0, options.find(String(value)))
+			opt.item_selected.connect(_on_tunable_enum.bind(key))
+			control = opt
+		_:
+			var slider := HSlider.new()
+			slider.min_value = float(row["min"])
+			slider.max_value = float(row["max"])
+			slider.step = maxf(float(row["step"]), 0.0001 if kind == "float" else 1.0)
+			slider.value = float(value)
+			slider.custom_minimum_size = Vector2(140.0, 28.0)
+			slider.value_changed.connect(_on_tunable_number.bind(key))
+			control = slider
+	control.name = "Control"
+	control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line.add_child(control)
+
+	var read := Label.new()
+	read.name = "Value"
+	read.text = _format_value(row, value)
+	read.custom_minimum_size = Vector2(76.0, 0.0)
+	read.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	read.add_theme_font_size_override("font_size", 11)
+	read.add_theme_color_override("font_color", HUMAN)
+	line.add_child(read)
+
+	var undo := Button.new()
+	undo.name = "Reset"
+	undo.text = "↺"
+	undo.tooltip_text = "back to %s" % str(row["default"])
+	undo.custom_minimum_size = Vector2(34.0, 28.0)
+	undo.pressed.connect(_on_reset_key.bind(key))
+	line.add_child(undo)
+
+	_tunable_controls[key] = control
+	_tunable_labels[key] = read
+	return line
+
+
+static func _format_value(row: Dictionary, value: Variant) -> String:
+	match String(row["type"]):
+		"bool":
+			return "on" if bool(value) else "off"
+		"int":
+			return str(int(value))
+		"enum":
+			return String(value)
+	return "%.3f" % float(value)
+
+
+## The control for one key, so a test may move it the way a thumb would.
+func tunable_control(key: String) -> Control:
+	return _tunable_controls.get(key, null) as Control
+
+
+## What the panel is CURRENTLY READING BACK for one key, as a string.
+func tunable_text(key: String) -> String:
+	var l: Label = _tunable_labels.get(key, null) as Label
+	return "" if l == null else l.text
+
+
+# -- the tunable handlers -----------------------------------------------------
+
+func _on_tunable_number(value: float, key: String) -> void:
+	if _applying:
+		return
+	_config.set_value(key, value)
+
+
+func _on_tunable_bool(pressed: bool, key: String) -> void:
+	if _applying:
+		return
+	_config.set_value(key, pressed)
+
+
+func _on_tunable_enum(index: int, key: String) -> void:
+	if _applying:
+		return
+	var opt: OptionButton = _tunable_controls.get(key, null) as OptionButton
+	if opt == null:
+		return
+	_config.set_value(key, opt.get_item_text(index))
+
+
+func _on_reset_key(key: String) -> void:
+	_config.reset(key)
+
+
+func _on_reset_all() -> void:
+	_config.reset()
+
+
+func _on_copy_json() -> void:
+	DisplayServer.clipboard_set(_config.to_json())
+
+
+func _on_paste_json() -> bool:
+	return _config.from_json(DisplayServer.clipboard_get())
+
+
+## AN OUTSIDE WRITE, REFLECTED. `_applying` is raised for exactly as long as it
+## takes to set the control, so the control's own signal -- which fires whether
+## a thumb or this line moved it -- finds the guard up and goes home.
+func _on_config_changed(key: String, value: Variant) -> void:
+	var control: Control = _tunable_controls.get(key, null) as Control
+	if control == null:
+		return
+	var row: Dictionary = _config.row(key)
+	_applying = true
+	if control is HSlider:
+		(control as HSlider).value = float(value)
+	elif control is CheckButton:
+		(control as CheckButton).button_pressed = bool(value)
+	elif control is OptionButton:
+		var opt := control as OptionButton
+		for i in range(opt.item_count):
+			if opt.get_item_text(i) == String(value):
+				opt.selected = i
+				break
+	_applying = false
+	var l: Label = _tunable_labels.get(key, null) as Label
+	if l != null and not row.is_empty():
+		l.text = _format_value(row, value)
+
+
+# -- panel 9: the controls ----------------------------------------------------
+
+## THE TWELVE THINGS THE EARTH DIAL USED TO DO.
+##
+## A dial is for one figure; it was never the right place for a camera reset.
+## Each row here is a button that calls the HOST by name, guarded by
+## [method Object.has_method], so this panel stands complete whether the glass
+## has grown the method yet or not -- a missing method is a greyed button, not
+## a crash.
+func _build_controls(box: VBoxContainer) -> void:
+	var grid := GridContainer.new()
+	grid.name = "Grid"
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	box.add_child(grid)
+
+	for row in CONTROL_ROWS:
+		var b := Button.new()
+		b.name = _control_id(row)
+		b.text = String(row["label"])
+		b.custom_minimum_size = Vector2(0.0, 40.0)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.add_theme_font_size_override("font_size", 11)
+		b.disabled = true
+		b.pressed.connect(_on_control_pressed.bind(row))
+		grid.add_child(b)
+		_control_buttons[b.name] = b
+
+	_control_readout = RichTextLabel.new()
+	_control_readout.name = "Readout"
+	_control_readout.bbcode_enabled = false
+	_control_readout.fit_content = false
+	_control_readout.scroll_active = true
+	_control_readout.custom_minimum_size = Vector2(0.0, 96.0)
+	_control_readout.add_theme_font_size_override("normal_font_size", 11)
+	_control_readout.add_theme_color_override("default_color", DIM)
+	_control_readout.text = "press a control; anything it says lands here"
+	box.add_child(_control_readout)
+	_sync_controls()
+
+
+## The button's node name. `walk_earth` owns two, so the direction joins the id.
+static func _control_id(row: Dictionary) -> String:
+	var id: String = String(row["method"])
+	if String(row.get("kind", "")) == "walk":
+		id += "_prev" if int(row.get("arg", 1)) < 0 else "_next"
+	return id
+
+
+## Grey every button whose method the host does not have. Called whenever the
+## host changes, which is the only time the answer can change.
+func _sync_controls() -> void:
+	for row in CONTROL_ROWS:
+		var b: Button = _control_buttons.get(_control_id(row), null) as Button
+		if b == null:
+			continue
+		b.disabled = _host == null or not _host.has_method(String(row["method"]))
+
+
+func _on_control_pressed(row: Dictionary) -> void:
+	var method: String = String(row["method"])
+	if _host == null or not _host.has_method(method):
+		return
+	var kind: String = String(row.get("kind", ""))
+	var out: Variant = null
+	if kind == "walk":
+		out = _host.call(method, int(row.get("arg", 1)))
+	else:
+		out = _host.call(method)
+	if _control_readout == null:
+		return
+	if kind == "text":
+		_control_readout.text = String(out)
+	elif kind == "flag":
+		_control_readout.text = "%s → %s" % [method, str(out)]
+
+
+## One control button by its id, so a test may press what a thumb would press.
+func control_button(id: String) -> Button:
+	return _control_buttons.get(id, null) as Button
+
+
+## What the controls panel last had to say.
+func control_text() -> String:
+	return "" if _control_readout == null else _control_readout.text
+
+
 # -- wiring ------------------------------------------------------------------
 
 ## Everything this panel is allowed to know, handed over at once. Qwen is
@@ -283,6 +632,7 @@ func set_alchemy(alchemy: Node) -> void:
 
 func set_host(host: Node) -> void:
 	_host = host
+	_sync_controls()
 
 
 # -- opening and closing -----------------------------------------------------
@@ -452,11 +802,17 @@ func _read_engine() -> Dictionary:
 	if _host != null:
 		var s: Variant = _host.get("_stream")
 		streamed = String(s).length() if s != null else 0
+	## How hard the decode loop is leaning on the cube, and whether its warm
+	## state is still the cube the body is standing on.
+	var info: Dictionary = _mnn.info() if _mnn != null and _mnn.has_method("info") else {}
 	return {
 		"available": bool(_mnn.available()) if _mnn != null and _mnn.has_method("available") else false,
 		"backend": String(_mnn.backend_name()) if _mnn != null and _mnn.has_method("backend_name") else "none",
 		"tier": String(_mnn.tier()) if _mnn != null and _mnn.has_method("tier") else "",
 		"tiers": tiers,
+		"q6_prior_weight": float(info.get("q6_prior_weight", 0.0)),
+		"q6_cast_version": int(info.get("q6_cast_version", 0)),
+		"q6_prior_mismatches": int(info.get("q6_prior_mismatches", 0)),
 		"answer_len": answer.length(),
 		"organism": organism,
 		"streamed": streamed,
@@ -629,6 +985,16 @@ func _paint_figures(g: Control) -> void:
 	var reason: String = String(f.get("flip", ""))
 	if reason != "":
 		_line(g, Vector2(0.0, 152.0), reason.substr(0, 84), FIRE, 10)
+
+	## WHETHER THE CUBE UNDER THE FIGURES IS STILL THE FIGURES' OWN. The cast
+	## version counts the casts the decode loop has been told about; a mismatch
+	## is a tick where the warm state and the standing figure disagreed, and a
+	## number that climbs here is the one bug this panel exists to catch.
+	var e: Dictionary = _snap.get("engine", {}) as Dictionary
+	var bad: int = int(e.get("q6_prior_mismatches", 0))
+	_line(g, Vector2(0.0, 168.0), "cast v%d · prior %.3f · mismatches %d" % [
+		int(e.get("q6_cast_version", 0)), float(e.get("q6_prior_weight", 0.0)), bad],
+		BAD if bad > 0 else DIM, 10)
 
 
 func _paint_senses(g: Control) -> void:

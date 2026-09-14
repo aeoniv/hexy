@@ -146,24 +146,34 @@ func format_biological_prompt(user_query: String, bio_telemetry: Dictionary) -> 
 		]
 	return _format_prompt(mood_prefix + user_query)
 
-func chat(prompt: String) -> String:
+## `cast_version` is the Q6 warm-state stamp the prompt was written under; the
+## native side drops a kv-cache warmed under an older cube rather than answer
+## for a figure the body has left. -1 means "don't care", which is the old
+## behaviour exactly, and is also what a plugin without `chat_at` gets.
+func chat(prompt: String, cast_version: int = -1) -> String:
 	if available():
 		if not _chat_ready:
 			chat_start()
 		var formatted := _format_prompt(prompt)
-		var res: String = str(_android.call("chat", formatted))
+		var res: String = ""
+		if _android.has_method("chat_at"):
+			res = str(_android.call("chat_at", formatted, cast_version))
+		else:
+			res = str(_android.call("chat", formatted))
 		if res != "":
 			return res
 	return "The ancient Book of Changes whispers: Change is constant. When the rigid yields to the flexible, harmony and progress endure."
 
-func chat_stream(prompt: String) -> bool:
+func chat_stream(prompt: String, cast_version: int = -1) -> bool:
 	if not _can_stream or not available():
 		# Fallback simulation
 		_streaming = true
-		chat_done.emit(chat(prompt))
+		chat_done.emit(chat(prompt, cast_version))
 		return true
 	_streaming = true
 	var formatted := _format_prompt(prompt)
+	if _android.has_method("chat_stream_at"):
+		return bool(_android.call("chat_stream_at", formatted, cast_version))
 	return bool(_android.call("chat_stream", formatted))
 
 static func cosine(a: PackedFloat32Array, b: PackedFloat32Array) -> float:

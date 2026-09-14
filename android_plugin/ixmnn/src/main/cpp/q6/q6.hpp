@@ -53,6 +53,17 @@ int reverse(int h);
 // FAST WALSH-HADAMARD, unnormalised, in place. Its own inverse up to 64.
 void fwht(double* v);
 
+// VERSIONED WARM STATE. A cast stamps a version on the figure-word push; a
+// chat declares the version it expects. Either side may say "don't care" with
+// -1, and two non-negative numbers that differ mean the cube in front of the
+// decode loop is not the one the chat was opened against.
+//
+// A mismatch is REPORTED, never enforced: the caller logs and counts it and
+// goes on decoding. A cube that cannot lean must never cost the user an answer.
+inline bool staleAgainst(int expect, int have) {
+    return expect >= 0 && have >= 0 && expect != have;
+}
+
 struct Q6 {
     double p[kStates];
 
@@ -100,6 +111,19 @@ struct Q6 {
     // bottom up, and the popcount cut keeps only the low-frequency harmonics,
     // so two clouds that differ in where their mass sits differ here too.
     void embed(float* out) const;
+
+    // THE VERSION STAMPS THE FIGURE-WORD PUSH, NOT THE MASS MOVES.
+    //
+    // reset / inject / uniform / step / anchor / setState do not touch it: the
+    // cube moves constantly during a reading and none of those moves is a new
+    // cast. Only the caller that pushes a fresh figure-word table stamps a new
+    // version, and a setState restore carries no version of its own -- it puts
+    // mass back, and whatever stamp the cube already had still stands.
+    void setVersion(int v) { version_ = v; }
+    int version() const { return version_; }
+
+private:
+    int version_ = -1;
 };
 
 // The per-token logit bias the decode loop adds. `figureOfToken` maps a vocab

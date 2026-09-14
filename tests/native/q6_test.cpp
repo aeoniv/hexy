@@ -26,6 +26,7 @@
 #include "q6/q6.hpp"
 
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -221,6 +222,163 @@ void biasOf(int targetBits, double machineMargin, double humanMargin, double* ou
 
 }  // namespace
 
+// --- GROUP-EQUIVARIANCE ------------------------------------------------------
+//
+// x -> x XOR g relabels the cube's corners for any line mask g in 0..63 (a
+// translation of Z2^6, hence a graph automorphism of Q6). See
+// tests/test_q6_equivariance.gd for the derivation: the per-line bias
+// U[h] = sum_i bias[i] * lineSign(h,i) obeys U[h^g] = U'[h] where
+// bias'[i] = bias[i] * (g's bit i set ? -1 : +1) -- exactly the existing
+// flip()/negate_bias() rule generalised from g = 63 to any g. Diffusion is a
+// heat kernel over the same Cayley graph and is translation-invariant for
+// free, so only the Gibbs term needs the transformed bias.
+//
+// reset/inject/anchor take bits ^ g; step takes the transformed bias; argmax
+// comes back XORed by g; tension is unchanged (same multiset of masses);
+// best_neighbour(bits) on the original equals best_neighbour(bits ^ g) on the
+// relabelled cube, returning the SAME line index (not XORed), because
+// (bits^g) ^ (1<<i) relabels to bits ^ (1<<i) for every i alike.
+
+namespace {
+
+void transformBias(const double bias[ix64::q6::kLines], int g, double out[ix64::q6::kLines]) {
+    for (int i = 0; i < ix64::q6::kLines; ++i) {
+        out[i] = ((g >> i) & 1) ? -bias[i] : bias[i];
+    }
+}
+
+void checkRelabelled(const ix64::q6::Q6& a, const ix64::q6::Q6& b, int g,
+                      const std::string& label) {
+    double worst = 0.0;
+    for (int h = 0; h < ix64::q6::kStates; ++h) {
+        const double d = std::fabs(b.p[h ^ g] - a.p[h]);
+        if (d > worst) worst = d;
+    }
+    checkNear(worst, 0.0, 1e-9, label + ": state[x^g] matches");
+    check(b.argmax() == (a.argmax() ^ g), label + ": argmax^g matches");
+    checkNear(a.tension(), b.tension(), 1e-9, label + ": tension unchanged");
+    const int bits = 17;
+    check(a.bestNeighbour(bits) == b.bestNeighbour(bits ^ g),
+          label + ": best_neighbour(bits) == best_neighbour(bits^g)");
+}
+
+// A tiny xorshift RNG so this file needs no extra includes and no dependence
+// on <random>'s implementation-defined sequences.
+struct Rng {
+    uint32_t s;
+    explicit Rng(uint32_t seed) : s(seed ? seed : 1) {}
+    uint32_t next() {
+        s ^= s << 13;
+        s ^= s >> 17;
+        s ^= s << 5;
+        return s;
+    }
+    int nextBits() { return static_cast<int>(next() % 64); }
+    double nextUnit() { return static_cast<double>(next() % 100000) / 100000.0; }
+    double nextRange(double lo, double hi) { return lo + (hi - lo) * nextUnit(); }
+};
+
+void runEquivarianceForG(int g, uint32_t seed) {
+    Rng rng(seed);
+    ix64::q6::Q6 a;
+    ix64::q6::Q6 b;
+    char label[64];
+    std::snprintf(label, sizeof(label), "g=%d seed=%u", g, seed);
+
+    int startBits = rng.nextBits();
+    a.reset(startBits);
+    b.reset(startBits ^ g);
+    checkRelabelled(a, b, g, std::string(label) + " after reset");
+
+    int injBits = rng.nextBits();
+    a.inject(injBits);
+    b.inject(injBits ^ g);
+    checkRelabelled(a, b, g, std::string(label) + " after inject");
+
+    int ancBits = rng.nextBits();
+    double ancAmt = rng.nextRange(0.1, 0.9);
+    a.anchor(ancBits, ancAmt);
+    b.anchor(ancBits ^ g, ancAmt);
+    checkRelabelled(a, b, g, std::string(label) + " after anchor");
+
+    for (int i = 0; i < 3; ++i) {
+        double bias[ix64::q6::kLines];
+        for (int j = 0; j < ix64::q6::kLines; ++j) bias[j] = rng.nextRange(-1.0, 1.0);
+        double t = rng.nextRange(0.05, 1.5);
+        double beta = rng.nextRange(0.5, 4.0);
+        double biasPrime[ix64::q6::kLines];
+        transformBias(bias, g, biasPrime);
+        a.step(bias, t, beta);
+        b.step(biasPrime, t, beta);
+        checkRelabelled(a, b, g, std::string(label) + " after step");
+    }
+
+    int anc2Bits = rng.nextBits();
+    a.anchor(anc2Bits, 0.5);
+    b.anchor(anc2Bits ^ g, 0.5);
+    checkRelabelled(a, b, g, std::string(label) + " after second anchor");
+}
+
+}  // namespace
+
+void run_equivariance() {
+    const int gs[] = {0, 1, 0b100000, 0b010101, 63};
+    const uint32_t seeds[] = {1, 2, 3};
+    for (int g : gs) {
+        for (uint32_t sd : seeds) {
+            runEquivarianceForG(g, sd);
+        }
+    }
+}
+
+// --- VERSIONED WARM STATE ----------------------------------------------------
+//
+// The version stamps the figure-word push, not the mass moves: a reading moves
+// the cube constantly and none of those moves is a new cast. staleAgainst is
+// the whole comparison, and it is deliberately permissive -- either side may
+// say -1 for "don't care", and only two non-negative numbers that differ are
+// stale. Nothing here refuses anything; the caller logs and decodes anyway.
+
+void run_version() {
+    ix64::q6::Q6 q;
+    check(q.version() == -1, "a fresh cube carries no version");
+
+    q.setVersion(7);
+    check(q.version() == 7, "and remembers the one it is given");
+
+    q.inject(42);
+    check(q.version() == 7, "inject moves mass, not the version");
+    q.reset(13);
+    check(q.version() == 7, "nor does reset");
+    q.uniform();
+    check(q.version() == 7, "nor uniform");
+    double bias[ix64::q6::kLines] = {0.5, -0.5, 0.25, -0.25, 1.0, -1.0};
+    q.step(bias, 0.3, 2.5);
+    check(q.version() == 7, "nor a step");
+    q.anchor(21, 0.5);
+    check(q.version() == 7, "nor an anchor");
+
+    q.setVersion(8);
+    check(q.version() == 8, "a new cast restamps it");
+    q.setVersion(-1);
+    check(q.version() == -1, "and it can be cleared back to don't-care");
+
+    // THE TRUTH TABLE. expect < 0 or have < 0 is never stale.
+    check(!ix64::q6::staleAgainst(-1, -1), "no expectation, no stamp: not stale");
+    check(!ix64::q6::staleAgainst(-1, 7), "no expectation: not stale");
+    check(!ix64::q6::staleAgainst(-1, 0), "no expectation, v0 cube: not stale");
+    check(!ix64::q6::staleAgainst(7, -1), "an unstamped cube: not stale");
+    check(!ix64::q6::staleAgainst(0, -1), "expecting v0 of an unstamped cube: not stale");
+    check(!ix64::q6::staleAgainst(-5, 7), "any negative expectation is don't-care");
+    check(!ix64::q6::staleAgainst(7, -5), "any negative stamp is don't-care");
+    check(!ix64::q6::staleAgainst(0, 0), "v0 against v0: not stale");
+    check(!ix64::q6::staleAgainst(7, 7), "v7 against v7: not stale");
+    check(ix64::q6::staleAgainst(7, 8), "v7 chat against a v8 cube is stale");
+    check(ix64::q6::staleAgainst(8, 7), "and so is the other way round");
+    check(ix64::q6::staleAgainst(0, 1), "v0 against v1 is stale");
+    check(ix64::q6::staleAgainst(1, 0), "and v1 against v0");
+}
+
 int main(int argc, char** argv) {
     std::string path = (argc > 1) ? argv[1] : "../golden/q6_golden.json";
     std::ifstream in(path, std::ios::binary);
@@ -330,6 +488,9 @@ int main(int argc, char** argv) {
         check(ix64::q6::popcount(h) + ix64::q6::popcount(ix64::q6::flip(h)) == 6,
               "a figure and its opposite have six yang lines between them");
     }
+
+    run_equivariance();
+    run_version();
 
     std::printf("checks: %d\n", gChecks);
     if (gFails == 0) {

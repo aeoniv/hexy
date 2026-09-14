@@ -12,6 +12,10 @@ run/main_scene="res://scenes/hexy.tscn"
 config/icon="res://icon.png"
 config/features=PackedStringArray("4.7", "Mobile")
 
+[autoload]
+
+Config="*res://scripts/core/config.gd"
+
 [display]
 
 window/size/viewport_width=720

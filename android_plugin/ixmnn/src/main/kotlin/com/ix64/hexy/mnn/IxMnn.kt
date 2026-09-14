@@ -162,13 +162,29 @@ class IxMnn(godot: Godot) : GodotPlugin(godot), SensorEventListener {
 	fun chat_ready(): Boolean = chatHandle != 0L
 
 	@UsedByGodot
-	fun chat(prompt: String): String {
+	fun chat(prompt: String): String = chat_at(prompt, -1)
+
+	/**
+	 * CHAT AGAINST A DECLARED CAST. `castVersion` is the version the caller
+	 * believes the cube carries -- the one stamped by [q6_set_figure_words].
+	 * -1 means "don't care" and is exactly what [chat] passes. A mismatch is
+	 * counted in [q6_prior_mismatches] and logged natively; the answer still
+	 * comes back. A cube that cannot lean must never cost the user an answer.
+	 */
+	@UsedByGodot
+	fun chat_at(prompt: String, castVersion: Int): String {
 		if (chatHandle == 0L) return ""
-		return onWorker("") { IxMnnNative.nativeChat(chatHandle, prompt, MAX_NEW_TOKENS) }
+		return onWorker("") {
+			IxMnnNative.nativeChat(chatHandle, prompt, MAX_NEW_TOKENS, castVersion)
+		}
 	}
 
 	@UsedByGodot
-	fun chat_stream(prompt: String): Boolean {
+	fun chat_stream(prompt: String): Boolean = chat_stream_at(prompt, -1)
+
+	/** [chat_stream] against a declared cast version; see [chat_at]. */
+	@UsedByGodot
+	fun chat_stream_at(prompt: String, castVersion: Int): Boolean {
 		if (chatHandle == 0L) return false
 		if (!streaming.compareAndSet(false, true)) return false
 		worker.submit {
@@ -177,7 +193,7 @@ class IxMnn(godot: Godot) : GodotPlugin(godot), SensorEventListener {
 			try {
 				IxMnnNative.tokenSink = { t -> emitSignal("chat_token", t) }
 				reply = String(
-					IxMnnNative.nativeChatStream(chatHandle, prompt, MAX_NEW_TOKENS),
+					IxMnnNative.nativeChatStream(chatHandle, prompt, MAX_NEW_TOKENS, castVersion),
 					Charsets.UTF_8
 				)
 			} catch (t: Throwable) {
@@ -281,11 +297,28 @@ class IxMnn(godot: Godot) : GodotPlugin(godot), SensorEventListener {
 	 * and an empty word is simply never biased.
 	 */
 	@UsedByGodot
-	fun q6_set_figure_words(words: Array<String>) {
+	fun q6_set_figure_words(words: Array<String>, version: Int) {
 		if (!runtime_ready()) return
 		val full = Array(64) { i -> if (i < words.size) words[i] else "" }
-		IxMnnNative.nativeQ6SetFigureWords(full)
+		IxMnnNative.nativeQ6SetFigureWords(full, version)
 	}
+
+	/**
+	 * The cast version stamped on the cube's current figure-word push, or -1
+	 * when nothing has stamped it. Mass moves -- inject, step, anchor, a state
+	 * restore -- never change it.
+	 */
+	@UsedByGodot
+	fun q6_figure_version(): Int =
+		if (runtime_ready()) IxMnnNative.nativeQ6FigureVersion() else -1
+
+	/**
+	 * How many decodes have run with a chat asking for one version and the cube
+	 * carrying another. Reported, never enforced.
+	 */
+	@UsedByGodot
+	fun q6_prior_mismatches(): Int =
+		if (runtime_ready()) IxMnnNative.nativeQ6PriorMismatches() else 0
 
 	
 	private var sensorManager: SensorManager? = null

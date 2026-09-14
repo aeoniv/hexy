@@ -19,6 +19,41 @@ signal machine_changed(m: Dictionary)
 signal human_changed(h: Dictionary)
 signal room_changed(r: Dictionary)
 signal answer_changed(a: String)
+## A CAST LANDED AND IS MEANT FOR THE BODY. The glass announces the gesture
+## here and never writes the body itself; Alchemy alone hears this and injects
+## it, so pacing re-anchors instead of being overwritten behind its back.
+signal cast_landed(c: Dictionary)
+
+## THE ONE BUS FOR ALL THREE SEATS. A gesture is announced here and the seat's
+## own writer answers; `cast_landed` is the old name of the BODY half of it and
+## is still emitted, so nothing written before there were three seats breaks.
+signal seat_landed(seat: int, c: Dictionary)
+
+## THE WHOLE STATE WAS PUT BACK. `load_dump` and `reset` say so when they are
+## done, because a figure that arrives whole is not a figure that moved: the
+## cube must be re-anchored on it rather than walked towards it.
+signal restored()
+
+## THE THREE SEATS A FIGURE CAN SIT IN. The order is the order they are drawn,
+## moon over sun over altar, and the numbers are wire-stable.
+enum Seat { HEAD = 0, BODY = 1, EARTH = 2 }
+
+## The last 64-corner cube mass Alchemy published. Empty until a first tick.
+var _q6_mass: PackedFloat32Array = PackedFloat32Array()
+
+## THE CUBE, AS ALCHEMY LAST PUBLISHED IT, so a dump carries the pacing that
+## the body was standing on and a restore can put it back. Publish only: the
+## store never computes these, it only remembers and persists them.
+var _pacing_bits: int = 0
+var _journal_tail: Dictionary = {}
+
+## TRUE ONCE ALCHEMY HAS CLAIMED THE BODY. With a claim, `note_seat(BODY, ...)`
+## only announces and Alchemy alone writes, so pacing re-anchors instead of
+## being overwritten behind its back. Without one -- a bare store in a test, a
+## headless tool, the glass with no core behind it -- the announcement still
+## has to land somewhere, so the store writes the body itself. One writer
+## either way; never none, never two.
+var _body_claimed: bool = false
 
 ## THE HEAD (moon, upper trigram, the Oracle). Moved by the user alone: a coin
 ## cast, a prev/next, a tap on the head ring. It walks HuohoutuData.HEAD_SEQUENCE.
@@ -38,11 +73,13 @@ var last_flip: Dictionary = _empty_flip()
 ## THE OLD NAME OF THE BODY. Every caller written before there were two figures
 ## reads store.hexagram, and every one of them meant the body; so this is not a
 ## copy but the body itself, through a property.
+## THE OLD NAME OF THE BODY, and an announcement like any other: it goes down
+## the seat bus so the body keeps its single writer whoever spells it this way.
 var hexagram: Dictionary:
 	get:
 		return body
 	set(value):
-		set_body(value)
+		note_seat(Seat.BODY, value)
 
 ## {trigram:int 0..7, score:float, sentence:String}
 var machine: Dictionary = _empty_family()
@@ -113,11 +150,60 @@ func get_character() -> RefCounted:
 ## call this the moment a cast is confirmed and committed, and the mushroom
 ## body gets its dopamine for the context that was live when it happened.
 ## Any name from FlyBrain.REWARDS works; the default is the cast.
-func note_cast(kind: String = "cast_confirmed") -> float:
+##
+## Hand it the cast itself and it is also ANNOUNCED on cast_landed, so Alchemy
+## can inject it into the body. An empty `c` is a reward and nothing more.
+func note_cast(kind: String = "cast_confirmed", c: Dictionary = {}) -> float:
+	if not c.is_empty():
+		note_seat(Seat.BODY, c)
 	var ch: RefCounted = get_character()
 	if ch == null or not ch.has_method("reward_event"):
 		return 0.0
 	return float(ch.reward_event(kind))
+
+
+## A FIGURE LANDED IN A SEAT. The glass owns the gestures and says so here; it
+## never writes a seat itself, so every seat has one event shape and one writer:
+##
+##   HEAD  -> the store, straight through set_head (no cube; the head is free).
+##   BODY  -> Alchemy, through inject, so pacing re-anchors on it. With no
+##            Alchemy bound the store writes it, so an announcement never falls
+##            on the floor.
+##   EARTH -> the store, straight through set_earth (the altar, not the body).
+func note_seat(seat: int, c: Dictionary) -> void:
+	var is_head: bool = seat != Seat.BODY
+	var n: Dictionary = _normalise_hexagram(c, is_head)
+	seat_landed.emit(seat, n)
+	match seat:
+		Seat.HEAD:
+			set_head(n)
+		Seat.EARTH:
+			set_earth(n)
+		_:
+			## The old name of this same announcement, for readers written
+			## before the bus was general. Alchemy listens on ONE of the two.
+			cast_landed.emit(n)
+			if not _body_claimed:
+				set_body(n)
+
+
+## Alchemy says "the body is mine" here, once, at bind. Nothing else may.
+func claim_body(claimed: bool = true) -> void:
+	_body_claimed = claimed
+
+
+## PUBLISH ONLY, from Alchemy, so `dump` can carry the cube the body stood on.
+func set_pacing_state(bits: int, journal_tail: Dictionary = {}) -> void:
+	_pacing_bits = bits & 63
+	_journal_tail = journal_tail.duplicate(true)
+
+
+func pacing_bits() -> int:
+	return _pacing_bits
+
+
+func journal_tail() -> Dictionary:
+	return _journal_tail
 
 
 static func _empty_hexagram() -> Dictionary:
@@ -159,9 +245,11 @@ func set_body(b: Dictionary) -> bool:
 	return true
 
 
-## The old name. It always meant the body; it still does.
+## The old name. It always meant the body; it still does -- and like every
+## other spelling of "the body moved", it goes down the seat bus.
 func set_hexagram(h: Dictionary) -> bool:
-	return set_body(h)
+	note_seat(Seat.BODY, h)
+	return true
 
 
 ## The head moved. NEVER emits hexagram_changed: the coupling is one way, and
@@ -186,6 +274,30 @@ func set_last_flip(f: Dictionary) -> bool:
 	last_flip = next
 	flipped.emit(last_flip)
 	return true
+
+
+## THE 64-CORNER Q6 MASS, AS THE STORE LAST HEARD IT. Alchemy.tick publishes
+## `pacing.cube.state()` here every beat and Wmn reads it for the bio pulse.
+##
+## PUBLISH ONLY, in both directions that matter: nothing in the store writes
+## the cube, and a peer's q6 arriving off the mesh is never poured in here --
+## Pacing is the one writer of cube mass and a remote body is not this body.
+func q6_mass() -> PackedFloat32Array:
+	return _q6_mass
+
+
+## Called by Alchemy and nobody else. Widened to float32 on the way in, because
+## that is what goes on the wire and a second precision would be a second copy.
+func set_q6_mass(mass: Variant) -> void:
+	var out := PackedFloat32Array()
+	out.resize(Q6Core.STATES)
+	var i: int = 0
+	for v in mass:
+		if i >= Q6Core.STATES:
+			break
+		out[i] = float(v)
+		i += 1
+	_q6_mass = out
 
 
 func head_bits() -> int:
@@ -231,7 +343,10 @@ func _normalise_hexagram(h: Dictionary, is_head: bool = false) -> Dictionary:
 	out["when"] = int(h.get("when", 0))
 	out["who"] = String(h.get("who", ""))
 	var src: String = String(h.get("source", "tap"))
-	if not (src in ["tap", "senses", "room"]):
+	## "wheel" is a walk of a sequence by hand and "restore" is a figure put
+	## back from a dump; neither is a tap, and coercing them to one would have
+	## the journal lie about why the body moved.
+	if not (src in ["tap", "senses", "room", "wheel", "restore"]):
 		src = "tap"
 	out["source"] = src
 	out["sig"] = String(h.get("sig", ""))
@@ -315,18 +430,29 @@ func dump() -> Dictionary:
 		"human": human.duplicate(true),
 		"room": room.duplicate(true),
 		"answer": answer,
+		"pacing_bits": _pacing_bits,
+		"journal_tail": _journal_tail.duplicate(true),
 	}
 
 
 func load_dump(d: Dictionary) -> void:
 	if d.has("head") and d["head"] is Dictionary:
 		set_head(d["head"] as Dictionary)
+	## A restore writes the body DIRECTLY, not down the bus: the figure is not
+	## a gesture and Alchemy re-anchors the cube on `restored` below, once, when
+	## every seat is back -- rather than once per seat on the way in.
 	if d.has("body") and d["body"] is Dictionary:
 		set_body(d["body"] as Dictionary)
+	elif d.has("hexagram") and d["hexagram"] is Dictionary:
+		## The legacy name, and its own branch: hung off the earth's `elif` it
+		## was dropped by any dump that had an earth, which is all of them.
+		set_body(d["hexagram"] as Dictionary)
 	if d.has("earth") and d["earth"] is Dictionary:
 		set_earth(d["earth"] as Dictionary)
-	elif d.has("hexagram") and d["hexagram"] is Dictionary:
-		set_body(d["hexagram"] as Dictionary)
+	if d.has("pacing_bits"):
+		_pacing_bits = int(d["pacing_bits"]) & 63
+	if d.has("journal_tail") and d["journal_tail"] is Dictionary:
+		_journal_tail = (d["journal_tail"] as Dictionary).duplicate(true)
 	if d.has("last_flip") and d["last_flip"] is Dictionary:
 		set_last_flip(d["last_flip"] as Dictionary)
 	if d.has("machine") and d["machine"] is Dictionary:
@@ -337,6 +463,7 @@ func load_dump(d: Dictionary) -> void:
 		set_room(d["room"] as Dictionary)
 	if d.has("answer"):
 		set_answer(String(d["answer"]))
+	restored.emit()
 
 
 func reset() -> void:
@@ -348,6 +475,9 @@ func reset() -> void:
 	set_human(_empty_family())
 	set_room(_empty_room())
 	set_answer("")
+	_pacing_bits = 0
+	_journal_tail = {}
+	restored.emit()
 
 
 static func _same(a: Dictionary, b: Dictionary) -> bool:

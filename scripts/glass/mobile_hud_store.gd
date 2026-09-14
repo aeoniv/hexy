@@ -306,14 +306,17 @@ func tap_cast() -> Dictionary:
 	var now: int = _now_ms()
 	var cast: Dictionary = Cast.tap_cast(Cast.seed_of(now, _who, 0))
 	if _store != null:
-		_store.set_hexagram({
+		# The glass ANNOUNCES the cast and never writes the body: Alchemy alone
+		# writes it, so pacing re-anchors instead of being overwritten by the
+		# next tick. There is no fallback on purpose -- a second writer here is
+		# exactly the race this bus exists to end.
+		_store.note_cast("cast_confirmed", {
 			"bits": int(cast.get("bits", 0)),
 			"moving": int(cast.get("moving", 0)),
 			"throws": cast.get("throws", []),
 			"when": now,
 			"who": _who,
 			"source": "tap",
-			"sig": "",
 		})
 	return cast
 

@@ -26,6 +26,19 @@ const MandalaScript := preload("res://scripts/sensor_mandala_3d.gd")
 ## How long the phone buzzes when the giant fibre fires, in milliseconds.
 const STARTLE_BUZZ_MS: int = 120
 
+## THE BREATH, AND THE FLARE. The ball has a breath of its own driven by its
+## octopamine, and it is not this file's to retune -- so the creature breathes
+## on TOP of it, as one slow swell of the whole solid. `set_breath_rate` is the
+## glass handing over how full the stillness dwell is, 0..1: a body that has
+## banked a breath swells more slowly and more deeply than one that has not.
+## `pulse` is the other half: one short flare when a line of the body turns.
+const BREATH_SLOW_HZ: float = 0.18
+const BREATH_FAST_HZ: float = 0.55
+const BREATH_AMP: float = 0.022
+## How far the flare throws the solid, and how long it takes to fall back.
+const PULSE_GAIN: float = 0.09
+const PULSE_FALL: float = 3.2
+
 ## A machine node was tapped: the glass should cast.
 signal throw_requested(trigram: int)
 ## The solid turned to another geometry (0 ico, 1 rhombic dodeca, 2 triaconta).
@@ -42,6 +55,12 @@ var _node_hit: bool = false
 ## buzzed once a frame while a fly was escaping would be a phone nobody keeps
 ## in a pocket. So the pulse is sent on the false -> true crossing alone.
 var _was_startled: bool = false
+
+## The dwell fraction the glass last handed over, 0..1, the phase it drives, and
+## the flare still falling out of the last `pulse`.
+var _breath_rate: float = 0.0
+var _breath_phase: float = 0.0
+var _flare: float = 0.0
 
 
 func _init() -> void:
@@ -65,7 +84,20 @@ func _ready() -> void:
 	set_process(true)
 
 
-func _process(_delta: float) -> void:
+## How full the stillness dwell is, 0..1. A held breath breathes slowly; a body
+## that has just moved breathes fast. Clamped here so no caller can drive the
+## solid out of shape.
+func set_breath_rate(r: float) -> void:
+	_breath_rate = clampf(r, 0.0, 1.0)
+
+
+## One flare, for a line that just turned. It falls back on its own.
+func pulse() -> void:
+	_flare = 1.0
+
+
+func _process(delta: float) -> void:
+	_breathe(delta)
 	if _store != null and _store.has_method("get_character"):
 		var ch: Variant = _store.get_character()
 		if ch != null and ball != null and ball.has_method("set_fly_brain_state"):
@@ -80,6 +112,16 @@ func _process(_delta: float) -> void:
 			var curl_v: float = float(fly.get("curl", 0.0))
 			ball.set_fly_brain_state(h_rad, oa_v, da_v, dfb_v, curl_v)
 			_pulse_on_startle(bool(fly.get("is_startled", false)))
+
+
+## ONE SWELL OVER THE BALL'S OWN. The whole creature is scaled, so nothing
+## inside the solid is retuned and the ball keeps the breath it already had.
+func _breathe(delta: float) -> void:
+	_breath_phase += delta * TAU * lerpf(BREATH_FAST_HZ, BREATH_SLOW_HZ, _breath_rate)
+	_breath_phase = fmod(_breath_phase, TAU)
+	_flare = maxf(0.0, _flare - delta * PULSE_FALL)
+	var swell: float = sin(_breath_phase) * BREATH_AMP * (0.4 + _breath_rate)
+	scale = Vector3.ONE * (1.0 + swell + _flare * PULSE_GAIN)
 
 
 ## ONE BUZZ PER ESCAPE, and only where there is something to buzz. Desktop and

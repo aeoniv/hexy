@@ -170,7 +170,7 @@ func ask(question: String) -> Signal:
 	_busy = true
 	_stream = ""
 	var prompt: String = prompt_now(question)
-	return _mnn.generate(prompt, MAX_TOKENS)
+	return _mnn.generate(prompt, max_tokens())
 
 
 ## Ask "What is this moment?" on the store's own beat, at most once per 3 s.
@@ -243,9 +243,59 @@ func _on_done(text: String) -> void:
 		out = _stream.strip_edges()
 	if out == "":
 		out = Judgements.for_bits(_store.primary() if _store != null else 0)
+	out = clip(out)
 	if _store != null:
 		_store.set_answer(out)
 	answer_ready.emit(out)
+
+
+# --- the shape of an answer -------------------------------------------------
+
+## THE TOKEN BUDGET, from the drawer when there is one. MAX_TOKENS stays the
+## default and the fallback, so a Qwen built in a test with no HexyConfig asks
+## for exactly the eighty tokens it always did.
+func max_tokens() -> int:
+	var cfg: HexyConfig = HexyConfig.peek()
+	if cfg == null:
+		return MAX_TOKENS
+	return int(cfg.get_value("qwen.max_tokens"))
+
+
+## CUT THE ANSWER DOWN TO THE GLASS. A model asked for one or two short
+## sentences will sometimes give five, and the bubble is one line wide, so the
+## answer is trimmed HERE rather than hoped for in the prompt. Off by default
+## of the drawer: with no config, nothing is cut.
+func clip(text: String) -> String:
+	var cfg: HexyConfig = HexyConfig.peek()
+	if cfg == null or not bool(cfg.get_value("qwen.one_line_only")):
+		return text
+	return first_sentences(text, int(cfg.get_value("qwen.max_sentences")))
+
+
+## The first `n` sentences of `text`, kept WITH their terminators. A sentence
+## ends at . ! ? or the Chinese full stop -- the four marks the model actually
+## reaches for -- and a run of them ("?!") ends ONE sentence, not two. Text
+## carrying no terminator at all is one sentence and comes back whole, because
+## a truncated stream is still the only answer there is.
+static func first_sentences(text: String, n: int) -> String:
+	if n <= 0:
+		return text.strip_edges()
+	var src: String = text.strip_edges()
+	var count: int = 0
+	var i: int = 0
+	while i < src.length():
+		if _is_terminator(src[i]):
+			while i + 1 < src.length() and _is_terminator(src[i + 1]):
+				i += 1
+			count += 1
+			if count >= n:
+				return src.substr(0, i + 1).strip_edges()
+		i += 1
+	return src
+
+
+static func _is_terminator(c: String) -> bool:
+	return c == "." or c == "!" or c == "?" or c == "。"
 
 
 # --- embedding --------------------------------------------------------------

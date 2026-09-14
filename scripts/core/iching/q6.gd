@@ -43,6 +43,15 @@ const TIE_EPSILON: float = 1e-9
 ## Nobody holds the native lease until somebody asks for it.
 static var _lease_taken: bool = false
 
+## THE WARM-STATE STAMP. Every write of the figure words, and every cast that
+## lands in the body, moves this number on. The native decode loop is handed it
+## with each prompt (`chat_at`, `chat_stream_at`) and refuses to answer from a
+## kv-cache that was warmed under an older cube: a stale answer is worse than a
+## slow one, because it is a reading of a figure the body has already left.
+## STATIC, and bumped on the pure path too, so a Q6Core.new(false) on desktop
+## is testable against the same counter the phone uses.
+static var _cast_version: int = 0
+
 var _p: PackedFloat64Array = Lattice.delta(0)
 var _native: bool = false
 var _plugin: Object = null
@@ -73,6 +82,40 @@ static func _singleton() -> Object:
 ## True when this object's arithmetic is happening in C++ inside ixmnn.
 func is_native() -> bool:
 	return _native
+
+
+# --- the warm-state stamp ---------------------------------------------------
+
+## What the cube is stamped at right now. Never decreases.
+static func cast_version() -> int:
+	return _cast_version
+
+
+## Move the stamp on and hand back the new value, so a caller may push it into
+## the same native call that made the state stale.
+static func bump_cast_version() -> int:
+	_cast_version += 1
+	return _cast_version
+
+
+## HOW OFTEN THE DECODE LOOP REACHED FOR A FIGURE WORD THE CUBE NO LONGER
+## STANDS ON -- the native side's own count of prompts it had to re-warm.
+## 0 on desktop, where there is no decode loop to be wrong.
+static func prior_mismatches() -> int:
+	var p: Object = _singleton()
+	if p == null or not p.has_method("q6_prior_mismatches"):
+		return 0
+	return int(p.call("q6_prior_mismatches"))
+
+
+## The stamp the NATIVE side last saw with its figure words. -1 off device, and
+## -1 on a plugin built before the stamp existed; a gap against cast_version()
+## is the honest signal that a push did not land.
+static func native_figure_version() -> int:
+	var p: Object = _singleton()
+	if p == null or not p.has_method("q6_figure_version"):
+		return -1
+	return int(p.call("q6_figure_version"))
 
 
 # --- moving the mass --------------------------------------------------------
@@ -253,6 +296,20 @@ static func set_prior_weight(w: float) -> void:
 		p.call("q6_set_prior_weight", w)
 
 
+## THE MANUAL DOOR ONTO THE PRIOR. Two hands may set the weight and only one at
+## a time: when `prior.follows_stillness` is on, Alchemy drives it from the
+## body's own stillness and tension and this call stands down; when it is off,
+## the number in the drawer IS the weight, clamped to `prior.max` so a slider
+## left at the top cannot deafen the decode loop. HexyConfig calls this on
+## every `prior.*` write.
+static func apply_manual_prior(weight: float, ceiling: float,
+		follows_stillness: bool) -> bool:
+	if follows_stillness:
+		return false
+	set_prior_weight(clampf(weight, 0.0, maxf(0.0, ceiling)))
+	return true
+
+
 ## What the decode loop is currently doing with the cube. 0 on desktop, always:
 ## there is no decode loop there to lean on.
 static func prior_weight() -> float:
@@ -265,6 +322,11 @@ static func prior_weight() -> float:
 ## THE 64 WORDS THE PRIOR LEANS ON, indexed by hexagram bits, taken straight
 ## from KingWen so the native side keeps no second copy of that table. ASCII
 ## pinyin, because a token id is what is wanted and the tokenizer is Qwen's.
+##
+## THESE WORDS ARE METADATA, NEVER MASS. They are the vocabulary the prior
+## projects onto -- a naming of the 64 seats, not a weight on any of them. No
+## word ever moves the cube: Pacing is the one and only writer of cube mass
+## (reset, inject, step, flip), and this call must stay side-effect free on it.
 func _send_figure_words() -> void:
 	if not _native:
 		return
@@ -272,7 +334,7 @@ func _send_figure_words() -> void:
 	words.resize(STATES)
 	for h in range(STATES):
 		words[h] = KingWen.pinyin(h)
-	_plugin.call("q6_set_figure_words", words)
+	_plugin.call("q6_set_figure_words", words, bump_cast_version())
 
 
 ## The six numbers a figure asks the cube for, as Pacing reads them: lines 0..2

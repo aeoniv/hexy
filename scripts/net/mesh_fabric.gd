@@ -306,15 +306,16 @@ func seen_count() -> int:
 ## law, which also strips `head` from anything a relay touches).
 ## Returns the envelope so a caller (and a test) can read what went out.
 func broadcast_bio_state(heading_rad: float, oa: float, habit_bias: Array = [],
-		q6: PackedFloat32Array = PackedFloat32Array()) -> Dictionary:
-	return emit_event("fly_bio_pulse", bio_payload(heading_rad, oa, habit_bias, q6), 1)
+		q6: PackedFloat32Array = PackedFloat32Array(), q6_topk: int = 0) -> Dictionary:
+	return emit_event("fly_bio_pulse",
+		bio_payload(heading_rad, oa, habit_bias, q6, q6_topk), 1)
 
 
 ## The payload builder, pure and testable on its own. Floats are rounded to
 ## three decimals because nothing downstream draws finer than that and a phone
 ## should not pay for digits nobody reads.
 static func bio_payload(heading_rad: float, oa: float, habit_bias: Array = [],
-		q6: PackedFloat32Array = PackedFloat32Array()) -> Dictionary:
+		q6: PackedFloat32Array = PackedFloat32Array(), q6_topk: int = 0) -> Dictionary:
 	var habit := PackedFloat32Array()
 	for h in habit_bias:
 		habit.append(snappedf(float(h), 0.001))
@@ -325,11 +326,66 @@ static func bio_payload(heading_rad: float, oa: float, habit_bias: Array = [],
 		"t": Time.get_ticks_msec(),
 	}
 	if q6.size() > 0:
-		var mass := PackedFloat32Array()
-		for v in q6:
-			mass.append(snappedf(float(v), 0.001))
-		body["q6"] = mass
+		if q6_topk > 0:
+			body["q6k"] = _topk_pairs(q6, q6_topk)
+		else:
+			var mass := PackedFloat32Array()
+			for v in q6:
+				mass.append(snappedf(float(v), 0.001))
+			body["q6"] = mass
 	return body
+
+
+## THE CUBE, THINNED FOR THE WIRE. A 64-float mass is 256 bytes in a pulse that
+## goes out twice a second to every hexy in the room, and almost all of those
+## floats are noise around zero: the shape of the cloud is in its few heaviest
+## corners. `q6k` carries those as flat (index, mass) pairs -- [i0, m0, i1, m1,
+## ...] -- in descending mass, which is a third the size at k=8 and reconstructs
+## to a mass a reader can use.
+static func _topk_pairs(q6: PackedFloat32Array, k: int) -> PackedFloat32Array:
+	var order: Array[int] = []
+	for i in range(q6.size()):
+		order.append(i)
+	order.sort_custom(func(a: int, b: int) -> bool: return q6[a] > q6[b])
+	var out := PackedFloat32Array()
+	for n in range(mini(k, order.size())):
+		out.append(float(order[n]))
+		out.append(snappedf(float(q6[order[n]]), 0.001))
+	return out
+
+
+## READ EITHER SHAPE. A pulse from a peer may carry the full `q6` or the
+## thinned `q6k`, depending on how that peer's drawer is set, and neither end
+## negotiates: the reader simply understands both and answers 64 floats. A
+## pulse carrying neither answers an empty array, which is the third legal
+## thing a pulse may say about the cube.
+static func q6_of(body: Dictionary, states: int = 64) -> PackedFloat32Array:
+	if body.has("q6"):
+		return _as_floats(body["q6"])
+	if not body.has("q6k"):
+		return PackedFloat32Array()
+	var pairs: PackedFloat32Array = _as_floats(body["q6k"])
+	var out := PackedFloat32Array()
+	out.resize(states)
+	var i: int = 0
+	while i + 1 < pairs.size():
+		var idx: int = int(pairs[i])
+		if idx >= 0 and idx < states:
+			out[idx] = pairs[i + 1]
+		i += 2
+	return out
+
+
+## JSON hands numbers back as an untyped Array; the local path hands the packed
+## one straight through. Both become the same 32-bit floats here.
+static func _as_floats(raw: Variant) -> PackedFloat32Array:
+	if raw is PackedFloat32Array:
+		return raw
+	var out := PackedFloat32Array()
+	if raw is Array or raw is PackedFloat64Array:
+		for v in raw:
+			out.append(float(v))
+	return out
 
 
 ## KURAMOTO, AND SOMEBODY LISTENS NOW. The value is an extra yaw rate, in

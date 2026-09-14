@@ -145,7 +145,11 @@ static func _mint_fabric_id(who: String) -> String:
 ## Send both figures. BYTE 0 OF THE WIRE IS THE HEAD -- the oracle a person
 ## threw is the one thing a room is entitled to read at a glance, and it is the
 ## head the room votes over. The body rides in the payload beside it.
-func broadcast(head: Dictionary, body: Dictionary) -> Dictionary:
+## THE ROOM VOTES ON HEADS, and on heads only: byte 0 of the wire word is this
+## hexy's HEAD and nothing else may be put there. `earth` is the altar, an
+## optional passenger -- it rides in the payload under its own name so a peer
+## that cares can read it and the vote never sees it.
+func broadcast(head: Dictionary, body: Dictionary, earth: Dictionary = {}) -> Dictionary:
 	if not _started:
 		return {}
 	var bits := int(head.get("bits", 0)) & 63
@@ -163,6 +167,9 @@ func broadcast(head: Dictionary, body: Dictionary) -> Dictionary:
 		"source": String(body.get("source", "tap")),
 		"sig": String(body.get("sig", "")),
 	}
+	if not earth.is_empty():
+		payload["earth"] = int(earth.get("bits", 0)) & 63
+		payload["earth_moving"] = int(earth.get("moving", 0)) & 63
 	_self_h = _figure_from(fabric.fabric_id, bits, payload)
 	room.set_self(bits, moving, now_ms(), fabric.fabric_id)
 	if keep_ledger:
@@ -403,11 +410,20 @@ func _bio_beat(now: int) -> void:
 	if fly.is_empty():
 		return
 	var heading := float(fly.get("heading_rad", 0.0))
+	# THE DRAWER DECIDES WHAT THE CUBE COSTS ON THE WIRE: whether it rides at
+	# all, and how many corners of it. No config, no change from before.
+	var mass: PackedFloat32Array = _q6_mass()
+	var topk: int = 0
+	var cfg: HexyConfig = HexyConfig.peek()
+	if cfg != null:
+		if not bool(cfg.get_value("mesh.q6_on_wire")):
+			mass = PackedFloat32Array()
+		topk = int(cfg.get_value("mesh.q6_topk"))
 	fabric.broadcast_bio_state(
 		heading,
 		float(fly.get("octopamine", 0.5)),
 		(fly.get("habit_bias", []) as Array),
-		_q6_mass())
+		mass, topk)
 	if _store.has_method("set_swarm_yaw"):
 		_store.set_swarm_yaw(fabric.compute_kuramoto_coupling(heading))
 

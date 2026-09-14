@@ -19,8 +19,14 @@ extends PanelContainer
 ## open into. There is no second panel class, so there is no second look.
 
 ## How long a bubble stands before it fades, in milliseconds. The test reads
-## this, and may lower it; nothing else should.
+## this, and may lower it; nothing else should. It is the DEFAULT now rather
+## than the law: `hud.bubble_ttl_s` in the drawer moves it, and is pulled once
+## at _ready and again whenever the drawer says that key moved -- never on
+## every `say`, so a test that writes `fade_ms` by hand keeps what it wrote.
 const FADE_MS: int = 6000
+
+## The drawer key that owns the six seconds.
+const TTL_KEY: String = "hud.bubble_ttl_s"
 
 ## The widest a small bubble is allowed to be, in pixels.
 const MAX_WIDTH: float = 420.0
@@ -97,7 +103,30 @@ func _ready() -> void:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.add_child(label)
+	_watch_config()
 	set_process(true)
+
+
+## The drawer, if there is one. There is none in a test that never asked for
+## one, and the bubble then stands for exactly the six seconds it always did.
+func _watch_config() -> void:
+	var cfg: HexyConfig = HexyConfig.peek()
+	if cfg == null:
+		return
+	_pull_ttl(cfg)
+	if not cfg.changed.is_connected(_on_config_changed):
+		cfg.changed.connect(_on_config_changed)
+
+
+func _on_config_changed(key: String, _value: Variant) -> void:
+	if key == TTL_KEY:
+		_pull_ttl(HexyConfig.peek())
+
+
+func _pull_ttl(cfg: HexyConfig) -> void:
+	if cfg == null:
+		return
+	fade_ms = maxi(1, int(round(float(cfg.get_value(TTL_KEY)) * 1000.0)))
 
 
 ## A short sentence, pointing at the thing that said it. [param at] is a point

@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <mutex>
+#include <atomic>
 
 #include <MNN/expr/Expr.hpp>
 #include <MNN/expr/ExprCreator.hpp>
@@ -157,6 +158,11 @@ std::vector<std::string> gFigureWords;  // indexed by hexagram bits, 0..63
 std::vector<int> gFigureTokens;         // first token id per figure, or -1
 bool gFigureTokensReady = false;
 
+// HOW OFTEN A CHAT ASKED FOR A VERSION THE CUBE DID NOT HAVE. Counted, logged,
+// and never acted on: see staleAgainst() in q6/q6.hpp. Atomic because the
+// decode loop bumps it on the worker thread while Godot reads it on its own.
+std::atomic<int> gPriorMismatches{0};
+
 void resetFigureTokens() {
     gFigureTokens.clear();
     gFigureTokensReady = false;
@@ -212,9 +218,21 @@ void applyPrior(MNN::Express::VARP logits) {
 //
 // Returns false if anything at all goes wrong, and the caller falls back to
 // Llm::response(). A cube that cannot lean must never cost the user an answer.
-bool generateWithPrior(Llm* llm, const std::string& prompt, int maxTokens, std::ostream* os) {
+bool generateWithPrior(Llm* llm, const std::string& prompt, int maxTokens, std::ostream* os,
+                       int expectVersion) {
     if (llm == nullptr || os == nullptr) return false;
     if (gPriorWeight == 0.0) return false;  // weight 0 is the old path, exactly
+    {
+        // A STALE CUBE IS REPORTED, NOT REFUSED. If the chat was opened against
+        // one cast and the cube has since been re-stamped by another, say so in
+        // the log, count it, and lean anyway -- the answer is still the user's.
+        std::lock_guard<std::mutex> lock(gQ6Mutex);
+        const int have = gQ6.version();
+        if (ix64::q6::staleAgainst(expectVersion, have)) {
+            gPriorMismatches.fetch_add(1);
+            LOGE("q6 prior stale: chat expects v%d, cube has v%d", expectVersion, have);
+        }
+    }
     try {
         ensureFigureTokens(llm);
         llm->reset();
@@ -346,13 +364,14 @@ Java_com_ix64_hexy_mnn_IxMnnNative_nativeLlmCreate(JNIEnv* env, jobject, jstring
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_ix64_hexy_mnn_IxMnnNative_nativeChat(JNIEnv* env, jobject, jlong handle, jstring prompt, jint maxTokens) {
+Java_com_ix64_hexy_mnn_IxMnnNative_nativeChat(JNIEnv* env, jobject, jlong handle, jstring prompt, jint maxTokens, jint expectVersion) {
     auto* llm = reinterpret_cast<Llm*>(handle);
     if (!llm) return env->NewStringUTF("");
     try {
         std::ostringstream os;
         const std::string text = toStd(env, prompt);
-        if (!generateWithPrior(llm, text, static_cast<int>(maxTokens), &os)) {
+        if (!generateWithPrior(llm, text, static_cast<int>(maxTokens), &os,
+                               static_cast<int>(expectVersion))) {
             os.str(std::string());
             llm->reset();
             llm->response(text, &os, nullptr, static_cast<int>(maxTokens));
@@ -365,7 +384,7 @@ Java_com_ix64_hexy_mnn_IxMnnNative_nativeChat(JNIEnv* env, jobject, jlong handle
 }
 
 JNIEXPORT jbyteArray JNICALL
-Java_com_ix64_hexy_mnn_IxMnnNative_nativeChatStream(JNIEnv* env, jobject, jlong handle, jstring prompt, jint maxTokens) {
+Java_com_ix64_hexy_mnn_IxMnnNative_nativeChatStream(JNIEnv* env, jobject, jlong handle, jstring prompt, jint maxTokens, jint expectVersion) {
     auto* llm = reinterpret_cast<Llm*>(handle);
     if (!llm) return toBytes(env, "");
     JniSink sink{env};
@@ -373,7 +392,8 @@ Java_com_ix64_hexy_mnn_IxMnnNative_nativeChatStream(JNIEnv* env, jobject, jlong 
         TokenStream buf(&jniEmit, &sink);
         std::ostream os(&buf);
         const std::string text = toStd(env, prompt);
-        if (!generateWithPrior(llm, text, static_cast<int>(maxTokens), &os)) {
+        if (!generateWithPrior(llm, text, static_cast<int>(maxTokens), &os,
+                               static_cast<int>(expectVersion))) {
             llm->reset();
             llm->response(text, &os, nullptr, static_cast<int>(maxTokens));
         }
@@ -512,7 +532,8 @@ Java_com_ix64_hexy_mnn_IxMnnNative_nativeQ6PriorWeight(JNIEnv*, jobject) {
 // against the old list.
 JNIEXPORT void JNICALL
 Java_com_ix64_hexy_mnn_IxMnnNative_nativeQ6SetFigureWords(JNIEnv* env, jobject,
-                                                          jobjectArray words) {
+                                                          jobjectArray words,
+                                                          jint version) {
     std::lock_guard<std::mutex> lock(gQ6Mutex);
     gFigureWords.assign(ix64::q6::kStates, std::string());
     if (words != nullptr) {
@@ -523,7 +544,22 @@ Java_com_ix64_hexy_mnn_IxMnnNative_nativeQ6SetFigureWords(JNIEnv* env, jobject,
             if (s) env->DeleteLocalRef(s);
         }
     }
+    gQ6.setVersion(static_cast<int>(version));
     resetFigureTokens();
+}
+
+// How many times a chat has declared a version the cube did not have. Never
+// resets on its own; it is a counter for the dashboard, not a gate.
+JNIEXPORT jint JNICALL
+Java_com_ix64_hexy_mnn_IxMnnNative_nativeQ6PriorMismatches(JNIEnv*, jobject) {
+    return static_cast<jint>(gPriorMismatches.load());
+}
+
+// The version stamped on the cube's current figure-word push, or -1 if none.
+JNIEXPORT jint JNICALL
+Java_com_ix64_hexy_mnn_IxMnnNative_nativeQ6FigureVersion(JNIEnv*, jobject) {
+    std::lock_guard<std::mutex> lock(gQ6Mutex);
+    return static_cast<jint>(gQ6.version());
 }
 
 } // extern "C"

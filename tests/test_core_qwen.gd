@@ -18,6 +18,15 @@ func check(ok: bool, label: String) -> void:
 
 func _initialize() -> void:
 	print("\n--- TEST CORE QWEN (ground + ask + thought + judgements) ---")
+	# THESE ARE PLUMBING CHECKS, and the mock's "answer" is the ECHOED PROMPT --
+	# many sentences long, with the judgement and the two sentences parted by
+	# " | ". `qwen.one_line_only` is on by default and would cut that echo at its
+	# first full stop, so it is turned off here: what is under test below is that
+	# the whole prompt reaches the store, not how a real answer is trimmed for
+	# the glass. The trimming has its own checks in tests/test_config.gd.
+	var cfg: HexyConfig = HexyConfig.instance()
+	cfg.autosave = false
+	cfg.set_value("qwen.one_line_only", false)
 	_test_judgements()
 	_test_ground()
 	_test_organism_line()

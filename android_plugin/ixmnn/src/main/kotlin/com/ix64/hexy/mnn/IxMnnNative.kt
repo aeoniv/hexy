@@ -11,8 +11,8 @@ internal object IxMnnNative {
 	external fun nativeEmbeddingRelease(handle: Long)
 
 	external fun nativeLlmCreate(configPath: String): Long
-	external fun nativeChat(handle: Long, prompt: String, maxTokens: Int): String
-	external fun nativeChatStream(handle: Long, prompt: String, maxTokens: Int): ByteArray
+	external fun nativeChat(handle: Long, prompt: String, maxTokens: Int, expectVersion: Int): String
+	external fun nativeChatStream(handle: Long, prompt: String, maxTokens: Int, expectVersion: Int): ByteArray
 
 	@Volatile
 	@JvmStatic
@@ -44,5 +44,10 @@ internal object IxMnnNative {
 	external fun nativeQ6Embed(): FloatArray
 	external fun nativeQ6SetPriorWeight(w: Float)
 	external fun nativeQ6PriorWeight(): Float
-	external fun nativeQ6SetFigureWords(words: Array<String>)
+	external fun nativeQ6SetFigureWords(words: Array<String>, version: Int)
+
+	// The cast version stamped on the current figure-word push, and how many
+	// times a chat has asked for one the cube did not have.
+	external fun nativeQ6PriorMismatches(): Int
+	external fun nativeQ6FigureVersion(): Int
 }

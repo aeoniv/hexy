@@ -83,6 +83,13 @@ var _focused: bool = true
 
 
 func _init() -> void:
+	# THE BEAT, from the drawer when there is one. `peek` and not `instance`:
+	# a Senses built in a test that never asked for a config keeps its 3500.
+	var cfg: HexyConfig = HexyConfig.peek()
+	if cfg != null:
+		period_ms = int(cfg.get_value("senses.period_ms"))
+		if not cfg.changed.is_connected(_on_config_changed):
+			cfg.changed.connect(_on_config_changed)
 	machine = ([
 		SenseSanctuary.new(),
 		SenseThermal.new(),
@@ -110,6 +117,12 @@ func _init() -> void:
 ## The screen, tracked rather than guessed. These two notifications reach every
 ## Node in the tree, so a Senses that was added to the tree is told; one built
 ## bare in a test is not, and reads as focused, which is what a test wants.
+## The one key Senses owns. Everything else in the drawer is somebody else's.
+func _on_config_changed(key: String, value: Variant) -> void:
+	if key == "senses.period_ms":
+		period_ms = int(value)
+
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_IN:
 		_focused = true
