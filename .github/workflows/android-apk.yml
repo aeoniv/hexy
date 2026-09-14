@@ -122,6 +122,9 @@ jobs:
 
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/hexy-debug.apk
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || gh release create "${GITHUB_REF_NAME}" --title "hexy ${GITHUB_REF_NAME}" --notes "Debug APK built by android-apk workflow."
+          gh release upload "${GITHUB_REF_NAME}" build/hexy-debug.apk --clobber
