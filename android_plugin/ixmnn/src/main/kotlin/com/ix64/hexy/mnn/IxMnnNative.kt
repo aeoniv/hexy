@@ -26,6 +26,21 @@ internal object IxMnnNative {
 
 	external fun nativeLlmRelease(handle: Long)
 
+	// --- THE ENGINE SURFACE ---------------------------------------------------
+	//
+	// MNN's own `llm.hpp`, handed straight through: tokenizer_encode/decode,
+	// apply_chat_template, set_config for sampling, getContext() for the
+	// counters and getCurrentHistory/eraseHistory for the kv-cache window.
+	// Worker thread only, like everything else in here.
+
+	external fun nativeTokenize(handle: Long, text: String): IntArray
+	external fun nativeDetokenize(handle: Long, tokenId: Int): String
+	external fun nativeGetPerf(handle: Long): String
+	external fun nativeSetSampling(handle: Long, temperature: Float, topP: Float, repetitionPenalty: Float): Boolean
+	external fun nativeHistoryCount(handle: Long): Int
+	external fun nativeEraseHistory(handle: Long, begin: Int, end: Int): Boolean
+	external fun nativeApplyTemplate(handle: Long, prompt: String): String
+
 	// --- Q6: the six-bit cube -------------------------------------------------
 	//
 	// One state p[64] over the 64 hexagrams, living in q6/q6.cpp beside the Qwen

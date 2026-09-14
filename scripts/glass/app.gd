@@ -48,6 +48,11 @@ const ALCHEMY_PATH: String = "res://scripts/core/alchemy.gd"
 
 var alchemy: Node = null
 
+## THE ADD-ONS, IF ANY ARE ON DISK. The loader scans
+## `res://addons/hexy_*/addon.gd` and nothing in base names one, so a phone
+## built without them boots exactly the same app with an empty doors panel.
+var addons: HexyAddons = null
+
 var _ticker: Timer = null
 var _boot_line: String = ""
 
@@ -115,6 +120,20 @@ func _ready() -> void:
 
 	hud.set_who(_identity_name())
 	wmn.start(hud.who())
+
+	## THE ADD-ONS, LAST, AFTER EVERY CORE OBJECT IS BOUND. An add-on may only
+	## write through the seat bus, the homeostat and the registry, so it must
+	## find all three already standing. One call; the loader does the rest.
+	addons = HexyAddons.new()
+	addons.name = "Addons"
+	add_child(addons)
+	addons.load_all(store, {
+		"store": store,
+		"character": store.get_character(),
+		"alchemy": alchemy,
+	})
+	if hud.has_method("set_addons"):
+		hud.set_addons(addons)
 
 	mnn.token.connect(_on_token)
 	mnn.done.connect(_on_done)

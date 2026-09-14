@@ -412,6 +412,117 @@ Java_com_ix64_hexy_mnn_IxMnnNative_nativeLlmRelease(JNIEnv*, jobject, jlong hand
 }
 
 
+// --- THE ENGINE SURFACE -----------------------------------------------------
+//
+// MNN's `llm.hpp` handed through, nothing more. Every one of these needs a
+// loaded Llm and nothing else -- no model file is opened, no decode runs -- and
+// every one answers a safe empty on a null handle or a throw, because a seam
+// that has to branch on "did the engine survive" is a seam that will forget to.
+
+JNIEXPORT jintArray JNICALL
+Java_com_ix64_hexy_mnn_IxMnnNative_nativeTokenize(JNIEnv* env, jobject, jlong handle, jstring text) {
+    auto* llm = reinterpret_cast<Llm*>(handle);
+    std::vector<int> ids;
+    if (llm) {
+        try {
+            ids = llm->tokenizer_encode(toStd(env, text));
+        } catch (...) {
+            ids.clear();
+        }
+    }
+    jintArray arr = env->NewIntArray(static_cast<jsize>(ids.size()));
+    if (!ids.empty()) {
+        env->SetIntArrayRegion(arr, 0, static_cast<jsize>(ids.size()),
+                               reinterpret_cast<const jint*>(ids.data()));
+    }
+    return arr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_ix64_hexy_mnn_IxMnnNative_nativeDetokenize(JNIEnv* env, jobject, jlong handle, jint tokenId) {
+    auto* llm = reinterpret_cast<Llm*>(handle);
+    if (!llm) return env->NewStringUTF("");
+    try {
+        return env->NewStringUTF(llm->tokenizer_decode(static_cast<int>(tokenId)).c_str());
+    } catch (...) {
+        return env->NewStringUTF("");
+    }
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_ix64_hexy_mnn_IxMnnNative_nativeGetPerf(JNIEnv* env, jobject, jlong handle) {
+    auto* llm = reinterpret_cast<Llm*>(handle);
+    if (!llm) return env->NewStringUTF("{}");
+    try {
+        const auto* ctx = llm->getContext();
+        if (!ctx) return env->NewStringUTF("{}");
+        std::ostringstream os;
+        os << "{\"prompt_len\":" << ctx->prompt_len
+           << ",\"gen_seq_len\":" << ctx->gen_seq_len
+           << ",\"all_seq_len\":" << ctx->all_seq_len
+           << ",\"prefill_us\":" << static_cast<long long>(ctx->prefill_us)
+           << ",\"decode_us\":" << static_cast<long long>(ctx->decode_us)
+           << ",\"status\":" << static_cast<int>(ctx->status)
+           << "}";
+        return env->NewStringUTF(os.str().c_str());
+    } catch (...) {
+        return env->NewStringUTF("{}");
+    }
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_ix64_hexy_mnn_IxMnnNative_nativeSetSampling(JNIEnv*, jobject, jlong handle,
+                                                     jfloat temperature, jfloat topP,
+                                                     jfloat repetitionPenalty) {
+    auto* llm = reinterpret_cast<Llm*>(handle);
+    if (!llm) return JNI_FALSE;
+    try {
+        std::ostringstream os;
+        os << "{\"sampler_type\":\"mixed\",\"temperature\":" << temperature
+           << ",\"topP\":" << topP
+           << ",\"penalty\":" << repetitionPenalty << "}";
+        return llm->set_config(os.str()) ? JNI_TRUE : JNI_FALSE;
+    } catch (...) {
+        return JNI_FALSE;
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_com_ix64_hexy_mnn_IxMnnNative_nativeHistoryCount(JNIEnv*, jobject, jlong handle) {
+    auto* llm = reinterpret_cast<Llm*>(handle);
+    if (!llm) return 0;
+    try {
+        return static_cast<jint>(llm->getCurrentHistory());
+    } catch (...) {
+        return 0;
+    }
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_ix64_hexy_mnn_IxMnnNative_nativeEraseHistory(JNIEnv*, jobject, jlong handle,
+                                                      jint begin, jint end) {
+    auto* llm = reinterpret_cast<Llm*>(handle);
+    if (!llm || begin < 0 || end < begin) return JNI_FALSE;
+    try {
+        llm->eraseHistory(static_cast<size_t>(begin), static_cast<size_t>(end));
+        return JNI_TRUE;
+    } catch (...) {
+        return JNI_FALSE;
+    }
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_ix64_hexy_mnn_IxMnnNative_nativeApplyTemplate(JNIEnv* env, jobject, jlong handle, jstring prompt) {
+    auto* llm = reinterpret_cast<Llm*>(handle);
+    if (!llm) return env->NewStringUTF("");
+    try {
+        return env->NewStringUTF(llm->apply_chat_template(toStd(env, prompt)).c_str());
+    } catch (...) {
+        return env->NewStringUTF("");
+    }
+}
+
+
 // --- Q6: THE SIX-BIT CUBE ---------------------------------------------------
 //
 // The same state the decode loop reads as a prior, moved from Godot. All of it

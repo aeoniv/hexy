@@ -80,7 +80,7 @@ func _process(delta: float) -> void:
 		var parsed = JSON.parse_string(pkt.get_string_from_utf8())
 		if parsed is Dictionary:
 			_handle(parsed, from_ip)
-	var now := Time.get_ticks_msec() / 1000.0
+	var now := Clock.now_ms() / 1000.0
 	for pid in _peers.keys():
 		if now - _peers[pid].last_seen > PEER_TIMEOUT:
 			_peers.erase(pid)
@@ -97,7 +97,7 @@ func _handle(m: Dictionary, from_ip: String) -> void:
 				return
 			var fresh := not _peers.has(pid)
 			_peers[pid] = {"ip": from_ip, "port": int(m.get("port", 0)),
-				"name": m.get("name", "?"), "last_seen": Time.get_ticks_msec() / 1000.0}
+				"name": m.get("name", "?"), "last_seen": Clock.now_ms() / 1000.0}
 			if fresh:
 				peer_found.emit(pid, m.get("name", "?"))
 				peer_proximity.emit(pid, "touch" if _same_host(from_ip) else "room")
@@ -108,7 +108,7 @@ func _handle(m: Dictionary, from_ip: String) -> void:
 			# events into a mesh it never joined.
 			if not _peers.has(pid):
 				return
-			_peers[pid].last_seen = Time.get_ticks_msec() / 1000.0
+			_peers[pid].last_seen = Clock.now_ms() / 1000.0
 			var key := "%s:%d" % [pid, int(m.get("seq", 0))]
 			if _seen.has(key):
 				return

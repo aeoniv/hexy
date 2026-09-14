@@ -5,14 +5,32 @@ class_name MnnRuntime
 ## Integrates canonical ix64-hexy ModelStore for RAM-gated tiers (0.6B Floor, 0.8B Mid, 1.7B High).
 
 const ModelStore = preload("res://scripts/brain/model_store.gd")
+const Seam = preload("res://scripts/seam.gd")
 
 signal chat_token(text: String)
+## The reasoning half of a streamed turn, separated from the speech. Emitted
+## only while `_streaming`; a plugin with no `chat_thought` simply never fires.
+signal chat_thought(text: String)
 signal chat_done(text: String)
 
 const EMBED_MODEL := "gte-embedding-mnn"
 const CHAT_MODEL := "qwen3-0.6b-mnn"
 const MOCK_DIM := 64
 const QWEN_NO_THINK := " /no_think"
+
+## THE AAR THIS SCRIPT WAS WRITTEN AGAINST, checked at attach by
+## `scripts/seam.gd`. A stale ixmnn answers `has_singleton` true and then loses
+## whichever new method this script needs, silently; the handshake is what turns
+## that into one loud line and an honest mock.
+##
+## NAMED `REQUIRES`, NOT `NEEDS`. `NEEDS` is already the fly-brain's six need
+## lines (`scripts/creature/reading_words.gd`), and one word cannot mean both.
+const REQUIRES := "ixmnn/2"
+
+## The plugin name and version this seam requires, split. Read by
+## `tests/plugin_version_smoke.gd` so the handshake string can never rot into a
+## shape `seam.gd` would compare but nobody could parse.
+const REQUIRES_TAG := "mnn"
 
 var _android: Object = null
 var _dim := MOCK_DIM
@@ -28,15 +46,28 @@ func _init() -> void:
 	_chat_model = _lane_info.get("dir", CHAT_MODEL)
 	
 	if Engine.has_singleton("IxMnn"):
-		_android = Engine.get_singleton("IxMnn")
+		var node: Object = Engine.get_singleton("IxMnn")
+		# THE VERSION HANDSHAKE, BEFORE A SINGLE SIGNAL IS CONNECTED. On a
+		# mismatch `seam.gd` prints the loud line and we keep `_android` null,
+		# which `available()` already reads as "run the mock". A mock that says
+		# it is a mock beats a plugin that lies about its age.
+		if not Seam.check(node, REQUIRES, REQUIRES_TAG):
+			return
+		_android = node
 		_can_stream = _android.has_signal("chat_token") and _android.has_signal("chat_done")
 		if _can_stream:
 			_android.connect("chat_token", _on_plugin_token)
 			_android.connect("chat_done", _on_plugin_done)
+		if _android.has_signal("chat_thought"):
+			_android.connect("chat_thought", _on_plugin_thought)
 
 func _on_plugin_token(text: String) -> void:
 	if _streaming:
 		chat_token.emit(text)
+
+func _on_plugin_thought(text: String) -> void:
+	if _streaming:
+		chat_thought.emit(text)
 
 func _on_plugin_done(text: String) -> void:
 	if not _streaming:
@@ -188,3 +219,231 @@ static func cosine(a: PackedFloat32Array, b: PackedFloat32Array) -> float:
 		norm_b += b[i] * b[i]
 	var denom := sqrt(norm_a) * sqrt(norm_b)
 	return dot / denom if denom > 0.00001 else 0.0
+
+
+# ── MNN ENGINE EXTENSIONS: TOKENIZER, SAMPLING, PERF & CONTEXT ──────────────
+#
+# Every one of these calls a method the ixmnn/2 aar owns. `REQUIRES` above is
+# the real gate; the `has_method` guard below is the second fence, so an aar
+# that got past the handshake and is still missing a method degrades to the
+# desktop mock with ONE LOUD LINE rather than an engine error nobody reads.
+
+## Desktop truth for the sampling knobs: the plugin does not own a getter, so
+## the last values set are kept here and handed back by [get_sampling].
+var _sampling_params := {
+	"temperature": 0.7,
+	"top_p": 0.9,
+	"repetition_penalty": 1.15,
+}
+
+var _mock_history_count := 0
+var _mock_vocab: Dictionary = {}
+var _mock_inv_vocab: Dictionary = {}
+var _last_perf := {
+	"prompt_len": 0,
+	"gen_seq_len": 0,
+	"all_seq_len": 0,
+	"prefill_ms": 0.0,
+	"decode_ms": 0.0,
+	"tps": 0.0,
+	"status": 0,
+}
+
+
+## True when the plugin is here AND owns `name`. False is never silent: a stale
+## aar under a fresh script is exactly the failure worth shouting about.
+func _plugin_has(method: String) -> bool:
+	if not available():
+		return false
+	if _android.has_method(method):
+		return true
+	push_warning("mnn: the aar has no `%s` — falling back to the mock for this call. Re-export ixmnn (%s)." % [method, REQUIRES])
+	return false
+
+
+## True between `chat_stream()` and its `chat_done`.
+func streaming() -> bool:
+	return _streaming
+
+
+## The same question `chat_ready()` answers, under the name the agent loop asks.
+func chat_loaded() -> bool:
+	return chat_ready()
+
+
+func embedding_name() -> String:
+	return "mnn" if available() else "mock_hash"
+
+
+## THE PROMPT SWITCH, FENCED BY FAMILY. True only for the Qwen3 line, the only
+## line that reads `/no_think` as a command rather than as words. The dash does
+## the work: "qwen3-" excludes "qwen3.5-0.8b-mnn", which has no such switch.
+static func _wants_no_think(dir: String) -> bool:
+	return dir.begins_with("qwen3-")
+
+
+## Splits a reply into its reasoning (`<think>...</think>`) and its speech.
+## Pure, so a test can pin the shape without owning a model.
+static func partition_think(text: String) -> Dictionary:
+	var open_tag := "<think>"
+	var close_tag := "</think>"
+	var b := text.find(open_tag)
+	var e := text.find(close_tag)
+	if b == -1:
+		return {"thought": "", "speech": text.strip_edges()}
+	if e == -1 or e < b:
+		return {
+			"thought": text.substr(b + open_tag.length()).strip_edges(),
+			"speech": text.substr(0, b).strip_edges(),
+		}
+	var thought := text.substr(b + open_tag.length(), e - (b + open_tag.length()))
+	var speech := text.substr(0, b) + text.substr(e + close_tag.length())
+	return {"thought": thought.strip_edges(), "speech": speech.strip_edges()}
+
+
+## THE MOCK'S TOKENS, a pure function so a test can pin the shape of a stream.
+## Words with their trailing space kept on the chunk — the shape a real
+## tokenizer produces, and therefore the shape a sentence splitter must survive.
+static func stream_chunks(text: String) -> Array:
+	var out: Array = []
+	var cur := ""
+	for i in text.length():
+		var c := text[i]
+		cur += c
+		if c == " " or c == "\n":
+			out.append(cur)
+			cur = ""
+	if cur != "":
+		out.append(cur)
+	return out
+
+
+## Encodes a prompt into model token ids. The mock keeps a growing word->id
+## vocabulary, so the same word is the same id for the life of the runtime.
+func tokenize(text: String) -> PackedInt32Array:
+	if _plugin_has("tokenize"):
+		# The engine marshals a Kotlin IntArray as PackedInt32Array, but an older
+		# aar may hand back a plain Array; both are accepted rather than assumed.
+		var raw: Variant = _android.call("tokenize", text)
+		if raw is PackedInt32Array:
+			return raw
+		var ids := PackedInt32Array()
+		if raw is Array:
+			var arr: Array = raw
+			ids.resize(arr.size())
+			for i in arr.size():
+				ids[i] = int(arr[i])
+		return ids
+	var out := PackedInt32Array()
+	for w in text.split(" ", false):
+		var lower := String(w).to_lower().strip_edges()
+		if lower == "":
+			continue
+		if not _mock_vocab.has(lower):
+			var new_id := 1000 + int(_mock_vocab.size())
+			_mock_vocab[lower] = new_id
+			_mock_inv_vocab[new_id] = lower
+		out.append(int(_mock_vocab[lower]))
+	return out
+
+
+## Decodes one token id back into text. Round-trips whatever [tokenize] made.
+func detokenize(token_id: int) -> String:
+	if _plugin_has("detokenize"):
+		return String(_android.call("detokenize", token_id))
+	if _mock_inv_vocab.has(token_id):
+		return String(_mock_inv_vocab[token_id]) + " "
+	return "[tok_%d] " % token_id
+
+
+## Native execution telemetry: prefill/decode latency, tokens per second and the
+## three sequence lengths. Milliseconds out, microseconds in.
+func get_perf() -> Dictionary:
+	if _plugin_has("get_perf"):
+		var parsed: Variant = JSON.parse_string(String(_android.call("get_perf")))
+		if parsed is Dictionary:
+			var d: Dictionary = parsed
+			var p_us := float(d.get("prefill_us", 0))
+			var d_us := float(d.get("decode_us", 0))
+			var gen_len := int(d.get("gen_seq_len", 0))
+			var tps := 0.0
+			if d_us > 0.0 and gen_len > 0:
+				tps = (float(gen_len) * 1000000.0) / d_us
+			_last_perf = {
+				"prompt_len": int(d.get("prompt_len", 0)),
+				"gen_seq_len": gen_len,
+				"all_seq_len": int(d.get("all_seq_len", 0)),
+				"prefill_ms": p_us / 1000.0,
+				"decode_ms": d_us / 1000.0,
+				"tps": snappedf(tps, 0.1),
+				"status": int(d.get("status", 0)),
+			}
+	return _last_perf.duplicate()
+
+
+## Sets runtime sampling. The clamps are this seam's, not the plugin's, so the
+## mock and the phone agree about what a legal temperature is.
+func set_sampling(temperature: float, top_p: float = 0.9, repetition_penalty: float = 1.15) -> bool:
+	_sampling_params["temperature"] = clampf(temperature, 0.05, 2.0)
+	_sampling_params["top_p"] = clampf(top_p, 0.1, 1.0)
+	_sampling_params["repetition_penalty"] = clampf(repetition_penalty, 1.0, 2.0)
+	if _plugin_has("set_sampling"):
+		return bool(_android.call("set_sampling",
+			_sampling_params["temperature"],
+			_sampling_params["top_p"],
+			_sampling_params["repetition_penalty"]))
+	return true
+
+
+func get_sampling() -> Dictionary:
+	return _sampling_params.duplicate()
+
+
+## How many tokens of context history the session is carrying.
+func get_history_count() -> int:
+	if _plugin_has("get_history_count"):
+		return int(_android.call("get_history_count"))
+	return _mock_history_count
+
+
+## Trims the sliding window [begin, end) out of the kv-cache, so a long turn on
+## a phone does not grow until the OS takes the process away.
+func trim_history(begin: int, end: int) -> bool:
+	if _plugin_has("trim_history"):
+		return bool(_android.call("trim_history", begin, end))
+	_mock_history_count = maxi(0, _mock_history_count - maxi(0, end - begin))
+	return true
+
+
+## Formats a prompt with the model's own ChatML template. The mock writes the
+## Qwen shape by hand so a caller can be tested against a real-looking string.
+func apply_template(prompt: String) -> String:
+	if _plugin_has("apply_template"):
+		return String(_android.call("apply_template", prompt))
+	return "<|im_start|>user\n" + prompt.strip_edges() + "<|im_end|>\n<|im_start|>assistant\n"
+
+
+## THE DESKTOP FALLBACKS, named so a caller can reach them on purpose. Enough
+## shape to write and test against, never enough to be mistaken for thought.
+func _mock_chat(prompt: String) -> String:
+	if prompt.strip_edges().is_empty():
+		return ""
+	_mock_history_count += tokenize(prompt).size()
+	return "[mock] heard: " + prompt.strip_edges().left(60)
+
+
+## Deterministic 64-dim pseudo-embedding: same text, same vector, unit length.
+func _mock_embed(text: String) -> PackedFloat32Array:
+	var v := PackedFloat32Array()
+	v.resize(MOCK_DIM)
+	var h := hash(text)
+	var norm := 0.0
+	for i in MOCK_DIM:
+		h = int((h * 1103515245 + 12345 + i) & 0x7FFFFFFF)
+		v[i] = float(h % 2000 - 1000) / 1000.0
+		norm += v[i] * v[i]
+	norm = sqrt(norm)
+	if norm > 0.00001:
+		for i in MOCK_DIM:
+			v[i] /= norm
+	return v

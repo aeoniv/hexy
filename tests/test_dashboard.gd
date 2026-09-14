@@ -152,6 +152,16 @@ func _run() -> void:
 	check(dash.tunable_control("senses.period_ms") != null,
 		"and the registry reached it through the app's own autoload")
 
+	## PANEL 10 ON THE LIVE GLASS. The app builds a loader whether any add-on
+	## is on disk or not, so the doors panel must stand either way -- with six
+	## need rows and four circuit rows, and a dash wherever no door lands.
+	check(dash.panel("doors") != null and dash.panel("doors").get_parent() == dash.column,
+		"the doors panel stands under the two on the real glass")
+	check(app.addons != null, "the app built an add-on loader")
+	check(String(dash.doors_text()).split("
+").size() == 10,
+		"the doors panel reads six need lines and four circuits")
+
 # -- panels 8 and 9, on a bare dashboard -------------------------------------
 
 ## A GLASS THAT HAS EVERY CONTROL METHOD, and one that has none. The dashboard
@@ -228,6 +238,10 @@ func _run_widget_panels() -> void:
 	check(dash.panel("controls") != null, "the controls panel stands on the column")
 	check(String(HexyDashboard.TITLES["tunables"]).begins_with("8 ·"), "tunables is panel 8")
 	check(String(HexyDashboard.TITLES["controls"]).begins_with("9 ·"), "controls is panel 9")
+	check(dash.panel("doors") != null, "the doors panel stands on the column")
+	check(String(HexyDashboard.TITLES["doors"]).begins_with("10 ·"), "doors is panel 10")
+	check(String(dash.doors_text()).contains("body: —"),
+		"and with no loader bound it draws a dash on every row")
 
 	# -- a control for every key in the schema -------------------------------
 	var missing: Array[String] = []

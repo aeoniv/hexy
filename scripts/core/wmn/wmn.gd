@@ -214,7 +214,7 @@ func send_chirp() -> void:
 	fabric.emit_event(WIRE_KIND,
 		{WIRE_KEY: Envelope6.to_wire(Envelope6.KIND_CHIRP,
 			int(_self_h.get("bits", 0)),
-			{"s": Time.get_ticks_msec(), "e": echo})},
+			{"s": Clock.now_ms(), "e": echo})},
 		CHIRP_TTL)
 
 
@@ -259,7 +259,7 @@ func _take_figure(src: String, bits: int, payload: Dictionary) -> void:
 
 func _take_chirp(src: String, payload: Dictionary) -> void:
 	var t3 := int(payload.get("s", 0))
-	var t4 := Time.get_ticks_msec()
+	var t4 := Clock.now_ms()
 	var echo = payload.get("e", {})
 	var before := clock.offset_ms()
 	var did_pair := false

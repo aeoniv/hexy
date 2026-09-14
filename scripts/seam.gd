@@ -11,7 +11,7 @@ extends RefCounted
 ##
 ## THE ARRANGEMENT. Each plugin carries `const val PLUGIN_VERSION = "<name>/<n>"`
 ## and answers it through `@UsedByGodot fun plugin_version()`. Each GDScript seam
-## carries a `const NEEDS` with the string it was written against. At attach, and
+## carries a `const REQUIRES` with the string it was written against. At attach, and
 ## only at attach, [check] compares them. On a mismatch the seam prints one loud
 ## line, drops the singleton and runs its mock — a mock that says it is a mock is
 ## strictly better than a plugin that lies about its age.

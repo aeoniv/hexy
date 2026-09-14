@@ -274,7 +274,7 @@ func _on_seat_landed(seat: int, c: Dictionary) -> void:
 func _on_restored() -> void:
 	if _store == null or pacing == null:
 		return
-	var now: int = _last_now_ms if _last_now_ms > 0 else Time.get_ticks_msec()
+	var now: int = _last_now_ms if _last_now_ms > 0 else Clock.now_ms()
 	pacing.reset(_store.body_bits(), now)
 	if not pacing.journal.is_empty():
 		pacing.journal[pacing.journal.size() - 1]["source"] = "restore"
@@ -318,7 +318,7 @@ func state() -> Dictionary:
 	var profile: Dictionary = DeviceProfile.resolve()
 	var flex: bool = bool(profile.get("has_hinge", false)) and bool(profile.get("is_dual_pane", false))
 	var mult: float = float(profile.get("civil_fire_flex_multiplier", 1.0)) if flex else 1.0
-	var now: int = _last_now_ms if _last_now_ms > 0 else Time.get_ticks_msec()
+	var now: int = _last_now_ms if _last_now_ms > 0 else Clock.now_ms()
 	var flip: Dictionary = _store.last_flip if _store != null else {}
 	return {
 		"dwell_s": float(pacing.dwell()) if pacing != null else 0.0,

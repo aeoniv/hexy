@@ -105,6 +105,12 @@ func permission() -> String:
 
 
 func start() -> bool:
+	# TODO(M1b): acquire the MIC resource via Broker.take(Broker.MIC, ...)
+	# before opening the recogniser, and Broker.release(Broker.MIC, ...) in
+	# stop()/cancel()/_finish_mock(). Left undone here: Mic has no caller-
+	# supplied holder name or mode today (every call site just calls
+	# start()/stop() directly), so wiring Broker in would mean inventing a
+	# holder identity for Mic's callers rather than a small, contained change.
 	if _listening:
 		return false
 	if not available():

@@ -323,7 +323,7 @@ static func bio_payload(heading_rad: float, oa: float, habit_bias: Array = [],
 		"heading": snappedf(heading_rad, 0.001),
 		"oa": snappedf(oa, 0.001),
 		"habit_bias": habit,
-		"t": Time.get_ticks_msec(),
+		"t": Clock.now_ms(),
 	}
 	if q6.size() > 0:
 		if q6_topk > 0:

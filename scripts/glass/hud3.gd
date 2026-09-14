@@ -38,11 +38,11 @@ const PACING_PATH: String = "res://scripts/core/iching/pacing.gd"
 const GROUND: Color = Color(0.0588235, 0.0823529, 0.12549, 1.0)
 
 ## The fixed bands, in pixels of the band's own height. The body takes the rest.
-const STATUS_H: float = 54.0
-const HEAD_H: float = 300.0
-const EARTH_H: float = 300.0
+const STATUS_H: float = 52.0
+const HEAD_H: float = 270.0
+const EARTH_H: float = 270.0
 const COMPOSER_H: float = 54.0
-const BAND_GAP: int = 14
+const BAND_GAP: int = 12
 ## The left column the radar takes on a fold that is open, in pixels, and the
 ## two sizes the radar itself is given in its two placements.
 const RADAR_PANE_W: float = 300.0
@@ -94,6 +94,7 @@ const FLIP_FRESH_MS: int = 6000
 ## The owner's own two marks for the two figures, kept byte for byte.
 const MOON: String = "🌙"
 const SUN: String = "☀️"
+const EARTH_ICON: String = "🌍"
 
 ## The sense periods the earth ring walks through, in milliseconds. 3500 is the
 ## senses' own default and is the seat the ring starts on.
@@ -211,6 +212,9 @@ var bubble: GlassBubble = null
 ## of them, so the three dials measure the same whether it stands or not.
 var dashboard: HexyDashboard = null
 
+## The add-on loader, held only to hand on to the doors panel.
+var _addons: Node = null
+
 var _store: Node = null
 var _qwen: Node = null
 var _mnn: Node = null
@@ -269,8 +273,8 @@ func _ready() -> void:
 	pad.add_theme_constant_override("margin_right", 8)
 	root.add_child(pad)
 
-	var spine := AxisSpine.new(self)
-	pad.add_child(spine)
+	# AxisSpine cut off per layout request - dials are cleanly separated with proportional spacing
+	# (No central vertical line slicing through components)
 
 	bands = VBoxContainer.new()
 	bands.name = "Bands"
@@ -742,6 +746,14 @@ func mic_button() -> Button:
 
 func mic_listening() -> bool:
 	return _mic_listening
+
+
+## THE ADD-ON LOADER, passed straight through to the doors panel. The glass
+## itself has no opinion about add-ons; it only knows where the panel is.
+func set_addons(addons: Node) -> void:
+	_addons = addons
+	if dashboard != null:
+		dashboard.set_addons(addons)
 
 
 ## The alchemy is held only so the glass can say what it last did.
@@ -1279,11 +1291,10 @@ func _status_line() -> String:
 	## holds for this mode too: what a person is HOLDING keeps the top line, and
 	## the day's one sentence takes the line the fabric and the frame rate used
 	## to have. `day_line` is the sentence on its own, for whoever wants it.
+	if _mic_listening:
+		return _figures_phrase() + "\n" + MIC_PHRASE
 	if _cfg_status_mode == "day":
 		return _figures_phrase() + "\n" + day_line()
-	if _mic_listening:
-		return _figures_phrase() + "
-" + MIC_PHRASE
 	var news: String = _flip_phrase()
 	return _figures_phrase() + "\n" + (news if news != "" else _state_phrase())
 
@@ -1585,6 +1596,8 @@ func _build_dashboard() -> void:
 	root.add_child(dashboard)
 	dashboard.set_host(self)
 	dashboard.bind(_store, _mnn, _wmn, _senses, _alchemy, _qwen)
+	if _addons != null:
+		dashboard.set_addons(_addons)
 
 
 ## What the model is, what the fruit fly connectome is living, and what it is allowed to be on this phone.
@@ -1980,6 +1993,7 @@ class AxisSpine extends Control:
 		queue_redraw()
 
 	func _draw() -> void:
+		return
 		if _hud == null:
 			return
 		var st: Control = _hud.get("status_panel")

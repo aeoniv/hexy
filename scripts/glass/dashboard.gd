@@ -42,12 +42,13 @@ const TITLES: Dictionary = {
 	"mesh": "7 · MESH",
 	"tunables": "8 · TUNABLES",
 	"controls": "9 · CONTROLS",
+	"doors": "10 · DOORS",
 }
 
 ## The two panels that are WIDGETS, not paintings. A gauge shows you a number;
 ## these two let you MOVE one, which no _draw can do. They stand on the same
 ## column, under the seven, and are built out of real Controls.
-const WIDGET_PANELS: Array[String] = ["tunables", "controls"]
+const WIDGET_PANELS: Array[String] = ["tunables", "controls", "doors"]
 
 ## The twelve app controls that used to live on the earth dial, in the order a
 ## thumb should meet them. `kind` says what the button does with what it gets
@@ -159,6 +160,13 @@ var _control_buttons: Dictionary = {}
 var _control_readout: RichTextLabel = null
 var _config: HexyConfig = null
 
+## The loader, if the app built one. Read-only, and duck-typed like everything
+## else the glass is handed: a dashboard with no loader draws six dashes.
+var _addons: Node = null
+
+## line or circuit id -> the Label that names the doors feeding it.
+var _door_labels: Dictionary = {}
+
 
 # -- building ----------------------------------------------------------------
 
@@ -264,6 +272,10 @@ func _build_panel(kind: String) -> PanelContainer:
 		return panel
 	if kind == "controls":
 		_build_controls(box)
+		_panels[kind] = panel
+		return panel
+	if kind == "doors":
+		_build_doors(box)
 		_panels[kind] = panel
 		return panel
 
@@ -609,6 +621,92 @@ func control_text() -> String:
 	return "" if _control_readout == null else _control_readout.text
 
 
+# -- panel 10: the doors ------------------------------------------------------
+
+## WHICH HARDWARE DOOR FEEDS WHICH LINE.
+##
+## Ten rows: the six need lines the homeostat holds, then the four fly
+## circuits an add-on may drive instead. Each row names the doors of every
+## attached add-on that answered with that line, and an em dash when nothing
+## does -- which is what the whole column reads on a base app with no add-ons
+## on disk, and is the picture "add-on off = base unchanged" should make.
+func _build_doors(box: VBoxContainer) -> void:
+	for i in range(HexyAddon.NEED_NAMES.size()):
+		box.add_child(_build_door_row(i, HexyAddon.NEED_NAMES[i]))
+	var sep := Label.new()
+	sep.name = "Circuits"
+	sep.text = "— CIRCUITS"
+	sep.add_theme_font_size_override("font_size", 11)
+	sep.add_theme_color_override("font_color", MACHINE)
+	box.add_child(sep)
+	for id in HexyAddon.CIRCUIT_NAMES:
+		box.add_child(_build_door_row(int(id), String(HexyAddon.CIRCUIT_NAMES[id])))
+	_sync_doors()
+
+
+func _build_door_row(id: int, label: String) -> Control:
+	var line := HBoxContainer.new()
+	line.name = "Door:" + label
+	line.add_theme_constant_override("separation", 6)
+
+	var name_label := Label.new()
+	name_label.name = "Name"
+	name_label.text = label
+	name_label.custom_minimum_size = Vector2(150.0, 0.0)
+	name_label.add_theme_font_size_override("font_size", 11)
+	name_label.add_theme_color_override("font_color", INK)
+	line.add_child(name_label)
+
+	var read := Label.new()
+	read.name = "Door"
+	read.text = "—"
+	read.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	read.add_theme_font_size_override("font_size", 11)
+	read.add_theme_color_override("font_color", HUMAN)
+	line.add_child(read)
+
+	_door_labels[id] = read
+	return line
+
+
+## Repaint the ten rows from the loader. Cheap enough to run on every beat,
+## and it is the only thing that can change on this panel.
+func _sync_doors() -> void:
+	var map: Dictionary = {}
+	if _addons != null and _addons.has_method("doors"):
+		map = _addons.call("doors") as Dictionary
+	for id in _door_labels:
+		var l: Label = _door_labels[id] as Label
+		if l == null:
+			continue
+		var hits: Array = map.get(int(id), []) as Array
+		l.text = "—" if hits.is_empty() else ", ".join(PackedStringArray(hits))
+
+
+## The loader whose doors this panel draws.
+func set_addons(addons: Node) -> void:
+	_addons = addons
+	_sync_doors()
+
+
+## THE DOORS PANEL AS ONE BLOCK OF TEXT, so a test may read what a person
+## reads. One "line: door" per row, need lines first, circuits after.
+func doors_text() -> String:
+	_sync_doors()
+	var out: PackedStringArray = PackedStringArray()
+	for i in range(HexyAddon.NEED_NAMES.size()):
+		out.append("%s: %s" % [HexyAddon.NEED_NAMES[i], _door_text(i)])
+	for id in HexyAddon.CIRCUIT_NAMES:
+		out.append("%s: %s" % [String(HexyAddon.CIRCUIT_NAMES[id]), _door_text(int(id))])
+	return "
+".join(out)
+
+
+func _door_text(id: int) -> String:
+	var l: Label = _door_labels.get(id, null) as Label
+	return "—" if l == null else l.text
+
+
 # -- wiring ------------------------------------------------------------------
 
 ## Everything this panel is allowed to know, handed over at once. Qwen is
@@ -752,6 +850,8 @@ func _refresh() -> void:
 	snap["fly"] = _read_fly()
 	snap["mesh"] = _read_mesh()
 	_snap = snap
+
+	_sync_doors()
 
 	if radar != null:
 		var fs: Dictionary = snap["fly"].get("state", {}) as Dictionary

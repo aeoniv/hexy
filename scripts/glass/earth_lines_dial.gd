@@ -43,7 +43,7 @@ const LINE_REACH: float = 44.0
 
 ## The rim, the glyph and the hub, as shares of the dial's own radius.
 const RING: float = 0.86
-const HUB: float = 0.40
+const HUB: float = 0.52
 const GLYPH_W: float = 44.0
 const GLYPH_H: float = 4.0
 const CAPTION_PT: int = 9
@@ -171,11 +171,48 @@ func _draw() -> void:
 	var hub_r: float = hub_radius()
 	draw_circle(dial_center, hub_r, Color(0.05, 0.08, 0.13, 0.96))
 	draw_arc(dial_center, hub_r, 0.0, TAU, 48, Color(1.0, 0.65, 0.18, 0.95), 2.5, true)
+	draw_arc(dial_center, hub_r - 3.0, 0.0, TAU, 48, Color(0.25, 0.75, 0.95, 0.35), 1.0, true)
+
+	# 4096 HYPERGRAM (64 HEAD x 64 BODY)
+	var hypergram_idx: int = ((head_bits & 63) << 6) | (body_bits & 63)
+
 	if font != null:
-		var cast_txt: String = "CAST"
-		var cw: float = font.get_string_size(cast_txt, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 10).x
-		draw_string(font, dial_center + Vector2(-cw * 0.5, 4.0), cast_txt,
-			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 10, Color(1.0, 0.78, 0.3, 0.9))
+		var hyp_hdr: String = "HYPERGRAM #%d / 4096" % (hypergram_idx + 1)
+		var hw: float = font.get_string_size(hyp_hdr, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8).x
+		draw_string(font, dial_center + Vector2(-hw * 0.5, -hub_r * 0.54), hyp_hdr,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8, Color(1.0, 0.78, 0.35, 0.95))
+
+	# Draw the 6 Hypergram Lines in the Center Hub (line 0 at bottom to line 5 at top)
+	var hlw: float = 38.0
+	for i in range(6):
+		var ly: float = dial_center.y + float(2.5 - float(i)) * 8.0 - 2.0
+		var b_bit: int = (body_bits >> i) & 1
+		var h_bit: int = (head_bits >> i) & 1
+		
+		if b_bit == 1 and h_bit == 1:
+			# Young Yang (Firm Steady Yang)
+			draw_line(Vector2(dial_center.x - hlw * 0.5, ly), Vector2(dial_center.x + hlw * 0.5, ly), Color(1.0, 0.85, 0.35, 0.92), 2.2)
+		elif b_bit == 0 and h_bit == 0:
+			# Young Yin (Firm Steady Yin)
+			var half: float = (hlw - 7.0) * 0.5
+			draw_line(Vector2(dial_center.x - hlw * 0.5, ly), Vector2(dial_center.x - hlw * 0.5 + half, ly), Color(0.28, 0.68, 0.88, 0.82), 2.2)
+			draw_line(Vector2(dial_center.x + hlw * 0.5 - half, ly), Vector2(dial_center.x + hlw * 0.5, ly), Color(0.28, 0.68, 0.88, 0.82), 2.2)
+		elif b_bit == 1 and h_bit == 0:
+			# Old Yang (Moving Yang -> Yin)
+			draw_line(Vector2(dial_center.x - hlw * 0.5, ly), Vector2(dial_center.x + hlw * 0.5, ly), Color(1.0, 0.52, 0.18, 0.98), 2.4)
+			draw_circle(Vector2(dial_center.x, ly), 2.8, Color(1.0, 0.92, 0.45, 0.98))
+		else:
+			# Old Yin (Moving Yin -> Yang)
+			var half: float = (hlw - 7.0) * 0.5
+			draw_line(Vector2(dial_center.x - hlw * 0.5, ly), Vector2(dial_center.x - hlw * 0.5 + half, ly), Color(0.35, 0.92, 1.0, 0.98), 2.4)
+			draw_line(Vector2(dial_center.x + hlw * 0.5 - half, ly), Vector2(dial_center.x + hlw * 0.5, ly), Color(0.35, 0.92, 1.0, 0.98), 2.4)
+			draw_circle(Vector2(dial_center.x, ly), 2.5, Color(1.0, 0.85, 0.25, 0.98))
+
+	if font != null:
+		var cast_txt: String = "[ CAST ]"
+		var cw: float = font.get_string_size(cast_txt, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9).x
+		draw_string(font, dial_center + Vector2(-cw * 0.5, hub_r * 0.65), cast_txt,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9, Color(1.0, 0.82, 0.32, 0.95))
 
 
 func _gui_input(event: InputEvent) -> void:

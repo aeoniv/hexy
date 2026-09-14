@@ -266,6 +266,64 @@ func schema() -> Array[Dictionary]:
 	return out
 
 
+## AN ADD-ON'S TUNABLES, JOINED TO THE ONE DRAWER.
+##
+## `rows` is keyed by NAMESPACED key ("body.min_confidence") and valued by a
+## row in the same shape [method schema] uses. A row may leave out anything but
+## `default`: the group falls back to the key's own prefix, the type to what
+## the default is, and the bounds to zeroes. Once registered a key is
+## indistinguishable from a built-in -- it clamps, it persists, it appears on
+## the dashboard, and it bumps [method revision].
+##
+## A key that is already in the drawer is left exactly as it stands: an add-on
+## may not move a built-in's bounds, and a re-attach may not undo a person's
+## setting. Returns how many keys were actually added.
+func register(rows: Dictionary) -> int:
+	var added: int = 0
+	for k in rows:
+		var key: String = String(k)
+		if key == "" or _by_key.has(key):
+			continue
+		if not (rows[k] is Dictionary):
+			push_warning("HexyConfig: %s is not a row" % key)
+			continue
+		var row: Dictionary = _normalise_row(key, rows[k] as Dictionary)
+		_rows.append(row)
+		_by_key[key] = row
+		_values[key] = row["default"]
+		added += 1
+	if added > 0:
+		_revision += 1
+		_queue_save()
+	return added
+
+
+## One loose row filled out to the shape every reader expects.
+static func _normalise_row(key: String, given: Dictionary) -> Dictionary:
+	var row: Dictionary = given.duplicate(true)
+	row["key"] = key
+	var dotted: PackedStringArray = key.split(".")
+	if String(row.get("group", "")) == "":
+		row["group"] = dotted[0] if dotted.size() > 1 else key
+	var dflt: Variant = row.get("default", 0.0)
+	if String(row.get("type", "")) == "":
+		if dflt is bool:
+			row["type"] = "bool"
+		elif dflt is int:
+			row["type"] = "int"
+		elif dflt is String:
+			row["type"] = "enum" if (row.get("options", []) as Array).size() > 0 else "string"
+		else:
+			row["type"] = "float"
+	for field in ["min", "max", "step"]:
+		row[field] = float(row.get(field, 0.0))
+	if not (row.get("options", null) is Array):
+		row["options"] = []
+	row["doc"] = String(row.get("doc", ""))
+	row["default"] = _coerce(row, dflt)
+	return row
+
+
 ## One row by key, copied, or {} when there is no such key.
 func row(key: String) -> Dictionary:
 	if not _by_key.has(key):
@@ -374,8 +432,15 @@ static func _coerce(row: Dictionary, value: Variant) -> Variant:
 			return bool(value)
 		"int":
 			var iv: int = int(round(float(value)))
+			## A REGISTERED ROW MAY BE UNBOUNDED: max <= min means "no bound",
+			## not "pin everything to zero". No built-in row is shaped that way,
+			## so this branch belongs to the add-ons alone.
+			if float(row["max"]) <= float(row["min"]):
+				return iv
 			return clampi(iv, int(row["min"]), int(row["max"]))
 		"float":
+			if float(row["max"]) <= float(row["min"]):
+				return float(value)
 			return clampf(float(value), float(row["min"]), float(row["max"]))
 		"enum":
 			var s: String = String(value)

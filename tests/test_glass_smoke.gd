@@ -90,8 +90,8 @@ func _run() -> void:
 		"the strip's own summary is ASCII but for the owner's marks")
 	check(summary.contains("HEAD") and summary.contains("BODY"),
 		"the summary names both figures")
-	check(summary.contains(KingWen.zh(int(store.head_bits()))),
-		"and carries the owner's own character for the HEAD figure")
+	check(summary.contains(KingWen.name(int(store.head_bits()))),
+		"and carries the owner's own name for the HEAD figure")
 	check(summary.contains(Hud3.MOON) and summary.contains(Hud3.SUN),
 		"and marks them with the owner's moon and sun")
 

@@ -27,7 +27,7 @@ import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
-const val PLUGIN_VERSION = "ixmnn/1"
+const val PLUGIN_VERSION = "ixmnn/2"
 
 /**
  * MNN runtime host for MnnRuntime (scripts/brain/mnn_runtime.gd).
@@ -60,6 +60,9 @@ class IxMnn(godot: Godot) : GodotPlugin(godot), SensorEventListener {
 	override fun getPluginSignals(): Set<SignalInfo> = setOf(
 		SignalInfo("chat_token", String::class.java),
 		SignalInfo("chat_done", String::class.java),
+		// The reasoning half of a streamed turn, said once when the turn ends.
+		// `chat_done` still carries the speech alone, exactly as it always did.
+		SignalInfo("chat_thought", String::class.java),
 		SignalInfo("chat_fault", String::class.java),
 		SignalInfo("mic_partial", String::class.java),
 		SignalInfo("mic_result", String::class.java),
@@ -203,6 +206,8 @@ class IxMnn(godot: Godot) : GodotPlugin(godot), SensorEventListener {
 				IxMnnNative.tokenSink = null
 				streaming.set(false)
 				fault?.let { emitSignal("chat_fault", it) }
+				val thought = thinkPart(reply)
+				if (thought.isNotEmpty()) emitSignal("chat_thought", thought)
 				emitSignal("chat_done", reply)
 			}
 		}
@@ -211,6 +216,78 @@ class IxMnn(godot: Godot) : GodotPlugin(godot), SensorEventListener {
 
 	@UsedByGodot
 	fun chat_streaming(): Boolean = streaming.get()
+
+	/** The `<think>...</think>` block of a reply, or "" when it has none. */
+	private fun thinkPart(reply: String): String {
+		val b = reply.indexOf("<think>")
+		if (b < 0) return ""
+		val e = reply.indexOf("</think>", b)
+		val inner = if (e < 0) reply.substring(b + 7) else reply.substring(b + 7, e)
+		return inner.trim()
+	}
+
+	// --- THE ENGINE SURFACE: TOKENIZER, SAMPLING, PERF & CONTEXT -------------
+	//
+	// Everything here is MNN's own `llm.hpp` handed through: the tokenizer, the
+	// chat template, the sampling config, the per-turn counters and the kv-cache
+	// window. None of it loads anything; all of it needs a loaded chat session,
+	// and every one answers a safe empty when there is none.
+
+	/** Encodes a prompt into model token ids. Empty when no chat is loaded. */
+	@UsedByGodot
+	fun tokenize(text: String): IntArray {
+		if (chatHandle == 0L) return IntArray(0)
+		return onWorker(IntArray(0)) { IxMnnNative.nativeTokenize(chatHandle, text) }
+	}
+
+	/** Decodes one token id back to its piece of text. */
+	@UsedByGodot
+	fun detokenize(tokenId: Int): String {
+		if (chatHandle == 0L) return ""
+		return onWorker("") { IxMnnNative.nativeDetokenize(chatHandle, tokenId) }
+	}
+
+	/**
+	 * Last turn's telemetry as a JSON object -- `prompt_len`, `gen_seq_len`,
+	 * `all_seq_len`, `prefill_us`, `decode_us`, `status`. JSON rather than a
+	 * Dictionary because a JNISingleton's marshalling has no map of mixed types
+	 * and a seven-call surface for seven numbers would be worse.
+	 */
+	@UsedByGodot
+	fun get_perf(): String {
+		if (chatHandle == 0L) return "{}"
+		return onWorker("{}") { IxMnnNative.nativeGetPerf(chatHandle) }
+	}
+
+	/** Temperature / top-p / repetition penalty, pushed into MNN's own config. */
+	@UsedByGodot
+	fun set_sampling(temperature: Float, topP: Float, repetitionPenalty: Float): Boolean {
+		if (chatHandle == 0L) return false
+		return onWorker(false) {
+			IxMnnNative.nativeSetSampling(chatHandle, temperature, topP, repetitionPenalty)
+		}
+	}
+
+	/** Tokens of kv-cache history the session is currently carrying. */
+	@UsedByGodot
+	fun get_history_count(): Int {
+		if (chatHandle == 0L) return 0
+		return onWorker(0) { IxMnnNative.nativeHistoryCount(chatHandle) }
+	}
+
+	/** Drops the window [begin, end) out of the kv-cache. */
+	@UsedByGodot
+	fun trim_history(begin: Int, end: Int): Boolean {
+		if (chatHandle == 0L) return false
+		return onWorker(false) { IxMnnNative.nativeEraseHistory(chatHandle, begin, end) }
+	}
+
+	/** Wraps a prompt in the model's own chat template. */
+	@UsedByGodot
+	fun apply_template(prompt: String): String {
+		if (chatHandle == 0L) return ""
+		return onWorker("") { IxMnnNative.nativeApplyTemplate(chatHandle, prompt) }
+	}
 
 	// --- Q6: the six-bit cube -------------------------------------------------
 	//

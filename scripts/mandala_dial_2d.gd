@@ -82,23 +82,42 @@ func _draw() -> void:
 	draw_circle(dial_center, aura_r, Color(0.2, 0.65, 0.9, 0.12 + 0.1 * breath))
 	draw_arc(dial_center, aura_r, 0, TAU, 32, Color(0.3, 0.8, 1.0, 0.3 + 0.35 * breath), 1.5, true)
 
-	# Central Human Symbol (Active Habit Trigram Glyph & Caption)
+	# Central Trigram Display (Human Mind & Intent Trigram + Selected Hexagram)
+	var cur_hex: Dictionary = HuohoutuData.get_head_hex(current_hex_index)
+	var hex_bits: int = int(cur_hex.get("bits", 0))
+	var hex_num: int = int(cur_hex.get("id", 1))
+	var hex_name: String = String(cur_hex.get("name", ""))
+	var active_tri: int = active_human_trigram if active_human_trigram in HUMAN_STATION_TRIGRAMS else (hex_bits & 7)
+	var tri_name: String = KingWen.trigram_name(active_tri)
+
+	# Draw the 3 Trigram Lines (line 0 bottom, line 1 middle, line 2 top)
+	var lw: float = 38.0
+	for i in range(3):
+		var ly: float = dial_center.y + float(1 - i) * 10.0 - 2.0
+		var is_yang: bool = ((active_tri >> i) & 1) == 1
+		if is_yang:
+			draw_line(Vector2(dial_center.x - lw * 0.5, ly), Vector2(dial_center.x + lw * 0.5, ly), Color(1.0, 0.84, 0.32, 0.98), 2.5)
+		else:
+			var half: float = (lw - 8.0) * 0.5
+			draw_line(Vector2(dial_center.x - lw * 0.5, ly), Vector2(dial_center.x - lw * 0.5 + half, ly), Color(0.35, 0.85, 1.0, 0.95), 2.5)
+			draw_line(Vector2(dial_center.x + lw * 0.5 - half, ly), Vector2(dial_center.x + lw * 0.5, ly), Color(0.35, 0.85, 1.0, 0.95), 2.5)
+
 	var font: Font = get_theme_default_font()
 	if font != null:
-		var header: String = "HEAD · MIND & INTENT"
-		var hw: float = font.get_string_size(header, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9).x
-		draw_string(font, dial_center + Vector2(-hw * 0.5, -hub_r * 0.42), header,
-			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9, Color(0.65, 0.88, 1.0, 0.95))
+		var header: String = "TRIGRAM · %s" % tri_name.to_upper()
+		var hw: float = font.get_string_size(header, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8).x
+		draw_string(font, dial_center + Vector2(-hw * 0.5, -hub_r * 0.44), header,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8, Color(0.7, 0.9, 1.0, 0.95))
 		
-		var job: String = "THOUGHT ENGINE"
-		var jw: float = font.get_string_size(job, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 11).x
-		draw_string(font, dial_center + Vector2(-jw * 0.5, 4.0), job,
-			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 11, Color(1.0, 0.85, 0.35, 0.98))
+		var sub: String = "HEAD #%d %s" % [hex_num, hex_name]
+		var sw: float = font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9).x
+		draw_string(font, dial_center + Vector2(-sw * 0.5, hub_r * 0.42), sub,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9, Color(1.0, 0.85, 0.35, 0.98))
 		
-		var sub: String = "[ TAP TO INQUIRE ]"
-		var sw: float = font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8).x
-		draw_string(font, dial_center + Vector2(-sw * 0.5, hub_r * 0.54), sub,
-			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8, Color(0.55, 0.78, 0.95, 0.8))
+		var inq: String = "[ TAP TO INQUIRE ]"
+		var iw: float = font.get_string_size(inq, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 7).x
+		draw_string(font, dial_center + Vector2(-iw * 0.5, hub_r * 0.68), inq,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 7, Color(0.5, 0.72, 0.9, 0.75))
 
 func _gui_input(event: InputEvent) -> void:
 	var is_press: bool = false

@@ -121,7 +121,7 @@ func _on_character_line_opened(line: int) -> void:
 		"line": line - 1,
 		"to_yang": true,
 		"reason": meta.get("transmitter", "open"),
-		"when": Time.get_ticks_msec()
+		"when": Clock.now_ms()
 	})
 
 
@@ -131,7 +131,7 @@ func _on_character_line_closed(line: int) -> void:
 		"line": line - 1,
 		"to_yang": false,
 		"reason": meta.get("transmitter", "closed"),
-		"when": Time.get_ticks_msec()
+		"when": Clock.now_ms()
 	})
 
 
@@ -183,7 +183,7 @@ func note_seat(seat: int, c: Dictionary) -> void:
 			## The old name of this same announcement, for readers written
 			## before the bus was general. Alchemy listens on ONE of the two.
 			cast_landed.emit(n)
-			if not _body_claimed:
+			if not _body_claimed or c.get("source", "") in ["tap", "wheel", "manual"]:
 				set_body(n)
 
 

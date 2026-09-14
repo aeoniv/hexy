@@ -20,16 +20,16 @@ signal bandwidth_changed(id: String, quality: String)
 signal probe_done(id: String, dir: String, bytes: float, seconds: float)
 
 ## THE HANDSHAKE IS NO LONGER SPELLED HERE. `scripts/seam.gd` is still what
-## runs it; the adapter below is what calls it, with the NEEDS on the next line.
+## runs it; the adapter below is what calls it, with the REQUIRES on the next line.
 ## THE AAR THIS SCRIPT WAS WRITTEN AGAINST. Compared with the plugin's own
 ## `plugin_version()` at attach; see `scripts/seam.gd` for why a mismatch is
 ## worth a loud line and a degrade rather than a shrug.
-const NEEDS := "ixmesh/1"
+const REQUIRES := "ixmesh/1"
 ## THE ONE DOOR TO IxMesh. Refactor R5.
 const MeshAdapterScript = preload("res://scripts/adapters/mesh_adapter.gd")
 
 var _android: Object = null
-var _door := MeshAdapterScript.new(NEEDS, "mesh", "nearby", "lan")
+var _door := MeshAdapterScript.new(REQUIRES, "mesh", "nearby", "lan")
 var force_lan: bool = false
 var _lan: LanMesh = null
 

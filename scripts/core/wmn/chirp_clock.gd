@@ -4,7 +4,7 @@ extends RefCounted
 ## A tiny NTP for a room full of phones.
 ##
 ## Two phones cannot compare figures cast "at the same moment" unless they
-## agree what the moment was, and `Time.get_ticks_msec()` is boot-relative, so
+## agree what the moment was, and `Clock.now_ms()` is boot-relative, so
 ## two devices in the same room differ by hours. This holds the single integer
 ## that reconciles them: `now_ms() == get_ticks_msec() + offset_ms()`.
 ##
@@ -64,7 +64,7 @@ func offset_ms() -> int:
 
 ## The room's clock. This is the number every cast is stamped with.
 func now_ms() -> int:
-	return Time.get_ticks_msec() + offset_ms()
+	return Clock.now_ms() + offset_ms()
 
 
 ## How far apart the samples are — a rough confidence. 0 with fewer than two.

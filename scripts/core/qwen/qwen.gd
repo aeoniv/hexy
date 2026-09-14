@@ -181,7 +181,7 @@ func ask(question: String) -> Signal:
 ## store has meanwhile come back to the figure we already answered, in which
 ## case there is nothing left to say.
 func thought() -> bool:
-	var now: int = Time.get_ticks_msec()
+	var now: int = Clock.now_ms()
 	if now - _last_thought_ms < COOLDOWN_MS:
 		_owe(COOLDOWN_MS - (now - _last_thought_ms))
 		return false
@@ -191,7 +191,7 @@ func thought() -> bool:
 
 func _speak() -> void:
 	_owed = false
-	_last_thought_ms = Time.get_ticks_msec()
+	_last_thought_ms = Clock.now_ms()
 	_spoken_key = _figure_key()
 	_thoughts += 1
 	thought_started.emit(THOUGHT_QUESTION)
