@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hexy: Minimal MNN + Qwen + I-Ching (Pure vs Enhanced Benchmark Studio)</title>
+  <title>Hexy: MNN + Qwen + I-Ching + Fly Organism Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -870,8 +870,8 @@
 
   <header>
     <div class="header-title">
-      <h1>Hexy C++ Native & Alibaba MNN Full Engine Studio</h1>
-      <p>Pan/Zoom Architecture UML, TokenStream Filters & MNN C++ Deep-Dive (Transformer, KV-Cache, Sampler)</p>
+      <h1>Hexy Engine & Organism Studio</h1>
+      <p>MNN C++ deep-dive (Transformer, KV-Cache, Sampler), I-Ching cybernetics, and the fly organism that now feeds the three dials at 60 Hz</p>
     </div>
     <div class="header-badges">
       <button class="btn" id="tutorialBtn" onclick="toggleTutorial()" style="background: linear-gradient(135deg, #f59e0b, #ea580c); color: #fff; border-color: #fcd34d; font-weight: 700; box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);">
@@ -879,7 +879,7 @@
       </button>
       <div class="badge-status">
         <span class="badge-dot"></span>
-        <span id="headerStatus">MNN 3.6.1 / C++ LLM ENGINE</span>
+        <span id="headerStatus">MNN 3.6.1 / QWEN / FLY BRAIN v4fa1f18</span>
       </div>
     </div>
   </header>
@@ -920,6 +920,7 @@
           <button class="tab-btn engine-tab" id="tab5" onclick="switchTab(5)">6. Sampler & Logits Pipeline</button>
           <button class="tab-btn engine-tab" id="tab6" onclick="switchTab(6)" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.14); box-shadow: 0 0 10px rgba(251, 191, 36, 0.2);">7. 🎓 Educational Lab & Math Sandbox</button>
           <button class="tab-btn engine-tab" id="tab7" onclick="switchTab(7)" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.45); background: rgba(56, 189, 248, 0.14); box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);">8. ☯ Pure vs Enhanced Benchmark & Cybernetics</button>
+          <button class="tab-btn engine-tab" id="tab8" onclick="switchTab(8)" style="color: #fb923c; border-color: rgba(251, 146, 60, 0.45); background: rgba(251, 146, 60, 0.14); box-shadow: 0 0 10px rgba(251, 146, 60, 0.2);">9. 🪰 Fly Organism (current state)</button>
         </div>
 
         <div class="zoom-toolbar">
@@ -1893,7 +1894,7 @@
 
     function switchTab(idx) {
       activeTab = idx;
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 9; i++) {
         const tab = document.getElementById(`tab${i}`);
         if (tab) {
           if (i === idx) tab.classList.add('active');
@@ -1915,6 +1916,10 @@
       else if (idx === 7) {
         mount.innerHTML = renderBenchmarkDualModeHtml();
         initBenchmarkStudio();
+      }
+      else if (idx === 8) {
+        mount.innerHTML = renderFlyOrganismHtml();
+        initFlyOrganism();
       }
 
       closePopover();
@@ -3729,6 +3734,245 @@
       renderFrame();
     }
 
+
+    // =========================================================================
+    // TAB 9: Fly Organism, the state of main after the fly-brain merge.
+    // Numbers are the ones the headless suites printed; device numbers are
+    // marked as targets. The radar is a JS port of the same math (8-wedge
+    // ring bump, six modulators, giant fiber decay) so it moves like the phone's.
+    // =========================================================================
+
+    const FLY_TRIGRAMS = ['乾 Heaven','兌 Lake','離 Fire','震 Thunder','巽 Wind','坎 Water','艮 Mountain','坤 Earth'];
+    const FLY_MODS = [
+      {k:'dopamine', l:'DA vigor', c:'#fbbf24'},
+      {k:'serotonin', l:'NPF food', c:'#4ade80'},
+      {k:'octopamine', l:'OA arousal', c:'#fb7185'},
+      {k:'gaba', l:'dFB rest', c:'#818cf8'},
+      {k:'acetylcholine', l:'ACh focus', c:'#22d3ee'},
+      {k:'coherence', l:'CX coherence', c:'#c084fc'},
+    ];
+    const FLY_STATUS = [
+      ['Fold addon into scripts/brain', 'done', '7 suites', '—'],
+      ['One FlyBrain owned by Character', 'done', 'test_fly_brain_wiring 35', '—'],
+      ['SensorOracle built and ticked by HexyApp', 'done 4fa1f18', 'test_fly_boot_wiring 9', 'radar needle must turn on device'],
+      ['DeviceProfile table, Fold 4 primary', 'done', 'test_device_profile 13', 'Fold 5/6 share the Fold 4 row'],
+      ['Prompt: one live state line, 428 chars', 'done', 'test_core_qwen 33', '—'],
+      ['Mushroom body learns from events', 'done', 'test_fly_memory 35', 'habit bias moves after 3 casts'],
+      ['FlyHash recall over GTE embeddings', 'done', 'recall@5 = 1.00, ~1 ms/hash', 'Qwen does not query it yet'],
+      ['Calcium radar in hud3, haptic startle', 'done', 'test_fly_outputs 36', 'buzz on a 10 cm drop'],
+      ['Mesh bio state 2 Hz, Kuramoto to swarm yaw', 'done', 'test_core_wmn 81', 'two phones, one room'],
+      ['Perf budget', 'measured x86', '365 µs feed, 163 KB', 'target 40 µs on device'],
+      ['APK from GitHub Actions', 'blocked', 'workflow written', 'no hosted runner assigned to any job'],
+      ['Native CSR connectome in ixmnn.so', 'not started', '—', 'needs a use case 256 KC cannot serve'],
+    ];
+
+    let flyAnimId = null;
+    let flyState = null;
+
+    function renderFlyOrganismHtml() {
+      const rows = FLY_STATUS.map(r => {
+        const col = r[1].startsWith('done') ? '#4ade80' : (r[1] === 'blocked' ? '#fb7185' : (r[1].startsWith('measured') ? '#fbbf24' : '#94a3b8'));
+        return `<tr>
+          <td style="padding:5px 8px; border-bottom:1px solid rgba(255,255,255,0.06);">${r[0]}</td>
+          <td style="padding:5px 8px; border-bottom:1px solid rgba(255,255,255,0.06); color:${col}; font-family:'JetBrains Mono'; font-size:0.7rem; white-space:nowrap;">${r[1]}</td>
+          <td style="padding:5px 8px; border-bottom:1px solid rgba(255,255,255,0.06); font-family:'JetBrains Mono'; font-size:0.7rem;">${r[2]}</td>
+          <td style="padding:5px 8px; border-bottom:1px solid rgba(255,255,255,0.06); color:var(--text-muted); font-size:0.72rem;">${r[3]}</td>
+        </tr>`;
+      }).join('');
+      const bars = FLY_MODS.map((m,i) => `
+        <div style="display:flex; align-items:center; gap:8px; font-size:0.7rem;">
+          <span style="width:92px; color:${m.c}; font-family:'JetBrains Mono';">${m.l}</span>
+          <div class="prob-bar-bg" style="flex:1;"><div id="flyBar${i}" class="prob-bar-fill" style="width:50%; background:${m.c};"></div></div>
+          <span id="flyBarV${i}" style="width:34px; text-align:right; font-family:'JetBrains Mono'; color:#fff;">.50</span>
+        </div>`).join('');
+      return `
+        <div class="bm-container">
+          <div class="edu-subnav" style="border-bottom: 1px solid rgba(251, 146, 60, 0.25);">
+            <span style="font-size: 0.74rem; font-weight: 700; color: #fb923c; margin-right: 4px;">FLY ORGANISM · main @ 4fa1f18:</span>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">16 senses → one FlyBrain → dials, ball, radar, haptic, mesh, Qwen. 60 Hz reflex, 2 Hz mesh, Qwen on ask.</span>
+          </div>
+
+          <div style="display:grid; grid-template-columns: 1.1fr 1fr; gap:14px; margin-top:10px;">
+            <div class="edu-card" style="border-color: rgba(251,146,60,0.3);">
+              <div class="edu-card-title" style="color:#fb923c;">Calcium radar (same math as fly_calcium_radar_2d.gd)</div>
+              <div style="display:flex; gap:12px; align-items:flex-start; margin-top:8px; flex-wrap:wrap;">
+                <canvas id="flyRadarCanvas" width="300" height="300" style="width:300px; height:300px; background: radial-gradient(circle, #0d1829 0%, #060913 90%); border-radius:50%; border:1px solid rgba(255,255,255,0.08);"></canvas>
+                <div style="flex:1; min-width:220px; display:flex; flex-direction:column; gap:6px;">
+                  ${bars}
+                  <div style="margin-top:6px; font-size:0.7rem; color:var(--text-muted);">yaw rate <span id="flyYawV" style="color:#fff; font-family:'JetBrains Mono';">0.00</span> rad/s</div>
+                  <input type="range" id="flyYaw" min="-2" max="2" step="0.05" value="0" style="width:100%; cursor:pointer;" oninput="flySetYaw(this.value)" />
+                  <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
+                    <button class="btn" onclick="flyDrop()" style="border-color:#fb7185; color:#fb7185; font-size:0.72rem;">Drop (0 g)</button>
+                    <button class="btn" onclick="flyCast()" style="border-color:#fbbf24; color:#fbbf24; font-size:0.72rem;">Cast (reward +1)</button>
+                    <button class="btn" onclick="flyStill()" style="border-color:#818cf8; color:#818cf8; font-size:0.72rem;">Still 2.5 s (Civil Fire)</button>
+                    <button class="btn" onclick="flyNight()" style="border-color:#94a3b8; color:#94a3b8; font-size:0.72rem;">Toggle night</button>
+                  </div>
+                  <div id="flyStateLine" style="margin-top:6px; font-size:0.7rem; font-family:'JetBrains Mono'; color:#e2e8f0; background:rgba(0,0,0,0.35); padding:6px 8px; border-radius:6px; border-left:3px solid #fb923c;">[state DA .55 OA .45 rest .50 | heading Heaven | phase day | startle 0]</div>
+                  <div style="font-size:0.68rem; color:var(--text-muted);">This exact line is what Qwen reads. Nothing else about the fly reaches the model.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="edu-card" style="border-color: rgba(251,146,60,0.3);">
+              <div class="edu-card-title" style="color:#fb923c;">One loop, three clocks</div>
+              <svg viewBox="0 0 420 330" style="width:100%; height:auto; margin-top:6px;" role="img" aria-label="Senses feed FlyBrain; FlyBrain drives dials, ball, radar, haptic, mesh and the Qwen state line; casts, substrate and peers feed back.">
+                <defs><marker id="flyArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#94a3b8"/></marker>
+                <marker id="flyArrowO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#fb923c"/></marker></defs>
+                <g font-family="Outfit, sans-serif" font-size="10.5" fill="#f8fafc">
+                  <rect x="10" y="60" width="110" height="60" rx="6" fill="rgba(15,23,42,0.9)" stroke="#38bdf8"/>
+                  <text x="65" y="78" text-anchor="middle" font-weight="700">sensor_oracle</text>
+                  <text x="65" y="93" text-anchor="middle" font-size="9" fill="#94a3b8">accel gyro lux battery</text>
+                  <text x="65" y="106" text-anchor="middle" font-size="9" fill="#94a3b8">thermal hour peers breath</text>
+
+                  <rect x="150" y="40" width="130" height="100" rx="6" fill="rgba(15,23,42,0.9)" stroke="#fb923c" stroke-width="1.5"/>
+                  <text x="215" y="58" text-anchor="middle" font-weight="700">Character.fly_brain</text>
+                  <text x="215" y="74" text-anchor="middle" font-size="9" fill="#94a3b8">giant fiber → ring → clock</text>
+                  <text x="215" y="87" text-anchor="middle" font-size="9" fill="#94a3b8">→ mushroom body 256 KC</text>
+                  <text x="215" y="100" text-anchor="middle" font-size="9" fill="#94a3b8">→ conductance 6×6 → needs</text>
+                  <text x="215" y="118" text-anchor="middle" font-size="9" fill="#fbbf24">to_q6_bias = .85 needs + .15 habit</text>
+                  <text x="215" y="131" text-anchor="middle" font-size="9" fill="#e2e8f0">get_fly_state() → one dict</text>
+
+                  <line x1="120" y1="90" x2="150" y2="90" stroke="#94a3b8" marker-end="url(#flyArrow)"/>
+                  <text x="135" y="84" text-anchor="middle" font-size="8" fill="#94a3b8">60 Hz</text>
+
+                  <g font-size="9.5">
+                    <rect x="310" y="20" width="100" height="24" rx="5" fill="rgba(15,23,42,0.9)" stroke="#4ade80"/><text x="360" y="36" text-anchor="middle">3 dials, one line/event</text>
+                    <rect x="310" y="52" width="100" height="24" rx="5" fill="rgba(15,23,42,0.9)" stroke="#4ade80"/><text x="360" y="68" text-anchor="middle">ball: head, breath, curl</text>
+                    <rect x="310" y="84" width="100" height="24" rx="5" fill="rgba(15,23,42,0.9)" stroke="#4ade80"/><text x="360" y="100" text-anchor="middle">calcium radar</text>
+                    <rect x="310" y="116" width="100" height="24" rx="5" fill="rgba(15,23,42,0.9)" stroke="#4ade80"/><text x="360" y="132" text-anchor="middle">haptic 120 ms</text>
+                    <rect x="310" y="148" width="100" height="24" rx="5" fill="rgba(15,23,42,0.9)" stroke="#4ade80"/><text x="360" y="164" text-anchor="middle">Wmn bio beat 2 Hz</text>
+                  </g>
+                  <line x1="280" y1="90" x2="310" y2="32" stroke="#94a3b8" marker-end="url(#flyArrow)"/>
+                  <line x1="280" y1="90" x2="310" y2="64" stroke="#94a3b8" marker-end="url(#flyArrow)"/>
+                  <line x1="280" y1="90" x2="310" y2="96" stroke="#94a3b8" marker-end="url(#flyArrow)"/>
+                  <line x1="280" y1="90" x2="310" y2="128" stroke="#94a3b8" marker-end="url(#flyArrow)"/>
+                  <line x1="280" y1="90" x2="310" y2="160" stroke="#94a3b8" marker-end="url(#flyArrow)"/>
+
+                  <rect x="150" y="200" width="260" height="44" rx="6" fill="rgba(15,23,42,0.9)" stroke="#c084fc"/>
+                  <text x="280" y="217" text-anchor="middle" font-weight="700">Qwen on MNN · on ask</text>
+                  <text x="280" y="233" text-anchor="middle" font-size="8.5" font-family="JetBrains Mono" fill="#e2e8f0">[state DA .82 OA .45 rest .14 | heading Thunder | phase dawn | startle 0]</text>
+                  <line x1="215" y1="140" x2="215" y2="200" stroke="#94a3b8" marker-end="url(#flyArrow)"/>
+                  <text x="240" y="172" font-size="8" fill="#94a3b8">organism_line(state)</text>
+
+                  <path d="M360 20 L360 8 L215 8 L215 40" fill="none" stroke="#fb923c" stroke-width="1.3" marker-end="url(#flyArrowO)"/>
+                  <text x="287" y="6" text-anchor="middle" font-size="8" fill="#fb923c">cast → store.note_cast → reward +1</text>
+                  <path d="M360 172 L360 290 L65 290 L65 120" fill="none" stroke="#fb923c" stroke-width="1.3" marker-end="url(#flyArrowO)"/>
+                  <text x="212" y="284" text-anchor="middle" font-size="8" fill="#fb923c">peers' headings → Kuramoto → store.swarm_yaw → gyro sample</text>
+                  <text x="20" y="150" font-size="8" fill="#fb923c">startle −1 · thermal −.6 · battery −.8 → memory</text>
+
+                  <rect x="10" y="200" width="120" height="44" rx="6" fill="rgba(15,23,42,0.9)" stroke="#94a3b8" stroke-dasharray="3 3"/>
+                  <text x="70" y="217" text-anchor="middle" font-weight="700" fill="#94a3b8">FlyHash + FlyRecall</text>
+                  <text x="70" y="232" text-anchor="middle" font-size="8.5" fill="#94a3b8">built, tested, not wired to Qwen</text>
+                  <line x1="130" y1="222" x2="150" y2="222" stroke="#94a3b8" stroke-dasharray="3 3"/>
+
+                  <text x="10" y="318" font-size="8.5" fill="#94a3b8">Civil Fire: 2.5 s still (5 s in Fold 4 flex) → one line toward balance · Martial Fire: kinetic ≥ .85 → lowest differing line flips, 3.5 s refractory</text>
+                </g>
+              </svg>
+            </div>
+          </div>
+
+          <div class="edu-card" style="margin-top:12px; border-color: rgba(251,146,60,0.3);">
+            <div class="edu-card-title" style="color:#fb923c;">Built vs verified</div>
+            <div style="overflow-x:auto; margin-top:6px;">
+              <table style="border-collapse:collapse; width:100%; font-size:0.76rem;">
+                <thead><tr style="color:var(--text-muted); font-size:0.66rem; text-transform:uppercase; letter-spacing:.06em;">
+                  <th style="text-align:left; padding:5px 8px;">Piece</th><th style="text-align:left; padding:5px 8px;">State</th><th style="text-align:left; padding:5px 8px;">Headless proof</th><th style="text-align:left; padding:5px 8px;">On-device gate</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+            <div style="margin-top:8px; font-size:0.7rem; color:var(--text-muted);">
+              Headless proofs ran on Godot 4.7.1 x86. Nothing in the right column has been observed on a Fold 4 or A22 yet. The first device report decides whether the 40 µs frame budget and the flex-mode gravity thresholds survive contact with hardware.
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function flyResetState() {
+      flyState = {
+        heading: 0, yaw: 0, act: new Array(8).fill(0.125),
+        mods: {dopamine:.55, serotonin:.5, octopamine:.45, gaba:.5, acetylcholine:.5, coherence:.3},
+        startle: 0, night: false, still: 0, habit: 0, t: 0, last: performance.now(),
+      };
+    }
+    function flySetYaw(v) { if (flyState) { flyState.yaw = parseFloat(v); document.getElementById('flyYawV').textContent = flyState.yaw.toFixed(2); } }
+    function flyDrop() { if (flyState) { flyState.startle = 1; flyState.mods.octopamine = Math.min(1, flyState.mods.octopamine + .25); flyState.mods.gaba *= .8; flyState.habit = Math.max(-1, flyState.habit - .3); } }
+    function flyCast() { if (flyState) { flyState.habit = Math.min(1, flyState.habit + .25); flyState.mods.dopamine = Math.min(1, flyState.mods.dopamine + .15); } }
+    function flyStill() { if (flyState) { flyState.still = 2.5; flyState.yaw = 0; document.getElementById('flyYaw').value = 0; document.getElementById('flyYawV').textContent = '0.00'; } }
+    function flyNight() { if (flyState) flyState.night = !flyState.night; }
+
+    function initFlyOrganism() {
+      if (flyAnimId) cancelAnimationFrame(flyAnimId);
+      flyResetState();
+      const canvas = document.getElementById('flyRadarCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const cx = 150, cy = 150;
+
+      function step(dt) {
+        const s = flyState;
+        s.t += dt;
+        s.heading += s.yaw * dt;
+        for (let i = 0; i < 8; i++) {
+          const wedge = i * Math.PI / 4;
+          const diff = Math.atan2(Math.sin(wedge - s.heading), Math.cos(wedge - s.heading));
+          const target = Math.exp(-0.8 * diff * diff) - 0.25;
+          s.act[i] += (target - s.act[i]) * Math.min(1, dt * 4);
+        }
+        const mx = Math.max(...s.act), mn = Math.min(...s.act);
+        s.mods.coherence = Math.max(0, Math.min(1, mx - mn));
+        s.startle = Math.max(0, s.startle - dt / 2);
+        if (s.still > 0) { s.still -= dt; s.mods.gaba = Math.min(1, s.mods.gaba + dt * .08); s.mods.octopamine = Math.max(0, s.mods.octopamine - dt * .06); }
+        s.mods.octopamine += (Math.min(1, .35 + Math.abs(s.yaw) * .25 + s.startle * .3) - s.mods.octopamine) * dt * .8;
+        const gabaTarget = s.night ? .85 : .45;
+        s.mods.gaba += (gabaTarget - s.mods.gaba) * dt * .3;
+        s.mods.dopamine += ((s.night ? .35 : .55) + s.habit * .2 - s.mods.dopamine) * dt * .4;
+        s.mods.acetylcholine += ((.4 + Math.abs(s.yaw) * .2) - s.mods.acetylcholine) * dt * .6;
+        s.mods.serotonin += (.5 - s.mods.serotonin) * dt * .1;
+      }
+
+      function draw() {
+        const s = flyState;
+        ctx.clearRect(0, 0, 300, 300);
+        for (let i = 0; i < 8; i++) {
+          const a0 = i * Math.PI / 4 - Math.PI / 8 - Math.PI / 2, a1 = a0 + Math.PI / 4;
+          const v = Math.max(0, Math.min(1, s.act[i] + .25));
+          ctx.beginPath(); ctx.arc(cx, cy, 140, a0, a1); ctx.arc(cx, cy, 112, a1, a0, true); ctx.closePath();
+          ctx.fillStyle = `rgba(251,146,60,${0.08 + v * 0.7})`; ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.stroke();
+          const am = (a0 + a1) / 2;
+          ctx.fillStyle = '#e2e8f0'; ctx.font = '10px Outfit'; ctx.textAlign = 'center';
+          ctx.fillText(FLY_TRIGRAMS[i].split(' ')[0], cx + Math.cos(am) * 126, cy + Math.sin(am) * 126 + 4);
+        }
+        ctx.beginPath(); ctx.arc(cx, cy, 100, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.stroke();
+        const h = s.heading - Math.PI / 2;
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(h) * 98, cy + Math.sin(h) * 98);
+        ctx.strokeStyle = s.startle > 0 ? `rgba(251,113,133,${0.5 + s.startle * 0.5})` : '#fbbf24'; ctx.lineWidth = 3; ctx.stroke(); ctx.lineWidth = 1;
+        FLY_MODS.forEach((m, i) => {
+          const a = -Math.PI / 2 + i * Math.PI / 3;
+          const v = s.mods[m.k];
+          ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * 14, cy + Math.sin(a) * 14);
+          ctx.lineTo(cx + Math.cos(a) * (14 + v * 70), cy + Math.sin(a) * (14 + v * 70));
+          ctx.strokeStyle = m.c; ctx.lineWidth = 6; ctx.stroke(); ctx.lineWidth = 1;
+          const el = document.getElementById('flyBar' + i), ev = document.getElementById('flyBarV' + i);
+          if (el) el.style.width = (v * 100).toFixed(0) + '%';
+          if (ev) ev.textContent = v.toFixed(2).replace(/^0/, '');
+        });
+        ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fillStyle = s.startle > 0 ? '#fb7185' : '#0f172a'; ctx.fill(); ctx.strokeStyle = '#fbbf24'; ctx.stroke();
+        const hdg = ((Math.round(s.heading / (Math.PI / 4)) % 8) + 8) % 8;
+        const two = x => x.toFixed(2).replace(/^0/, '');
+        const line = `[state DA ${two(s.mods.dopamine)} OA ${two(s.mods.octopamine)} rest ${two(s.mods.gaba)} | heading ${FLY_TRIGRAMS[hdg].split(' ')[1]} | phase ${s.night ? 'night' : 'day'} | startle ${s.startle > 0 ? two(s.startle) : '0'}${s.still > 0 ? ' | civil fire' : ''}]`;
+        const sl = document.getElementById('flyStateLine'); if (sl) sl.textContent = line;
+      }
+
+      function frame(now) {
+        if (!document.getElementById('flyRadarCanvas')) { flyAnimId = null; return; }
+        const dt = Math.min(0.1, (now - flyState.last) / 1000); flyState.last = now;
+        step(dt); draw();
+        flyAnimId = requestAnimationFrame(frame);
+      }
+      flyAnimId = requestAnimationFrame(frame);
+    }
     </script>
 </body>
 </html>
