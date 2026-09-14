@@ -341,10 +341,12 @@ static func free_storage_bytes() -> int:
 	var target: String = get_external_storage_dir()
 	if OS.get_name() != "Android":
 		target = OS.get_user_data_dir()
-	## BY WHICHEVER DOOR THE PLATFORM LEAVES OPEN. On Android a bare "df" is not
-	## on the exec PATH the app inherits, so the phone answered "unknown" while
-	## /system/bin/df sat right there and printed the number; the same lesson
-	## the meminfo read had to learn.
+	## BY WHICHEVER DOOR THE PLATFORM LEAVES OPEN, and on Android there is none:
+	## OS.execute() is not implemented there, so every path below returns -1 and
+	## the phone says free_storage=unknown. That is the honest answer, and the
+	## gate treats it as "not measured", never as a refusal -- a phone that will
+	## not say how full it is still gets to try. The paths still earn their keep
+	## on Linux and on the headless test runner.
 	for bin_path in ["df", "/system/bin/df", "/system/xbin/df", "/bin/df"]:
 		var out: Array = []
 		if OS.execute(bin_path, ["-k", target], out, false) == 0 and not out.is_empty():
