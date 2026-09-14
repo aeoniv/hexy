@@ -42,7 +42,7 @@ const STATUS_H: float = 54.0
 const HEAD_H: float = 300.0
 const EARTH_H: float = 300.0
 const COMPOSER_H: float = 54.0
-const BAND_GAP: int = 8
+const BAND_GAP: int = 14
 ## The left column the radar takes on a fold that is open, in pixels, and the
 ## two sizes the radar itself is given in its two placements.
 const RADAR_PANE_W: float = 300.0
@@ -214,6 +214,9 @@ func _ready() -> void:
 		pad.add_theme_constant_override("margin_" + side, 8)
 	root.add_child(pad)
 
+	var spine := AxisSpine.new(self)
+	pad.add_child(spine)
+
 	bands = VBoxContainer.new()
 	bands.name = "Bands"
 	bands.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -280,10 +283,8 @@ func _apply_radar_layout() -> void:
 		radar.radar_radius = 66.0
 		radar.ring_thickness = 15.0
 		radar.show_neuromodulators = false
-		radar.custom_minimum_size = Vector2(220.0, RADAR_DISC_H)
-		radar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-		bands.add_child(radar)
-		bands.move_child(radar, body_band.get_index() + 1)
+		radar.custom_minimum_size = Vector2.ZERO
+		radar_pane.add_child(radar)
 		pad.add_theme_constant_override("margin_left", 8)
 
 
@@ -747,8 +748,9 @@ func _on_earth_ring_tapped(slot: int) -> void:
 func _on_body_center_tapped() -> void:
 	var at: Vector2 = _hub_point(body)
 	var bb: int = _body_bits()
-	bubble.say("☀️ BODY (MACHINE PHYSICAL STATE)\n%s\nGeometry: %s | Civil Fire: %s\nStillness: %.1fs / 2.5s" % [
-		_figure_word(bb), _geometry_word(), _pacing_phrase(), _pacing_phrase()], at)
+	var still_s: float = float(_senses.stillness()) if (_senses != null and _senses.has_method("stillness")) else 0.0
+	bubble.say("☀️ BODY (MACHINE PHYSICAL STATE)\n%s\nGeometry: %s | Pacing: %s\nStillness: %.1fs / 2.5s" % [
+		_figure_word(bb), _geometry_word(), _pacing_phrase(), still_s], at)
 	if _creature != null and _creature.has_method("tap"):
 		_creature.tap(_to_stage(at))
 
@@ -815,6 +817,7 @@ func _on_mic_state(name_of: String) -> void:
 	mic_meter.visible = _mic_listening
 	if not _mic_listening:
 		mic_meter.value = 0.0
+	_refresh_status_strip(true)
 
 
 func _on_submitted(text: String) -> void:
@@ -882,9 +885,9 @@ func _process(_delta: float) -> void:
 ## number again: the phone latched at 22-24 FPS and stayed there. Now the
 ## sentence is composed four times a second and only assigned when it really
 ## changed, so a still screen shapes no text at all.
-func _refresh_status_strip() -> void:
+func _refresh_status_strip(force: bool = false) -> void:
 	var now: int = Time.get_ticks_msec()
-	if now - _status_at < STATUS_PERIOD_MS:
+	if not force and now - _status_at < STATUS_PERIOD_MS:
 		return
 	_status_at = now
 	var line: String = _status_line()
@@ -896,7 +899,7 @@ func _refresh_status_strip() -> void:
 ## duck-typed through the objects bind() handed over; the glass names no brain
 ## and no transport.
 func _feed_radar() -> void:
-	if radar == null or not radar.is_visible_in_tree():
+	if radar == null:
 		return
 	if _store != null and _store.has_method("get_character"):
 		var ch: Variant = _store.get_character()
@@ -1403,3 +1406,55 @@ func _earth_dict() -> Dictionary:
 	if _store != null and _store.get("earth") is Dictionary:
 		return _store.earth as Dictionary
 	return {}
+
+
+class AxisSpine extends Control:
+	var _hud: Node = null
+	func _init(h: Node) -> void:
+		_hud = h
+		name = "AxisSpine"
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	func _process(_delta: float) -> void:
+		queue_redraw()
+
+	func _draw() -> void:
+		if _hud == null:
+			return
+		var st: Control = _hud.get("status_panel")
+		var hd: Control = _hud.get("head")
+		var bd: Control = _hud.get("body_band")
+		var et: Control = _hud.get("earth")
+		var cp: Control = _hud.get("composer")
+		if st == null or hd == null or bd == null or et == null or cp == null:
+			return
+
+		var cx: float = size.x * 0.5
+		var col_glow := Color(0.12, 0.65, 0.95, 0.28)
+		var col_line := Color(0.25, 0.80, 1.0, 0.65)
+		var col_pip := Color(1.0, 0.85, 0.35, 0.95)
+
+		# Pairs of (upper_bottom_y, lower_top_y)
+		var gaps: Array = [
+			[st.position.y + st.size.y, hd.position.y],
+			[hd.position.y + hd.size.y, bd.position.y],
+			[bd.position.y + bd.size.y, et.position.y],
+			[et.position.y + et.size.y, cp.position.y]
+		]
+
+		for g in gaps:
+			var y0: float = float(g[0])
+			var y1: float = float(g[1])
+			if y1 > y0:
+				draw_line(Vector2(cx, y0), Vector2(cx, y1), col_glow, 4.0)
+				draw_line(Vector2(cx, y0), Vector2(cx, y1), col_line, 2.0)
+				var mid_y: float = (y0 + y1) * 0.5
+				# Draw diamond pip |
+				var pts: PackedVector2Array = [
+					Vector2(cx, mid_y - 4.0),
+					Vector2(cx + 3.0, mid_y),
+					Vector2(cx, mid_y + 4.0),
+					Vector2(cx - 3.0, mid_y)
+				]
+				draw_colored_polygon(pts, col_pip)

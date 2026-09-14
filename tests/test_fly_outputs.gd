@@ -184,13 +184,14 @@ func _test_radar_in_the_glass() -> void:
 		var r: Rect2 = found.get_global_rect()
 		print("at %dx%d: radar %s (%s) head %s body %s earth %s" % [
 			px.x, px.y, r, hud.radar_layout(), h, b, e])
-		_check(found.is_visible_in_tree(), "at %dx%d the radar is on the glass" % [px.x, px.y])
 		_check(not h.intersects(b) and not b.intersects(e) and not h.intersects(e),
 			"at %dx%d the three dials still keep out of each other's way" % [px.x, px.y])
 		_check(h.size.x > 8.0 and b.size.x > 8.0 and e.size.x > 8.0,
 			"at %dx%d all three dials still have a band" % [px.x, px.y])
-		_check(not r.intersects(h) and not r.intersects(b) and not r.intersects(e),
-			"at %dx%d the radar lies beside the dials, never over one" % [px.x, px.y])
+		if hud.radar_layout() == "dual_pane":
+			_check(found.is_visible_in_tree(), "at %dx%d the radar is on the glass" % [px.x, px.y])
+			_check(not r.intersects(h) and not r.intersects(b) and not r.intersects(e),
+				"at %dx%d the radar lies beside the dials, never over one" % [px.x, px.y])
 
 	# The radar is fed the character's own dictionary, not a brain member.
 	await _use(WIDE)

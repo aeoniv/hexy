@@ -89,6 +89,23 @@ const RD_CORDS: Array = [
 	[5, 10], [5, 11], [5, 12], [5, 13]
 ]
 
+# 12 congruent diamond rhombus facets forming the outer protective exoskeleton shell
+# Each rhombus quad alternates: axial vertex (0..5) -> cubic vertex (6..13) -> axial vertex -> cubic vertex
+const RD_FACES: Array = [
+	[0, 6, 2, 10],  # (+X, +Y)
+	[0, 8, 3, 12],  # (+X, -Y)
+	[1, 7, 2, 11],  # (-X, +Y)
+	[1, 9, 3, 13],  # (-X, -Y)
+	[0, 6, 4, 8],   # (+X, +Z)
+	[0, 10, 5, 12], # (+X, -Z)
+	[1, 7, 4, 9],   # (-X, +Z)
+	[1, 11, 5, 13], # (-X, -Z)
+	[2, 6, 4, 7],   # (+Y, +Z)
+	[2, 10, 5, 11], # (+Y, -Z)
+	[3, 8, 4, 9],   # (-Y, +Z)
+	[3, 12, 5, 13]  # (-Y, -Z)
+]
+
 # --- 3. RHOMBIC TRIACONTAHEDRON (32 vertices, 30 golden rhombus faces, 60 cords, 6 6D-axes) ---
 const RT_VERTICES: Array[Vector3] = [
 	Vector3(0.0, -0.52573, -0.85065),
@@ -586,7 +603,36 @@ func _update_geometry(anim_time: float) -> void:
 	# Render Translucent Rhombic Facets (for Rhombic Triacontahedron)
 	if face_immediate_mesh:
 		face_immediate_mesh.clear_surfaces()
-		if geometry_mode == GeometryMode.RHOMBIC_TRIACONTAHEDRON and tips.size() >= 32:
+		if geometry_mode == GeometryMode.RHOMBIC_DODECAHEDRON and tips.size() >= 14:
+			face_immediate_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+			var active_face_idx: int = (hexagram_bits % 12)
+			for f_idx in range(RD_FACES.size()):
+				var f: Array = RD_FACES[f_idx]
+				var p0: Vector3 = tips[f[0]]
+				var p1: Vector3 = tips[f[1]]
+				var p2: Vector3 = tips[f[2]]
+				var p3: Vector3 = tips[f[3]]
+				var is_active: bool = (f_idx == active_face_idx)
+				var face_col: Color
+				if is_active:
+					var f_pulse: float = sin(anim_time * 6.0) * 0.5 + 0.5
+					face_col = Color(0.1, 0.95, 0.5, 0.45).lerp(Color(0.2, 1.0, 0.8, 0.7), f_pulse)
+				else:
+					face_col = Color(0.06, 0.55, 0.32, 0.22)
+				face_immediate_mesh.surface_set_color(face_col)
+				face_immediate_mesh.surface_add_vertex(p0)
+				face_immediate_mesh.surface_set_color(face_col)
+				face_immediate_mesh.surface_add_vertex(p1)
+				face_immediate_mesh.surface_set_color(face_col)
+				face_immediate_mesh.surface_add_vertex(p2)
+				face_immediate_mesh.surface_set_color(face_col)
+				face_immediate_mesh.surface_add_vertex(p0)
+				face_immediate_mesh.surface_set_color(face_col)
+				face_immediate_mesh.surface_add_vertex(p2)
+				face_immediate_mesh.surface_set_color(face_col)
+				face_immediate_mesh.surface_add_vertex(p3)
+			face_immediate_mesh.surface_end()
+		elif geometry_mode == GeometryMode.RHOMBIC_TRIACONTAHEDRON and tips.size() >= 32:
 			face_immediate_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
 			
 			var active_face_idx: int = (hexagram_bits % 30)
