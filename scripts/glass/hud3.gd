@@ -112,6 +112,12 @@ const MIC_PHRASE: String = "MIC: listening"
 const MIC_RMS_FULL: float = 10.0
 const MARTIAL_THRESHOLD: float = 0.85
 
+## The strip is composed four times a second, not sixty.
+const STATUS_PERIOD_MS: int = 250
+
+var _status_at: int = 0
+var _pacing_consts: Dictionary = {}
+
 var layer: CanvasLayer = null
 var root: Control = null
 var ground: ColorRect = null
@@ -854,8 +860,26 @@ func _on_token(t: String) -> void:
 # -- refreshing --------------------------------------------------------------
 
 func _process(_delta: float) -> void:
-	status_label.text = _status_line()
+	_refresh_status_strip()
 	_feed_radar()
+
+
+## THE STRIP IS NOT A FRAME-RATE COUNTER FOR THE RENDERER TO CHASE. The strip
+## carries an FPS number, and a Label reshapes its whole line whenever the text
+## it is handed differs from the text it holds. Written every frame, the number
+## differed every frame the moment the phone left a flat 60, so the strip paid
+## a full text shaping on every frame, which cost frames, which moved the
+## number again: the phone latched at 22-24 FPS and stayed there. Now the
+## sentence is composed four times a second and only assigned when it really
+## changed, so a still screen shapes no text at all.
+func _refresh_status_strip() -> void:
+	var now: int = Time.get_ticks_msec()
+	if now - _status_at < STATUS_PERIOD_MS:
+		return
+	_status_at = now
+	var line: String = _status_line()
+	if line != status_label.text:
+		status_label.text = line
 
 
 ## ONE DICTIONARY A FRAME, and the swarm's headings beside it. Both are read
@@ -1042,8 +1066,13 @@ func _tier_phrase() -> String:
 func _threshold(key: String, fallback: float) -> float:
 	if _pacing == null:
 		return fallback
-	var map: Dictionary = _pacing.get_script_constant_map()
-	return float(map.get(key, fallback))
+	## ASKED ONCE, NOT FOUR TIMES A SECOND. get_script_constant_map() builds a
+	## fresh dictionary of every constant in Pacing on every call, and the strip
+	## called it twice each time it composed itself; it was the most expensive
+	## thing on the glass after the dials.
+	if _pacing_consts.is_empty():
+		_pacing_consts = _pacing.get_script_constant_map()
+	return float(_pacing_consts.get(key, fallback))
 
 
 # -- the two large views -----------------------------------------------------
