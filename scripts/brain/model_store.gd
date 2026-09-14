@@ -341,11 +341,16 @@ static func free_storage_bytes() -> int:
 	var target: String = get_external_storage_dir()
 	if OS.get_name() != "Android":
 		target = OS.get_user_data_dir()
-	var out: Array = []
-	if OS.execute("df", ["-k", target], out, false) == 0 and not out.is_empty():
-		var parsed: int = parse_df(String(out[0]))
-		if parsed >= 0:
-			return parsed
+	## BY WHICHEVER DOOR THE PLATFORM LEAVES OPEN. On Android a bare "df" is not
+	## on the exec PATH the app inherits, so the phone answered "unknown" while
+	## /system/bin/df sat right there and printed the number; the same lesson
+	## the meminfo read had to learn.
+	for bin_path in ["df", "/system/bin/df", "/system/xbin/df", "/bin/df"]:
+		var out: Array = []
+		if OS.execute(bin_path, ["-k", target], out, false) == 0 and not out.is_empty():
+			var parsed: int = parse_df(String(out[0]))
+			if parsed >= 0:
+				return parsed
 	return -1
 
 
