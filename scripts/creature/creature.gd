@@ -62,14 +62,15 @@ func _process(_delta: float) -> void:
 	if _store != null and _store.has_method("get_character"):
 		var ch: Variant = _store.get_character()
 		if ch != null and ball != null and ball.has_method("set_fly_brain_state"):
-			var cc: Variant = ch.get("central_complex")
-			var gf: Variant = ch.get("giant_fiber")
-			var nms: Dictionary = ch.get_neuromodulators() if ch.has_method("get_neuromodulators") else {}
-			var h_rad: float = float(cc.get("heading_rad")) if cc != null else 0.0
-			var oa_v: float = float(nms.get("octopamine", 0.5))
-			var da_v: float = float(nms.get("dopamine", 0.5))
-			var dfb_v: float = float(nms.get("gaba", 0.2))
-			var curl_v: float = float(gf.get("startle_intensity")) if (gf != null and gf.get("startle_intensity") != null) else 0.0
+			## ONE DICTIONARY, DUCK-TYPED. The creature knows no brain class and
+			## no subsystem member; it reads the fixed keys the character gives
+			## it, and if the character is too old to have them it stays still.
+			var fly: Dictionary = ch.get_fly_state() if ch.has_method("get_fly_state") else {}
+			var h_rad: float = float(fly.get("heading_rad", 0.0))
+			var oa_v: float = float(fly.get("octopamine", 0.5))
+			var da_v: float = float(fly.get("dopamine", 0.5))
+			var dfb_v: float = float(fly.get("gaba", 0.2))
+			var curl_v: float = float(fly.get("curl", 0.0))
 			ball.set_fly_brain_state(h_rad, oa_v, da_v, dfb_v, curl_v)
 
 

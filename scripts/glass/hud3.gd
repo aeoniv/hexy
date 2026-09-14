@@ -992,39 +992,40 @@ func brain_text() -> String:
 		var char_node: Variant = _store.get_character()
 		if char_node != null:
 			lines.append("-- DROSOPHILA CONNECTOME --")
-			var clock: Variant = char_node.get("circadian_clock")
-			if clock != null:
+			## ONE BRAIN, ONE DICTIONARY. The glass asks the character for the
+			## state of the fly and reads fixed keys; it never reaches inside a
+			## subsystem for a member that may or may not be spelled that way.
+			var fly: Dictionary = char_node.get_fly_state() if char_node.has_method("get_fly_state") else {}
+			if not fly.is_empty():
 				lines.append("circadian: %.1fh (%s) PDF: %.2f" % [
-					float(clock.get("simulated_hour")),
-					String(clock.call("get_phase_name")),
-					float(clock.get("pdf_level"))
+					float(fly.get("solar_hour", 12.0)),
+					String(fly.get("phase", "Day")),
+					float(fly.get("pdf", 0.0))
 				])
-			var cc: Variant = char_node.get("central_complex")
-			if cc != null:
-				lines.append("EB/PB compass: %.1f deg (align: %.2f)" % [
-					rad_to_deg(float(cc.get("heading_rad"))),
-					float(cc.get("target_alignment"))
+				lines.append("EB/PB compass: %.1f deg %s (align: %.2f, coherence: %.2f)" % [
+					rad_to_deg(float(fly.get("heading_rad", 0.0))),
+					String(fly.get("dominant_trigram", "")),
+					float(fly.get("target_alignment", 0.0)),
+					float(fly.get("coherence", 0.0))
 				])
-			var mb: Variant = char_node.get("mushroom_body")
-			if mb != null:
-				var kcs: Array = mb.call("get_active_kc_indices") as Array
-				lines.append("mushroom body: %d KCs active | habit: #%d" % [
-					kcs.size(),
-					int(mb.call("predict_habit_hexagram", kcs))
+				var habit: Array = (fly.get("habit_bias", []) as Array)
+				var habit_words: Array[String] = ([] as Array[String])
+				for h in habit:
+					habit_words.append("%+.2f" % float(h))
+				lines.append("mushroom body: %d KCs active | habit: %s" % [
+					int(fly.get("kc_count", 0)),
+					", ".join(habit_words)
 				])
-			var gf: Variant = char_node.get("giant_fiber")
-			if gf != null:
-				lines.append("giant fiber: startle %.2f (%s)" % [
-					float(gf.get("startle_intensity")),
-					"ESCAPING" if bool(gf.get("in_escape_mode")) else "calm"
+				lines.append("giant fiber: startle %.2f curl %.2f (%s)" % [
+					float(fly.get("startle", 0.0)),
+					float(fly.get("curl", 0.0)),
+					"ESCAPING" if bool(fly.get("is_startled", false)) else "calm"
 				])
-			if char_node.has_method("get_neuromodulators"):
-				var nms: Dictionary = char_node.get_neuromodulators()
 				lines.append("conductance: DA:%.2f OA:%.2f 5HT:%.2f ACh:%.2f" % [
-					float(nms.get("dopamine", 0.0)),
-					float(nms.get("octopamine", 0.0)),
-					float(nms.get("serotonin", 0.0)),
-					float(nms.get("acetylcholine", 0.0))
+					float(fly.get("dopamine", 0.0)),
+					float(fly.get("octopamine", 0.0)),
+					float(fly.get("serotonin", 0.0)),
+					float(fly.get("acetylcholine", 0.0))
 				])
 	if _mnn == null:
 		lines.append("no model is attached")

@@ -69,9 +69,7 @@ const MOOD_STEADY := "steady"
 const MOOD_QUIET := "quiet"
 const MOOD_SLUGGISH := "sluggish"
 
-const FlyMushroomBodyScript := preload("res://scripts/brain/fly_mushroom_body.gd")
-const FlyGiantFiberScript := preload("res://scripts/brain/fly_giant_fiber.gd")
-const FlyCircadianClockScript := preload("res://scripts/brain/fly_circadian_clock.gd")
+const FlyBrainScript := preload("res://scripts/brain/fly_brain.gd")
 
 var _fullness: Array[float] = [0.6, 0.6, 0.6, 0.6, 0.6, 0.0]
 var _last_tick_ms := -1
@@ -79,16 +77,58 @@ var _was_open: Array[bool] = [true, true, true, true, true, false]
 var _last_spoke_ms := -1
 var enable_connectome_coupling: bool = true
 
-var mushroom_body: RefCounted = null
-var giant_fiber: RefCounted = null
-var circadian_clock: RefCounted = null
+## THE ONE BRAIN. Built here, stepped by whoever owns the sample loop, and read
+## by everybody through get_fly_state(). The three names below are kept as
+## read-only windows onto it so that nothing that used to reach for
+## character.mushroom_body has to learn a new word.
+var fly_brain: RefCounted = null
+
+var mushroom_body: RefCounted:
+	get:
+		return fly_brain.mushroom_body if fly_brain != null else null
+
+var giant_fiber: RefCounted:
+	get:
+		return fly_brain.giant_fiber if fly_brain != null else null
+
+var circadian_clock: RefCounted:
+	get:
+		return fly_brain.circadian_clock if fly_brain != null else null
+
+var central_complex: RefCounted:
+	get:
+		return fly_brain.central_complex if fly_brain != null else null
 
 
 func _init() -> void:
-	mushroom_body = FlyMushroomBodyScript.new()
-	giant_fiber = FlyGiantFiberScript.new()
-	circadian_clock = FlyCircadianClockScript.new()
-	giant_fiber.startled.connect(_on_giant_fiber_startled)
+	fly_brain = FlyBrainScript.new()
+	fly_brain.startled.connect(_on_giant_fiber_startled)
+
+
+## One sensory sample, one step of the whole fly brain.
+func feed_senses(sample: Dictionary, dt_sec: float) -> void:
+	if fly_brain != null:
+		fly_brain.feed(sample, dt_sec)
+
+
+## The six needs under their transmitter names, for anyone reading the brain.
+func get_neuromodulators() -> Dictionary:
+	return {
+		"dopamine": _fullness[LINE_BODY],
+		"npf": _fullness[LINE_FOOD],
+		"octopamine": _fullness[LINE_BREATH],
+		"gaba": _fullness[LINE_REST],
+		"serotonin": _fullness[LINE_REST],
+		"acetylcholine": _fullness[LINE_FOCUS],
+		"fruitless": _fullness[LINE_CONNECTION],
+	}
+
+
+## The whole readable brain state plus the six neuromodulators, one dictionary.
+func get_fly_state() -> Dictionary:
+	var out: Dictionary = fly_brain.state() if fly_brain != null else {}
+	out.merge(get_neuromodulators(), true)
+	return out
 
 
 func _on_giant_fiber_startled(intensity: float, _reason: String) -> void:

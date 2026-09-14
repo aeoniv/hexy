@@ -89,16 +89,29 @@ var last_haptic_time: float = 0.0
 var current_machine_tri: int = 7 # Heaven
 var current_human_tri: int = 7   # Heaven
 
-const FlyCentralComplexScript := preload("res://scripts/brain/fly_central_complex.gd")
-const FlyGiantFiberScript := preload("res://scripts/brain/fly_giant_fiber.gd")
+## THE ORACLE OWNS NO BRAIN. It used to build its own central complex and its
+## own giant fiber, step those, and leave the character's copies cold -- so the
+## glass read one brain while a different one did the living. Now the oracle
+## only builds the sample and hands it to the single brain the character owns.
+var store: Node = null
 
-var central_complex: RefCounted = null
-var giant_fiber: RefCounted = null
+## Latest 16-input sense vector, kept so a reader can see what was projected.
+var last_sense_vector: PackedFloat32Array = PackedFloat32Array()
+
+## Live extras, when the phone has them. Neutral 0.5 when it does not.
+var current_thermal: float = -1.0
+var current_peer_count: int = 0
+var current_breath_rate: float = -1.0
+
+
+## The oracle is handed the store; it reaches for nothing on its own.
+func bind(s: Node) -> void:
+	store = s
 
 
 func _ready() -> void:
-	central_complex = FlyCentralComplexScript.new()
-	giant_fiber = FlyGiantFiberScript.new()
+	last_sense_vector.resize(16)
+	last_sense_vector.fill(0.0)
 	anchor_grav = Vector3(0.0, -9.8, 0.0)
 	filtered_grav = anchor_grav
 	var time_dict = Time.get_time_dict_from_system()
@@ -169,21 +182,11 @@ func _process(delta: float) -> void:
 		
 	_sample_hardware_extensions()
 	
-	if giant_fiber != null:
-		giant_fiber.step(delta, raw_acc)
-	
-	if central_complex != null:
-		central_complex.step(delta, filtered_gyro.z, 0.015)
-		# Stimulus injection from machine and human trigram attractors
-		var stim := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-		if current_machine_tri >= 0 and current_machine_tri < 8:
-			stim[current_machine_tri] += 0.5
-		if current_human_tri >= 0 and current_human_tri < 8:
-			stim[current_human_tri] += 0.5
-		central_complex.inject_stimulus(stim, delta * 0.3)
-	
 	var time_dict = Time.get_time_dict_from_system()
 	solar_hour = float(time_dict.get("hour", 12)) + float(time_dict.get("minute", 0)) / 60.0
+
+	# ONE BRAIN, ONE STEP, ONCE A TICK.
+	_feed_fly_brain(delta, raw_acc)
 
 	# 2. Coin toss divination
 	if jerk > shake_threshold:
@@ -437,6 +440,53 @@ func _execute_coin_toss_cast() -> void:
 	step_mutation_count = 0
 	Input.vibrate_handheld(45)
 	shake_cast_completed.emit(-1, primary_moving, bits)
+
+
+## The 16 cybernetic senses, as one flat vector for the mushroom body:
+## 8 machine substrate readings, then 8 human activity readings.
+func build_sense_vector() -> PackedFloat32Array:
+	var v := PackedFloat32Array()
+	v.resize(16)
+	v[0] = clampf(current_lux / 1000.0, 0.0, 1.0)
+	v[1] = clampf(current_battery / 100.0, 0.0, 1.0)
+	v[2] = clampf(solar_hour / 24.0, 0.0, 1.0)
+	v[3] = clampf(kinetic_excitation, 0.0, 1.0)
+	v[4] = clampf(absf(filtered_grav.x) / 9.8, 0.0, 1.0)
+	v[5] = clampf(absf(filtered_grav.y) / 9.8, 0.0, 1.0)
+	v[6] = clampf(absf(filtered_grav.z) / 9.8, 0.0, 1.0)
+	v[7] = clampf(filtered_jerk / 5.0, 0.0, 1.0)
+	v[8] = clampf(float(current_machine_tri) / 7.0, 0.0, 1.0)
+	v[9] = clampf(float(current_human_tri) / 7.0, 0.0, 1.0)
+	v[10] = clampf(current_heading_deg / 360.0, 0.0, 1.0)
+	v[11] = 1.0 if is_flex_mode_tabletop() else 0.0
+	v[12] = clampf(current_proximity / 5.0, 0.0, 1.0)
+	# The three that used to be a constant 0.5 apiece.
+	v[13] = clampf(current_thermal / 60.0, 0.0, 1.0) if current_thermal >= 0.0 else 0.5
+	v[14] = clampf(float(current_peer_count) / 8.0, 0.0, 1.0)
+	v[15] = clampf(current_breath_rate / 30.0, 0.0, 1.0) if current_breath_rate >= 0.0 else 0.5
+	last_sense_vector = v
+	return v
+
+
+## Builds the sample dictionary the fly brain reads.
+func build_brain_sample(raw_acc: Vector3) -> Dictionary:
+	return {
+		"accel": raw_acc,
+		"gyro_yaw_rate": filtered_gyro.z,
+		"solar_hour": solar_hour,
+		"heading_deg": current_heading_deg,
+		"senses": build_sense_vector(),
+		"peers": current_peer_count,
+	}
+
+
+func _feed_fly_brain(delta: float, raw_acc: Vector3) -> void:
+	if store == null or not store.has_method("get_character"):
+		return
+	var ch: Variant = store.get_character()
+	if ch == null or not ch.has_method("feed_senses"):
+		return
+	ch.feed_senses(build_brain_sample(raw_acc), delta)
 
 
 func get_moon_phase() -> Dictionary:
