@@ -9,6 +9,16 @@ extends Control
 ##   - Real-time fluorescent glow proportional to wedge activity.
 ##   - Heading vector pointer (P-EN heading angle).
 ##   - 6 Neuromodulatory spectrum bars (DA, NPF, OA, dFB, CX, Fru).
+##
+## THE ROOM LIVES INSIDE THE RING. This is also the swarm radar wmn needs: the
+## disc the needle sweeps is the peer field, you at the centre, three rings for
+## the three proximity classes the transport can honestly report (touch / room /
+## far), one blip per peer the fabric has heard from. Inside and outside share
+## ONE frame: the needle is your fly heading, a blip's angle is that peer's fly
+## heading (the fact we already hold) until a nav door hands a real bearing in
+## through `set_peer_bearings`, at which point the same blip moves to where the
+## person actually is and grows a nose. Nothing is invented: a peer with no
+## proximity yet parks on the default "room" ring, as the LAN backend rules.
 
 const TRIGRAM_NAMES := ["坤 ☷", "艮 ☶", "坎 ☵", "巽 ☴", "震 ☳", "离 ☲", "兑 ☱", "乾 ☰"]
 const NEURO_NAMES := ["DA (Body)", "NPF (Food)", "OA (Breath)", "dFB (Rest)", "CX (Focus)", "Fru (Conn)"]
@@ -35,8 +45,25 @@ var _coherence: float = 0.0
 var _startled: bool = false
 var _activity: PackedFloat32Array = PackedFloat32Array()
 var _mods: PackedFloat32Array = PackedFloat32Array()
-## fabric peer id -> their heading in radians. Drawn as ticks on the outer ring.
+const Identity := preload("res://scripts/social/identity.gd")
+
+## fabric peer id -> their heading in radians. Places the blip until a bearing exists.
 var _peers: Dictionary = {}
+## fabric peer id -> "touch" / "room" / "far", as the transport reported it.
+var _proximity: Dictionary = {}
+## fabric peer id -> bearing from us in radians, allocentric. Empty until a
+## nav add-on opens the compass door; then it wins over the fly heading.
+var _bearings: Dictionary = {}
+
+const CLS_TOUCH := "touch"
+const CLS_ROOM := "room"
+const CLS_FAR := "far"
+const DEFAULT_CLASS := CLS_ROOM
+## Ring radius as a fraction of the disc inside the wedge track.
+const RING_FRAC := {"touch": 0.30, "room": 0.56, "far": 0.82}
+const RING_ORDER: Array[String] = ["touch", "room", "far"]
+const PEER_RING_COLOR := Color(0.30, 0.52, 0.48, 0.35)
+const BLIP_R_FRAC := 0.075
 
 @export var radar_radius: float = 72.0
 @export var ring_thickness: float = 18.0
@@ -104,6 +131,56 @@ func peer_heading_count() -> int:
 	return _peers.size()
 
 
+## fabric peer id -> proximity class, as MeshFabric.peer_proximity_by_src keeps it.
+func set_peer_proximity(classes: Dictionary) -> void:
+	_proximity = classes.duplicate()
+
+
+func note_proximity(id: String, cls: String) -> void:
+	_proximity[id] = cls if RING_FRAC.has(cls) else DEFAULT_CLASS
+
+
+## fabric peer id -> allocentric bearing in radians. The nav door's gift.
+func set_peer_bearings(bearings: Dictionary) -> void:
+	_bearings = bearings.duplicate()
+
+
+func drop_peer(id: String) -> void:
+	_peers.erase(id)
+	_proximity.erase(id)
+	_bearings.erase(id)
+
+
+static func ring_frac(cls: String) -> float:
+	return float(RING_FRAC.get(cls, RING_FRAC[DEFAULT_CLASS]))
+
+
+## The disc the peers live in: everything inside the wedge track, minus a gap.
+func field_radius() -> float:
+	return maxf(8.0, radar_radius - ring_thickness * 0.5 - 6.0)
+
+
+## WHERE EVERY PEER STANDS, pure of drawing so a test can read it. id ->
+## {angle: rad, frac: 0..1 of field_radius, cls, bearing: bool}. A peer known
+## only by proximity (no pulse yet) is still plotted, at angle 0 -- silence
+## about direction is not a reason to hide a person.
+func peer_plots() -> Dictionary:
+	var out := {}
+	var ids := {}
+	for id in _peers:
+		ids[id] = true
+	for id in _proximity:
+		ids[id] = true
+	for id in ids:
+		var cls: String = String(_proximity.get(id, DEFAULT_CLASS))
+		if not RING_FRAC.has(cls):
+			cls = DEFAULT_CLASS
+		var has_bearing: bool = _bearings.has(id)
+		var ang: float = float(_bearings[id]) if has_bearing else float(_peers.get(id, 0.0))
+		out[id] = {"angle": fposmod(ang, TAU), "frac": ring_frac(cls), "cls": cls, "bearing": has_bearing}
+	return out
+
+
 func _process(_delta: float) -> void:
 	if visible:
 		queue_redraw()
@@ -146,6 +223,25 @@ func _draw() -> void:
 		var label_pos: Vector2 = center + Vector2(cos(label_angle), sin(label_angle)) * (radar_radius + ring_thickness * 0.5 + 14.0)
 		draw_string(ThemeDB.fallback_font, label_pos + Vector2(-12, 5), TRIGRAM_NAMES[i], HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color(0.75, 0.82, 0.9, glow_alpha))
 	
+	# 3b. THE ROOM INSIDE THE RING. Three proximity rings on the disc, and one
+	# blip per peer, coloured by the same hue every other surface gives them.
+	var fr: float = field_radius()
+	for cls in RING_ORDER:
+		draw_arc(center, fr * ring_frac(cls), 0.0, TAU, 40, PEER_RING_COLOR, 1.0, true)
+	var blip_r: float = maxf(2.5, fr * BLIP_R_FRAC)
+	var plots: Dictionary = peer_plots()
+	for pid in plots:
+		var p: Dictionary = plots[pid]
+		var dir := Vector2(cos(float(p["angle"])), sin(float(p["angle"])))
+		var at: Vector2 = center + dir * (fr * float(p["frac"]))
+		var hue: float = Identity.hue_from_id(String(pid))
+		draw_circle(at, blip_r, Identity.body_color(hue))
+		draw_arc(at, blip_r, 0.0, TAU, 16, Identity.edge_color(hue), 1.0, true)
+		# A blip placed by a real bearing wears a nose; one placed by its own
+		# fly heading does not, so the glass never claims a position it lacks.
+		if bool(p["bearing"]):
+			draw_line(at, at + dir * (blip_r * 1.8), Identity.edge_color(hue), 1.5, true)
+
 	# 3. Inner Heading Cursor Needle
 	var needle_dir := Vector2(cos(current_heading), sin(current_heading))
 	var needle_end := center + needle_dir * (radar_radius - ring_thickness * 0.6)
@@ -153,16 +249,6 @@ func _draw() -> void:
 	draw_line(center, needle_end, needle_col, 2.5, true)
 	draw_circle(center, 4.0, needle_col)
 	
-	# 3b. THE SWARM ON THE OUTER RING. Every peer that has pulsed a heading at
-	# us gets one short tick outside the wedges -- the only thing this radar
-	# ever says about somebody else's body, and it says it without a name.
-	var tick_r: float = radar_radius + ring_thickness * 0.5 + 3.0
-	for pid in _peers:
-		var pa: float = float(_peers[pid])
-		var dir := Vector2(cos(pa), sin(pa))
-		draw_line(center + dir * tick_r, center + dir * (tick_r + 7.0),
-			Color(0.55, 0.8, 1.0, 0.85), 2.0, true)
-
 	# 4. Neuromodulator Spectrum Gauges
 	if show_neuromodulators and _fed:
 		_draw_bars(center, Array(_mods))

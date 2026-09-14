@@ -22,6 +22,7 @@ func _process(_delta: float) -> bool:
 	print("HEXY_TEST: Running Circadian Clock & Calcium Radar Smoke Tests...")
 	_test_circadian_clock()
 	_test_calcium_radar_component()
+	_test_room_inside_the_ring()
 	
 	print("\n=== CIRCADIAN & RADAR RESULTS ===")
 	print("Passed: %d, Failed: %d" % [passes, failures])
@@ -71,3 +72,46 @@ func _test_calcium_radar_component() -> void:
 	check(radar.custom_minimum_size.x >= 220, "Custom minimum size is >= 220 px")
 	
 	radar.free()
+
+
+## THE ROOM INSIDE THE RING: the peer dial and the calcium dial are one Control.
+func _test_room_inside_the_ring() -> void:
+	print("
+• Testing the peer field inside the calcium ring...")
+	var radar: Control = FlyCalciumRadar2DScript.new()
+	radar.radar_radius = 100.0
+	radar.ring_thickness = 20.0
+	check(radar.peer_plots().is_empty(), "no peers, no blips")
+	check(radar.field_radius() < radar.radar_radius - radar.ring_thickness * 0.5, "the field stays inside the wedge track")
+
+	radar.set_peer_headings({"a": 1.0, "b": 2.0})
+	var plots: Dictionary = radar.peer_plots()
+	check(plots.size() == 2, "one blip per peer that pulsed")
+	check(String(plots["a"]["cls"]) == "room", "a peer with no proximity parks on the room ring")
+	check(is_equal_approx(float(plots["a"]["angle"]), 1.0), "without a bearing the blip sits at the peer's own fly heading")
+	check(not bool(plots["a"]["bearing"]), "and says so: no bearing claimed")
+
+	radar.set_peer_proximity({"a": "touch", "b": "far", "c": "room"})
+	plots = radar.peer_plots()
+	check(plots.size() == 3, "a peer known only by proximity is still plotted")
+	check(float(plots["a"]["frac"]) < float(plots["c"]["frac"]) and float(plots["c"]["frac"]) < float(plots["b"]["frac"]),
+		"touch < room < far in radius")
+	check(float(plots["b"]["frac"]) < 1.0, "the far ring is still inside the field")
+
+	radar.note_proximity("a", "nonsense")
+	check(String(radar.peer_plots()["a"]["cls"]) == "room", "an unknown class falls to the default ring")
+
+	radar.set_peer_bearings({"a": 3.0})
+	plots = radar.peer_plots()
+	check(is_equal_approx(float(plots["a"]["angle"]), 3.0), "a real bearing wins over the fly heading")
+	check(bool(plots["a"]["bearing"]), "and the blip grows a nose")
+	check(is_equal_approx(float(plots["b"]["angle"]), 2.0), "a peer without a bearing keeps its heading")
+
+	radar.drop_peer("a")
+	check(not radar.peer_plots().has("a"), "a dropped peer leaves every map")
+	check(radar.peer_plots().size() == 2, "and the others stay")
+
+	# It draws without a tree blowing up.
+	radar.size = Vector2(240, 280)
+	radar.free()
+	check(true, "the merged radar frees cleanly")

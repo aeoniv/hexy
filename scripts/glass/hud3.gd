@@ -1188,6 +1188,8 @@ func _feed_radar() -> void:
 			radar.set_state(ch.get_fly_state() as Dictionary)
 	if _wmn != null and _wmn.has_method("peer_headings"):
 		radar.set_peer_headings(_wmn.peer_headings() as Dictionary)
+	if _wmn != null and _wmn.has_method("peer_proximity"):
+		radar.set_peer_proximity(_wmn.peer_proximity() as Dictionary)
 
 
 func _refresh_dials() -> void:
@@ -1469,8 +1471,8 @@ func room_echo() -> bool:
 
 ## The two figures, marked with the owner's moon and sun.
 func _figures_phrase() -> String:
-	return "%s HEAD %s   %s BODY %s   EARTH %s" % [
-		MOON, _figure_word(_head_bits()), SUN, _figure_word(_body_bits()), _figure_word(_earth_bits())]
+	return "%s HEAD %s   %s BODY %s   %s EARTH %s" % [
+		MOON, _figure_word(_head_bits()), SUN, _figure_word(_body_bits()), EARTH_ICON, _figure_word(_earth_bits())]
 
 
 ## What is always true and never news.
@@ -1798,7 +1800,7 @@ func _geometry_word() -> String:
 ## character, and the name. The character is HuohoutuData's own spelling and it
 ## is carried through untouched.
 func _figure_word(bits: int) -> String:
-	return "#%d %s %s" % [KingWen.number(bits), KingWen.zh(bits), KingWen.name(bits)]
+	return "#%d %s" % [KingWen.number(bits), KingWen.name(bits)]
 
 
 func _peer_count() -> int:

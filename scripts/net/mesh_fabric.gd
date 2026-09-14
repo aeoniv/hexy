@@ -245,6 +245,16 @@ func _on_transport_peer_lost(id: String) -> void:
 ## The class lands before we know the peer's fabric id (a connection comes up
 ## before its first heartbeat), so it is held and re-emitted the moment the
 ## first-hand envelope names them. Nothing is dropped for arriving early.
+## fabric src id -> proximity class, for a radar that polls once a frame. Only
+## peers whose fabric id we have learnt appear; the rest wait in _peer_cls.
+func peer_proximity_by_src() -> Dictionary:
+	var out := {}
+	for tid in _peer_cls:
+		if _peer_src.has(tid):
+			out[String(_peer_src[tid])] = String(_peer_cls[tid])
+	return out
+
+
 func _on_transport_proximity(peer_id: String, cls: String) -> void:
 	_peer_cls[peer_id] = cls
 	if _peer_src.has(peer_id):

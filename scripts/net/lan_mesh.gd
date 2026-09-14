@@ -7,7 +7,7 @@ class_name LanMesh
 signal peer_found(id: String, peer_name: String)
 signal peer_lost(id: String)
 signal event_received(id: String, data: Dictionary)
-## How near a peer is, as a class rather than metres — see scripts/social/radar.gd.
+## How near a peer is, as a class rather than metres — see scripts/brain/fly_calcium_radar_2d.gd.
 ## THE RIG'S HONEST ANSWER: a LAN has no proximity at all, so this backend
 ## reports the one spatial fact it genuinely holds — a peer whose datagrams come
 ## from this machine's own loopback IS in the same place we are, because it is

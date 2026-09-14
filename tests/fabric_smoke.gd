@@ -14,7 +14,7 @@ var _fails := 0
 ## EVERY CHECK IS COUNTED. A compile error in a depended script makes a whole
 ## section skip silently, and a suite that prints ALL PASS because it ran nothing
 ## is worse than a red one. Raise this floor when checks are added.
-const MIN_CHECKS := 19
+const MIN_CHECKS := 21
 var _checks := 0
 
 
@@ -57,6 +57,14 @@ func _initialize() -> void:
 	await _wait(5.0, func(): return a.peer_count() >= 1 and c.peer_count() >= 1 \
 		and b.peer_count() >= 2)
 	_check(a.peer_count() == 1, "alpha sees only bravo")
+	# The LAN backend reports loopback peers as "touch"; once the first-hand
+	# envelope has named bravo, the class is filed under bravo's FABRIC id, which
+	# is the key the radar plots by.
+	var prox: Dictionary = a.peer_proximity_by_src()
+	_check(prox.is_empty() or prox.values().all(func(v): return v in ["touch", "room", "far"]),
+		"proximity by src only ever says touch/room/far")
+	_check(prox.keys().all(func(k): return not String(k).begins_with("fab")),
+		"proximity by src is keyed by fabric id, never transport id")
 	_check(c.peer_count() == 1, "charlie sees only bravo")
 	_check(b.peer_count() == 2, "bravo sees alpha and charlie")
 

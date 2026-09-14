@@ -266,7 +266,7 @@ static func _is_ascii_but_marks(s: String) -> bool:
 			continue
 		if u >= 0x4E00 and u <= 0x9FFF:
 			continue
-		if (Hud3.MOON + Hud3.SUN).contains(c):
+		if (Hud3.MOON + Hud3.SUN + Hud3.EARTH_ICON).contains(c):
 			continue
 		return false
 	return true

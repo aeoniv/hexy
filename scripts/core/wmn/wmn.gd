@@ -464,6 +464,11 @@ func peer_bio() -> Dictionary:
 	return fabric.peer_bio if fabric != null else {}
 
 
+## peer id -> "touch" / "room" / "far", the radar's ring for each blip.
+func peer_proximity() -> Dictionary:
+	return fabric.peer_proximity_by_src() if fabric != null else {}
+
+
 ## -- SHAPES ------------------------------------------------------------------
 
 static func _throws_of(h: Dictionary, bits: int, moving: int) -> Array:
