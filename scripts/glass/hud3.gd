@@ -1161,9 +1161,18 @@ func brain_text() -> String:
 	lines.append("backend %s" % String(_mnn.backend_name()))
 	lines.append("tier %s" % _tier_phrase())
 	lines.append("on device: %s" % ("yes" if bool(_mnn.available()) else "no"))
+	## WHAT THIS PHONE IS ALLOWED TO CARRY. The glass does not do the judging:
+	## every row arrives with its own verdict, and a refused tier is shown with
+	## the reason rather than hidden or silently offered.
 	for t in _mnn.tiers():
 		var row: Dictionary = t as Dictionary
-		lines.append("- %s %s" % [String(row.get("id", "")), String(row.get("name", ""))])
+		var mark: String = "ok" if bool(row.get("allowed", true)) else "--"
+		var why: String = String(row.get("reason", ""))
+		lines.append("%s %s %s%s" % [
+			mark,
+			String(row.get("id", "")),
+			String(row.get("params", "")),
+			("" if why == "" else "  (%s)" % why)])
 	lines.append("answer: %s" % (String(_store.answer) if _store != null else ""))
 	return "\n".join(lines)
 

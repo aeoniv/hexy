@@ -160,6 +160,11 @@ func _fly_lamp() -> void:
 		float(view.y) / maxf(1.0, float(view.x)),
 		String(prof.get("resolved_os_name", "?")),
 		String(prof.get("layout", "?")), String(prof.get("chat_lane", "?"))])
+	## WHICH MODELS THIS PHONE MAY CARRY, and why not the others. Asked of the
+	## same gate the list and the load path ask, so a logcat and the Brain
+	## panel can never tell two different stories.
+	if mnn != null and mnn.has_method("tier_lamp_line"):
+		print(mnn.tier_lamp_line())
 	for _i in 5:
 		await get_tree().create_timer(2.0).timeout
 		print("hexy fly: gyro=%s grav=%s" % [str(Input.get_gyroscope()), str(Input.get_gravity())])

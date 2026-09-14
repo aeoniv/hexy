@@ -64,5 +64,51 @@ MemFree:         1234 kB
 	assert(fold["id"] == "galaxy_z_fold4", "11 GiB at 2.562:1 is the Fold, not a generic slab")
 	assert(fold["layout"] == "tall_slab", "the cover screen is a tall slab")
 
+	# Test 7: THE ONE GATE. Three phones, four tiers, one pure function.
+	var GIB := 1024 * 1024 * 1024
+	var plenty := 8 * GIB
+	var a22 := int(3.8 * float(GIB))
+	for t in ["floor", "embed"]:
+		assert(ModelStore.tier_allowed(t, a22, plenty)["allowed"],
+			"a 3.8 GB phone still gets %s" % t)
+	for t in ["mid", "high"]:
+		var v: Dictionary = ModelStore.tier_allowed(t, a22, plenty)
+		print("Test 7 (3.8 GB, %s): %s" % [t, v["reason"]])
+		assert(not v["allowed"], "a 3.8 GB phone may not be offered %s" % t)
+		assert("RAM" in String(v["reason"]), "the refusal must name the RAM it wanted")
+	var six := 6 * GIB
+	assert(ModelStore.tier_allowed("mid", six, plenty)["allowed"], "6 GB clears mid")
+	assert(not ModelStore.tier_allowed("high", six, plenty)["allowed"], "6 GB does not clear high")
+	var fold_ram := int(11.8 * float(GIB))
+	for t in ModelStore.TIER_ORDER:
+		assert(ModelStore.tier_allowed(String(t), fold_ram, plenty)["allowed"],
+			"11.8 GB carries every tier, including %s" % t)
+
+	# Test 8: a full phone is refused whatever its RAM, and the reason says so.
+	var cramped := ModelStore.tier_allowed("floor", fold_ram, 100 * 1024 * 1024)
+	print("Test 8 (full disk): %s" % cramped["reason"])
+	assert(not cramped["allowed"], "no room means no model")
+	assert("free" in String(cramped["reason"]), "the refusal must name the storage")
+	# Unmeasured storage is not a refusal.
+	assert(ModelStore.tier_allowed("floor", fold_ram, -1)["allowed"],
+		"a phone that will not say how full it is still gets to try")
+	# A 32-bit phone carries nothing native.
+	var armv7 := ModelStore.tier_allowed("floor", fold_ram, plenty, "armeabi-v7a")
+	assert(not armv7["allowed"], "the native runtime is 64-bit only")
+	assert(not ModelStore.tier_allowed("nonsense", fold_ram, plenty)["allowed"], "unknown tiers are refused")
+
+	# Test 9: df read out of a page, not out of a guess.
+	var df_page := "Filesystem     1K-blocks    Used Available Use% Mounted on
+/dev/fuse      110000000 9000000  50000000  16% /storage/emulated
+"
+	var avail := ModelStore.parse_df(df_page)
+	print("Test 9 (df page): %d bytes (%.1f GiB)" % [avail, float(avail) / float(GIB)])
+	assert(avail == 50000000 * 1024, "Available must be read as kB and returned as bytes")
+	assert(ModelStore.parse_df("") == -1, "an empty page yields nothing, not a zero")
+
+	# Test 10: the report keeps every tier, refused ones included.
+	var report := ModelStore.tier_report(a22, plenty)
+	assert(report.size() == ModelStore.TIER_ORDER.size(), "no tier is hidden from the list")
+
 	print("--- ALL MODEL STORE TESTS PASSED PERFECTLY ---")
 	quit(0)

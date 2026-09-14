@@ -238,3 +238,140 @@ static func wants_no_think(dir_name: String) -> bool:
 	if "qwen3" in dir_name:
 		return true
 	return false
+
+
+# -- WHAT EACH TIER ASKS OF THE PHONE ----------------------------------------
+##
+## One row per tier id, and the only place a requirement is written down. The
+## chat rows mirror CHAT_LANES' min_ram; the embed row is deliberately free of
+## a RAM gate, because a 768-dim encoder is small enough for the floor phone
+## and the recall lane is the one thing a 4 GB device should still get.
+
+const TIER_FLOOR := "floor"
+const TIER_MID := "mid"
+const TIER_HIGH := "high"
+const TIER_EMBED := "embed"
+
+const TIER_ORDER := [TIER_FLOOR, TIER_MID, TIER_HIGH, TIER_EMBED]
+
+## Headroom kept free beyond the weights themselves: tokenizer, mmap scratch,
+## and the room a half-finished download needs before it can be renamed.
+const STORAGE_HEADROOM := 256 * 1024 * 1024
+
+const TIER_SPECS := {
+	TIER_FLOOR: {
+		"lane": LANE_CHAT,
+		"dir": LANE_DIRS[LANE_CHAT],
+		"short": "0.6b",
+		"min_ram": 0,
+		"bytes": 580 * 1024 * 1024,
+		"needs_native": true,
+		"arch": "arm64",
+		"min_api": 24,
+	},
+	TIER_MID: {
+		"lane": LANE_CHAT_35,
+		"dir": LANE_DIRS[LANE_CHAT_35],
+		"short": "0.8b",
+		"min_ram": CHAT_35_MIN_RAM,
+		"bytes": 780 * 1024 * 1024,
+		"needs_native": true,
+		"arch": "arm64",
+		"min_api": 24,
+	},
+	TIER_HIGH: {
+		"lane": LANE_CHAT_BIG,
+		"dir": LANE_DIRS[LANE_CHAT_BIG],
+		"short": "1.7b",
+		"min_ram": CHAT_BIG_MIN_RAM,
+		"bytes": 1450 * 1024 * 1024,
+		"needs_native": true,
+		"arch": "arm64",
+		"min_api": 24,
+	},
+	TIER_EMBED: {
+		"lane": LANE_EMBED,
+		"dir": LANE_DIRS[LANE_EMBED],
+		"short": "gte",
+		"min_ram": 0,
+		"bytes": 320 * 1024 * 1024,
+		"needs_native": true,
+		"arch": "arm64",
+		"min_api": 24,
+	},
+}
+
+
+static func _gb(bytes: int) -> String:
+	return "%.1f GB" % (float(bytes) / (1024.0 * 1024.0 * 1024.0))
+
+
+## THE ONE GATE. Pure: the same three numbers always give the same verdict, so
+## the list, the download and the load can each ask it and none of them can
+## disagree with the others. free_storage_bytes < 0 means "not measured", which
+## is not a refusal -- a phone that will not say how full it is still gets to
+## try. Returns {allowed: bool, reason: String, tier: String}.
+static func tier_allowed(tier: String, ram_bytes: int, free_storage_bytes: int = -1, arch: String = "arm64") -> Dictionary:
+	if not TIER_SPECS.has(tier):
+		return {"allowed": false, "reason": "no such tier", "tier": tier}
+	var spec: Dictionary = TIER_SPECS[tier]
+	if arch != "" and not arch.begins_with("arm64") and not arch.begins_with("x86_64"):
+		return {"allowed": false, "reason": "needs a 64-bit phone, this one is %s" % arch, "tier": tier}
+	var min_ram: int = int(spec["min_ram"])
+	if min_ram > 0 and ram_bytes < min_ram:
+		return {
+			"allowed": false,
+			"reason": "needs %s RAM, this phone has %s" % [_gb(min_ram), _gb(ram_bytes)],
+			"tier": tier,
+		}
+	var need: int = int(spec["bytes"]) + STORAGE_HEADROOM
+	if free_storage_bytes >= 0 and free_storage_bytes < need:
+		return {
+			"allowed": false,
+			"reason": "needs %s free, this phone has %s" % [_gb(need), _gb(free_storage_bytes)],
+			"tier": tier,
+		}
+	return {"allowed": true, "reason": "", "tier": tier}
+
+
+## Free bytes on the volume the models live on. -1 when nothing will say.
+## Android gives no DirAccess space call, so the same door the meminfo fix used
+## is taken here: read the number out of `df`, and say -1 rather than guess.
+static func free_storage_bytes() -> int:
+	var target: String = get_external_storage_dir()
+	if OS.get_name() != "Android":
+		target = OS.get_user_data_dir()
+	var out: Array = []
+	if OS.execute("df", ["-k", target], out, false) == 0 and not out.is_empty():
+		var parsed: int = parse_df(String(out[0]))
+		if parsed >= 0:
+			return parsed
+	return -1
+
+
+## The "Available" column of `df -k`, in bytes, from the text of its output.
+## -1 when the page carries no data row. Pure, so a headless test can hold it
+## to a fixed page.
+static func parse_df(text: String) -> int:
+	var lines: PackedStringArray = text.split("\n", false)
+	for i in range(lines.size()):
+		var line: String = lines[i].strip_edges()
+		if line == "" or line.begins_with("Filesystem"):
+			continue
+		var parts: PackedStringArray = line.split(" ", false)
+		# Filesystem 1K-blocks Used Available Use% Mounted
+		if parts.size() >= 4 and parts[3].is_valid_int():
+			return parts[3].to_int() * 1024
+	return -1
+
+
+## Every tier with its verdict, in TIER_ORDER, for a list that must show the
+## refused rows greyed rather than hide them.
+static func tier_report(ram_bytes: int, free_storage_bytes_in: int = -1, arch: String = "arm64") -> Array:
+	var out: Array = []
+	for t in TIER_ORDER:
+		var v: Dictionary = tier_allowed(String(t), ram_bytes, free_storage_bytes_in, arch)
+		v["short"] = String(TIER_SPECS[t]["short"])
+		v["dir"] = String(TIER_SPECS[t]["dir"])
+		out.append(v)
+	return out

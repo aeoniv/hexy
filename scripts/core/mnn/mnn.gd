@@ -31,6 +31,7 @@ var _mock: MockLlm = null
 var _tier: String = ""
 var _loaded: bool = false
 var _live: bool = false
+var _free_storage: int = -2
 
 
 func _init() -> void:
@@ -55,27 +56,74 @@ func _ensure_mock() -> void:
 
 # --- what the device can carry ----------------------------------------------
 
-## [{id, params, dir, tier}] read straight from ModelStore, floor first.
+## [{id, params, dir, tier, allowed, reason}] read straight from ModelStore,
+## floor first. EVERY ROW CARRIES ITS VERDICT, so a list can show the refused
+## tiers greyed with the reason instead of offering a phone a model it cannot
+## hold. The verdict comes from the one gate, ModelStore.tier_allowed().
 func tiers() -> Array[Dictionary]:
+	var ram: int = ram_bytes()
+	var free: int = free_storage_bytes()
+	var arch: String = Engine.get_architecture_name()
 	var out: Array[Dictionary] = ([] as Array[Dictionary])
 	for id in [TIER_FLOOR, TIER_MID, TIER_HIGH]:
 		var lane: String = String(TIER_LANE[id])
 		for row in ModelStore.CHAT_LANES:
 			if String(row["lane"]) == lane:
+				var v: Dictionary = ModelStore.tier_allowed(id, ram, free, arch)
 				out.append({
 					"id": id,
 					"params": String(row["short"]).to_upper(),
 					"dir": String(row["dir"]),
 					"tier": String(row["tier"]),
+					"allowed": bool(v["allowed"]),
+					"reason": String(v["reason"]),
 				})
 				break
+	var ve: Dictionary = ModelStore.tier_allowed(TIER_EMBED, ram, free, arch)
 	out.append({
 		"id": TIER_EMBED,
 		"params": "gte",
 		"dir": String(ModelStore.LANE_DIRS[ModelStore.LANE_EMBED]),
 		"tier": "Embed",
+		"allowed": bool(ve["allowed"]),
+		"reason": String(ve["reason"]),
 	})
 	return out
+
+
+## The RAM this phone is judged by: DeviceProfile.resolve() is the source of
+## truth, so the lane the profile names and the tiers the list offers are read
+## off the same number.
+func ram_bytes() -> int:
+	return int(DeviceProfile.resolve().get("resolved_ram_bytes", 0))
+
+
+## Free bytes where the weights would land, or -1 when the phone will not say.
+## Measured once; a df per frame would cost more than the answer is worth.
+func free_storage_bytes() -> int:
+	if _free_storage == -2:
+		_free_storage = ModelStore.free_storage_bytes()
+	return _free_storage
+
+
+## Why a tier is or is not allowed on this phone. Empty string means allowed.
+func tier_refusal(tier_id: String) -> String:
+	var v: Dictionary = ModelStore.tier_allowed(
+		tier_id, ram_bytes(), free_storage_bytes(), Engine.get_architecture_name())
+	return "" if bool(v["allowed"]) else String(v["reason"])
+
+
+## One line naming every tier and its verdict, for the boot lamp.
+func tier_lamp_line() -> String:
+	var parts: Array[String] = ([] as Array[String])
+	for row in tiers():
+		if bool(row["allowed"]):
+			parts.append("%s=yes" % String(row["id"]))
+		else:
+			parts.append("%s=no(%s)" % [String(row["id"]), String(row["reason"])])
+	var free: int = free_storage_bytes()
+	parts.append("free_storage=%s" % ("unknown" if free < 0 else "%.1fGB" % (float(free) / 1073741824.0)))
+	return "hexy tiers: " + " ".join(parts)
 
 
 ## True only when the IxMnn singleton is present AND weights are on disk.
@@ -127,6 +175,14 @@ func load_tier(tier_id: String = TIER_FLOOR) -> bool:
 			dir = String(row["dir"])
 			break
 	if dir == "" or tier_id == TIER_EMBED:
+		_loaded = false
+		return false
+	## THE SAME GATE THE LIST USED. A tier the phone was never offered may not
+	## be loaded by a caller that asked for it by name either; the mock takes
+	## over and the app keeps speaking, which is what a refusal means here.
+	var refusal: String = tier_refusal(tier_id)
+	if refusal != "":
+		push_warning("hexy tiers: %s refused, %s" % [tier_id, refusal])
 		_loaded = false
 		return false
 	if not available():
