@@ -1,4 +1,6 @@
-# IxFfBrain: Drosophila melanogaster Cybernetic Connectome Addon
+# Fly brain (native GDScript, scripts/brain/fly_*.gd)
+
+Formerly packaged as addons/ixffbrain. It is not an Android plugin: no Kotlin, no .so, no version handshake. It lives in the tree and Character owns it.
 
 `ixffbrain` packages the canonical **Fruit Fly (*Drosophila melanogaster*) connectome** as an editor and runtime addon for Hexy.
 
@@ -28,7 +30,7 @@
 6. **Live Calcium Radar 2D**:
    - GCaMP fluorescence activity visualization with 8 Bagua trigrams and 6 neuromodulator gauges.
 
-## Performance Invariants
+## Performance targets (asserted by tests/test_fly_perf.gd, not yet measured on device)
 - Memory footprint: $< 1.5\text{ MB}$ RAM.
 - Computation time: $< 0.04\text{ ms}$ per frame at 60 FPS.
 - Zero neural network inference during continuous background operation.
