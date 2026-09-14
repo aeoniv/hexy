@@ -210,8 +210,10 @@ func _ready() -> void:
 	pad.name = "Pad"
 	pad.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for side in ["left", "right", "top", "bottom"]:
-		pad.add_theme_constant_override("margin_" + side, 8)
+	pad.add_theme_constant_override("margin_top", 16)
+	pad.add_theme_constant_override("margin_bottom", 12)
+	pad.add_theme_constant_override("margin_left", 8)
+	pad.add_theme_constant_override("margin_right", 8)
 	root.add_child(pad)
 
 	var spine := AxisSpine.new(self)
@@ -329,7 +331,7 @@ func _build_status() -> void:
 	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	status_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	status_label.add_theme_font_size_override("font_size", 13)
+	status_label.add_theme_font_size_override("font_size", 11)
 	status_label.add_theme_color_override("font_color", Color(0.68, 0.82, 0.92, 1.0))
 	status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hbox.add_child(status_label)
@@ -366,7 +368,6 @@ func _build_body() -> void:
 	body_band.name = "BodyBand"
 	body_band.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	body_band.resized.connect(_layout_stage)
 	bands.add_child(body_band)
 
 	body = BodyDialTap.new()
@@ -376,6 +377,7 @@ func _build_body() -> void:
 	body.machine_station_clicked.connect(_on_machine_diamond_tapped)
 	body.center_clicked.connect(_on_body_center_tapped)
 	body.dial_dragged.connect(_on_body_dial_dragged)
+	body.ring_slot_tapped.connect(_on_body_ring_tapped)
 
 	creature_field = Control.new()
 	creature_field.name = "CreatureField"
@@ -383,6 +385,7 @@ func _build_body() -> void:
 	creature_field.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	creature_field.gui_input.connect(_on_creature_input)
 	body_band.add_child(creature_field)
+	body_band.resized.connect(_layout_stage)
 	_layout_stage.call_deferred()
 
 
@@ -934,7 +937,7 @@ func _refresh_room() -> void:
 ## The stage takes the whole glass, the tap square takes the middle of the body
 ## band, and the eye is told where to stand so the two agree.
 func _layout_stage() -> void:
-	if root == null or stage == null or body_band == null:
+	if root == null or stage == null or body_band == null or creature_field == null or body == null:
 		return
 	_apply_radar_layout()
 	var box: Vector2 = root.size
@@ -1021,8 +1024,8 @@ func status_summary() -> String:
 
 ## The two figures, marked with the owner's moon and sun.
 func _figures_phrase() -> String:
-	return "%s HEAD %s   %s BODY %s" % [
-		MOON, _figure_word(_head_bits()), SUN, _figure_word(_body_bits())]
+	return "%s HEAD %s   %s BODY %s   EARTH %s" % [
+		MOON, _figure_word(_head_bits()), SUN, _figure_word(_body_bits()), _figure_word(_earth_bits())]
 
 
 ## What is always true and never news.
@@ -1245,10 +1248,42 @@ func _body_bits() -> int:
 
 ## Walk the HEAD to a slot of the head sequence and write it down. The store is
 ## the only place a figure lives; the ring follows the store, never the reverse.
+func _on_body_ring_tapped(slot: int) -> void:
+	_walk_body(slot, "tap")
+
+
 func _walk_head(slot: int, why: String) -> void:
 	var idx: int = posmod(slot, HuohoutuData.HEAD_SEQUENCE.size())
 	var hex: Dictionary = HuohoutuData.get_head_hex(idx)
-	_write_head(int(hex.get("bits", 0)), ([] as Array[int]), why, idx)
+	var bits: int = int(hex.get("bits", 0))
+	_write_head(bits, ([] as Array[int]), why, idx)
+	var at: Vector2 = _hub_point(head)
+	bubble.say("🌙 HEAD: %s" % _figure_word(bits), at)
+
+
+func _walk_body(slot: int, why: String) -> void:
+	var idx: int = posmod(slot, HuohoutuData.BODY_SEQUENCE.size())
+	var hex: Dictionary = HuohoutuData.get_body_hex(idx)
+	var bits: int = int(hex.get("bits", 0))
+	_write_body(bits, ([] as Array[int]), why, idx)
+	var at: Vector2 = _hub_point(body)
+	bubble.say("☀️ BODY: %s" % _figure_word(bits), at)
+
+
+func _write_body(bits: int, throws: Array[int], why: String, slot: int) -> void:
+	if body != null:
+		body.set_body_slot(slot)
+	if _store == null or not _store.has_method("set_body"):
+		return
+	_store.set_body({
+		"bits": bits,
+		"moving": 0,
+		"throws": throws,
+		"when": _now_ms(),
+		"who": _who,
+		"source": why,
+		"seq_index": slot,
+	})
 
 
 ## The coin throw, on the head only: six lines, thrown once, signed.
@@ -1364,6 +1399,8 @@ func _walk_earth(slot: int, why: String) -> void:
 	var hex: Dictionary = HuohoutuData.get_head_hex(idx)
 	var bits: int = int(hex.get("bits", 2))
 	_write_earth(bits, ([] as Array[int]), why, idx)
+	var at: Vector2 = _hub_point(earth)
+	bubble.say("EARTH: %s" % _figure_word(bits), at)
 
 
 func _cast_earth() -> void:
@@ -1435,26 +1472,30 @@ class AxisSpine extends Control:
 		var col_line := Color(0.25, 0.80, 1.0, 0.65)
 		var col_pip := Color(1.0, 0.85, 0.35, 0.95)
 
-		# Pairs of (upper_bottom_y, lower_top_y)
+		# Pairs of (upper_bottom_y, lower_top_y) representing the meridian gaps
+		# | [status] | (head) | (body) | (earth) | [chat] |
 		var gaps: Array = [
+			[0.0, st.position.y],
 			[st.position.y + st.size.y, hd.position.y],
 			[hd.position.y + hd.size.y, bd.position.y],
 			[bd.position.y + bd.size.y, et.position.y],
-			[et.position.y + et.size.y, cp.position.y]
+			[et.position.y + et.size.y, cp.position.y],
+			[cp.position.y + cp.size.y, size.y]
 		]
 
 		for g in gaps:
 			var y0: float = float(g[0])
 			var y1: float = float(g[1])
-			if y1 > y0:
+			if y1 > y0 + 2.0:
 				draw_line(Vector2(cx, y0), Vector2(cx, y1), col_glow, 4.0)
-				draw_line(Vector2(cx, y0), Vector2(cx, y1), col_line, 2.0)
+				draw_line(Vector2(cx, y0), Vector2(cx, y1), col_line, 1.8)
 				var mid_y: float = (y0 + y1) * 0.5
-				# Draw diamond pip |
+				var pip_h: float = minf(4.0, (y1 - y0) * 0.25)
+				var pip_w: float = 3.0
 				var pts: PackedVector2Array = [
-					Vector2(cx, mid_y - 4.0),
-					Vector2(cx + 3.0, mid_y),
-					Vector2(cx, mid_y + 4.0),
-					Vector2(cx - 3.0, mid_y)
+					Vector2(cx, mid_y - pip_h),
+					Vector2(cx + pip_w, mid_y),
+					Vector2(cx, mid_y + pip_h),
+					Vector2(cx - pip_w, mid_y)
 				]
 				draw_colored_polygon(pts, col_pip)

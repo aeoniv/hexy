@@ -1,13 +1,16 @@
 class_name BodyDialTap
 extends BodyDial2D
 
-## THE MACHINE REALM DIAL: FULL TOUCH-DRAG ORBIT & SENSOR INTERACTIONS.
+## THE MACHINE REALM DIAL: FULL TOUCH-DRAG ROTATION, HEXAGRAM SELECTION & SENSOR STATIONS.
 ##
-## Dragging around the dial orbits the 3D creature and rotates the machine dial.
+## Dragging around the dial orbits the 3D creature and rotates the 64-hexagram graduation ring.
+## Snapping and slot selection updates the body hexagram in real-time.
+## Tapping on the outer ring selects that body hexagram directly.
 ## Tapping the 8 machine diamond stations opens telemetry and triggers sensor pulses.
 ## Tapping the central 3D creature fetches full machine physical status.
 
 signal dial_dragged(delta_angle: float)
+signal ring_slot_tapped(slot: int)
 signal center_clicked()
 
 ## The eight machine scores, 0..1, indexed by trigram code.
@@ -16,6 +19,7 @@ var scores: Array = []
 var _is_dragging: bool = false
 var _touch_down_pos: Vector2 = Vector2.ZERO
 var _touch_down_time: int = 0
+var _drag_start_angle: float = 0.0
 var _prev_angle: float = 0.0
 var _has_moved: bool = false
 
@@ -47,8 +51,8 @@ func _measure() -> void:
 func station_position(trigram: int) -> Vector2:
 	_measure()
 	for station in MACHINE_STATIONS:
-		if int(station["trigram"]) == clampi(trigram, 0, 7):
-			var ang: float = float(station["angle"])
+		if int(station.get("trigram", -1)) == clampi(trigram, 0, 7):
+			var ang: float = float(station.get("angle", 0.0))
 			return dial_center + Vector2(cos(ang), sin(ang)) * (dial_radius * 0.78)
 	return dial_center
 
@@ -60,8 +64,9 @@ func body_slot() -> int:
 func set_body_slot(slot: int) -> void:
 	current_hex_index = posmod(slot, HuohoutuData.BODY_SEQUENCE.size())
 	current_hex_id = HuohoutuData.BODY_SEQUENCE[current_hex_index]
-	dial_angle = -float(current_hex_index) * (TAU / 64.0)
-	target_dial_angle = dial_angle
+	if not _is_dragging:
+		dial_angle = -float(current_hex_index) * (TAU / 64.0)
+		target_dial_angle = dial_angle
 	queue_redraw()
 
 
@@ -70,13 +75,19 @@ func set_body_bits(bits: int) -> void:
 	set_body_slot(HuohoutuData.find_body_index_by_id(id))
 
 
+func slot_at(point: Vector2) -> int:
+	var ang: float = (point - dial_center).angle()
+	var step: float = TAU / 64.0
+	return posmod(int(round((ang - dial_angle) / step)), HuohoutuData.BODY_SEQUENCE.size())
+
+
 func _draw() -> void:
 	super()
 	if scores.is_empty():
 		return
 	for station in MACHINE_STATIONS:
-		var tri: int = int(station["trigram"])
-		var ang: float = float(station["angle"])
+		var tri: int = int(station.get("trigram", 0))
+		var ang: float = float(station.get("angle", 0.0))
 		var pos: Vector2 = dial_center + Vector2(cos(ang), sin(ang)) * (dial_radius * 0.78)
 		var s: float = clampf(score_of(tri), 0.0, 1.0)
 		var r: float = 17.0
@@ -110,19 +121,29 @@ func _gui_input(event: InputEvent) -> void:
 		_touch_down_pos = ev_pos
 		_touch_down_time = int(Time.get_ticks_msec())
 		_has_moved = false
-		_prev_angle = (ev_pos - dial_center).angle()
+		var dir: Vector2 = ev_pos - dial_center
+		_drag_start_angle = dir.angle() - dial_angle
+		_prev_angle = dir.angle()
 		accept_event()
 		return
 
 	if is_move and _is_dragging:
 		if (ev_pos - _touch_down_pos).length() > 10.0:
 			_has_moved = true
-		var cur_angle: float = (ev_pos - dial_center).angle()
+		var dir: Vector2 = ev_pos - dial_center
+		var cur_angle: float = dir.angle()
 		var delta_ang: float = wrapf(cur_angle - _prev_angle, -PI, PI)
 		_prev_angle = cur_angle
-		dial_angle += delta_ang
+		dial_angle = cur_angle - _drag_start_angle
 		target_dial_angle = dial_angle
 		dial_dragged.emit(delta_ang)
+		var step_rad: float = TAU / 64.0
+		var new_idx: int = posmod(int(round(-dial_angle / step_rad)), HuohoutuData.BODY_SEQUENCE.size())
+		if new_idx != current_hex_index:
+			current_hex_index = new_idx
+			current_hex_id = HuohoutuData.BODY_SEQUENCE[current_hex_index]
+			ring_slot_tapped.emit(new_idx)
+			Input.vibrate_handheld(10)
 		queue_redraw()
 		accept_event()
 		return
@@ -132,6 +153,14 @@ func _gui_input(event: InputEvent) -> void:
 		_is_dragging = false
 		_has_moved = false
 		if was_drag:
+			var step_rad: float = TAU / 64.0
+			current_hex_index = posmod(int(round(-dial_angle / step_rad)), HuohoutuData.BODY_SEQUENCE.size())
+			current_hex_id = HuohoutuData.BODY_SEQUENCE[current_hex_index]
+			target_dial_angle = -float(current_hex_index) * step_rad
+			dial_angle = target_dial_angle
+			ring_slot_tapped.emit(current_hex_index)
+			Input.vibrate_handheld(15)
+			queue_redraw()
 			accept_event()
 			return
 
@@ -142,8 +171,8 @@ func _gui_input(event: InputEvent) -> void:
 		var closest_tri: int = -1
 		var closest_dist: float = 9999.0
 		for station in MACHINE_STATIONS:
-			var tri: int = int(station["trigram"])
-			var ang: float = float(station["angle"])
+			var tri: int = int(station.get("trigram", -1))
+			var ang: float = float(station.get("angle", 0.0))
 			var st: Vector2 = dial_center + Vector2(cos(ang), sin(ang)) * (dial_radius * 0.78)
 			var d: float = (ev_pos - st).length()
 			if d < closest_dist:
@@ -159,9 +188,18 @@ func _gui_input(event: InputEvent) -> void:
 			return
 
 		# B. Center 3D Creature Tap
-		if dist < dial_radius * 0.56:
+		if dist < dial_radius * 0.50:
 			center_clicked.emit()
 			Input.vibrate_handheld(30)
+			accept_event()
+			return
+
+		# C. Outer graduation ring tap: Select Body Hexagram directly
+		if dist >= dial_radius * 0.50 and dist <= dial_radius * 1.35:
+			var slot: int = slot_at(ev_pos)
+			set_body_slot(slot)
+			ring_slot_tapped.emit(slot)
+			Input.vibrate_handheld(20)
 			accept_event()
 			return
 
