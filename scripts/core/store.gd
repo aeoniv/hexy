@@ -13,6 +13,7 @@ extends Node
 signal hexagram_changed(h: Dictionary)
 signal head_changed(h: Dictionary)
 signal body_changed(b: Dictionary)
+signal earth_changed(e: Dictionary)
 signal flipped(f: Dictionary)
 signal machine_changed(m: Dictionary)
 signal human_changed(h: Dictionary)
@@ -27,6 +28,9 @@ var head: Dictionary = _empty_hexagram()
 ## THE BODY (sun, lower trigram, the Tensegrity). Moved by the senses alone,
 ## one line at a time. It walks HuohoutuData.BODY_SEQUENCE.
 var body: Dictionary = _empty_hexagram()
+
+## THE EARTH (altar, manual controls, the exclusive Hexagram).
+var earth: Dictionary = _empty_hexagram()
 
 ## The last line that turned, and why. {line:int 0..5, to_yang:bool, reason, when}
 var last_flip: Dictionary = _empty_flip()
@@ -61,6 +65,7 @@ func _init() -> void:
 	character = CharacterScript.new()
 	character.line_opened.connect(_on_character_line_opened)
 	character.line_closed.connect(_on_character_line_closed)
+	earth = _normalise_hexagram({"id": 2, "bits": 2})
 
 
 func _on_character_line_opened(line: int) -> void:
@@ -165,6 +170,19 @@ func body_bits() -> int:
 	return int(body.get("bits", 0)) & 63
 
 
+func set_earth(e: Dictionary) -> bool:
+	var next: Dictionary = _normalise_hexagram(e, false)
+	if _same(next, earth):
+		return false
+	earth = next
+	earth_changed.emit(earth)
+	return true
+
+
+func earth_bits() -> int:
+	return int(earth.get("bits", 2)) & 63
+
+
 ## The seat a figure holds on its own wheel, 0..63. Absent, it is derived from
 ## the bits through the King Wen id, because the wheels are keyed by id.
 static func seq_index_of(bits: int, is_head: bool) -> int:
@@ -265,6 +283,7 @@ func dump() -> Dictionary:
 		"hexagram": body.duplicate(true),
 		"head": head.duplicate(true),
 		"body": body.duplicate(true),
+		"earth": earth.duplicate(true),
 		"last_flip": last_flip.duplicate(true),
 		"machine": machine.duplicate(true),
 		"human": human.duplicate(true),
@@ -278,6 +297,8 @@ func load_dump(d: Dictionary) -> void:
 		set_head(d["head"] as Dictionary)
 	if d.has("body") and d["body"] is Dictionary:
 		set_body(d["body"] as Dictionary)
+	if d.has("earth") and d["earth"] is Dictionary:
+		set_earth(d["earth"] as Dictionary)
 	elif d.has("hexagram") and d["hexagram"] is Dictionary:
 		set_body(d["hexagram"] as Dictionary)
 	if d.has("last_flip") and d["last_flip"] is Dictionary:
@@ -295,6 +316,7 @@ func load_dump(d: Dictionary) -> void:
 func reset() -> void:
 	set_head(_empty_hexagram())
 	set_body(_empty_hexagram())
+	set_earth(_normalise_hexagram({"id": 2, "bits": 2}))
 	set_last_flip(_empty_flip())
 	set_machine(_empty_family())
 	set_human(_empty_family())

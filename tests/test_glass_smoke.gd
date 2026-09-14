@@ -136,19 +136,19 @@ func _run() -> void:
 	check(store.has_method("head_bits") and int(store.head_bits()) == want_bits,
 		"a tap on the head ring wrote that figure into store.head")
 
-	# -- the earth ring casts the HEAD ---------------------------------------
-	var before_head: int = int(store.head_bits()) if store.has_method("head_bits") else -1
+	# -- the earth ring casts the EARTH altar --------------------------------
+	var before_earth: int = int(store.earth_bits()) if store.has_method("earth_bits") else -1
 	var earth: EarthDial2D = hud.earth_dial() as EarthDial2D
 	var cast_at: Vector2 = earth.station_position(0)
-	check(earth.station_label(0).contains("CAST HEAD"), "station 0 is the owner's CAST HEAD")
+	check(earth.station_label(0).contains("CAST"), "station 0 is the owner's CAST ALTAR")
 	var turned: bool = false
 	for attempt in range(6):
 		earth._gui_input(_tap(cast_at))
 		await process_frame
-		if store.has_method("head_bits") and int(store.head_bits()) != before_head:
+		if store.has_method("earth_bits") and int(store.earth_bits()) != before_earth:
 			turned = true
 			break
-	check(turned, "the CAST HEAD station throws six coins and the HEAD changes")
+	check(turned, "the CAST ALTAR station throws six coins and the EARTH changes")
 
 	# -- stillness walks the BODY one line at a time -------------------------
 	check(app.alchemy != null, "the app built an Alchemy and bound it")

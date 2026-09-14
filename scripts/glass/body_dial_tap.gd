@@ -1,12 +1,14 @@
 class_name BodyDialTap
 extends BodyDial2D
 
-## THE MACHINE REALM DIAL: FULL TOUCH-DRAG ORBIT & MACHINE SENSORS.
+## THE MACHINE REALM DIAL: FULL TOUCH-DRAG ORBIT & SENSOR INTERACTIONS.
 ##
 ## Dragging around the dial orbits the 3D creature and rotates the machine dial.
-## Tapping the 8 machine diamond stations opens telemetry for that sensor.
+## Tapping the 8 machine diamond stations opens telemetry and triggers sensor pulses.
+## Tapping the central 3D creature fetches full machine physical status.
 
 signal dial_dragged(delta_angle: float)
+signal center_clicked()
 
 ## The eight machine scores, 0..1, indexed by trigram code.
 var scores: Array = []
@@ -89,7 +91,7 @@ func _gui_input(event: InputEvent) -> void:
 	var is_press: bool = false
 	var is_release: bool = false
 	var is_move: bool = false
-	var ev_pos: Vector2 = Vector2.ZERO
+	var ev_pos: Vector2 = event.position
 
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		ev_pos = event.position
@@ -110,8 +112,10 @@ func _gui_input(event: InputEvent) -> void:
 		_has_moved = false
 		_prev_angle = (ev_pos - dial_center).angle()
 		accept_event()
-	elif is_move and _is_dragging:
-		if (ev_pos - _touch_down_pos).length() > 14.0:
+		return
+
+	if is_move and _is_dragging:
+		if (ev_pos - _touch_down_pos).length() > 10.0:
 			_has_moved = true
 		var cur_angle: float = (ev_pos - dial_center).angle()
 		var delta_ang: float = wrapf(cur_angle - _prev_angle, -PI, PI)
@@ -121,17 +125,44 @@ func _gui_input(event: InputEvent) -> void:
 		dial_dragged.emit(delta_ang)
 		queue_redraw()
 		accept_event()
-	elif is_release:
-		var move_dist: float = (ev_pos - _touch_down_pos).length()
-		var tap_dur: int = int(Time.get_ticks_msec()) - _touch_down_time
+		return
+
+	if is_release:
+		var was_drag: bool = _is_dragging and _has_moved
 		_is_dragging = false
-		if not _has_moved and move_dist < 18.0 and tap_dur < 400:
-			var pos: Vector2 = ev_pos
-			for station in MACHINE_STATIONS:
-				var ang: float = float(station["angle"])
-				var st: Vector2 = dial_center + Vector2(cos(ang), sin(ang)) * (dial_radius * 0.78)
-				if (pos - st).length() < 34.0:
-					machine_station_clicked.emit(int(station["trigram"]))
-					accept_event()
-					return
+		_has_moved = false
+		if was_drag:
+			accept_event()
+			return
+
+		# Tap detection
+		var dist: float = (ev_pos - dial_center).length()
+
+		# A. Check 8 Machine Diamond Stations
+		var closest_tri: int = -1
+		var closest_dist: float = 9999.0
+		for station in MACHINE_STATIONS:
+			var tri: int = int(station["trigram"])
+			var ang: float = float(station["angle"])
+			var st: Vector2 = dial_center + Vector2(cos(ang), sin(ang)) * (dial_radius * 0.78)
+			var d: float = (ev_pos - st).length()
+			if d < closest_dist:
+				closest_dist = d
+				closest_tri = tri
+
+		if closest_tri != -1 and closest_dist < 46.0:
+			active_machine_trigram = closest_tri
+			machine_station_clicked.emit(closest_tri)
+			Input.vibrate_handheld(25)
+			queue_redraw()
+			accept_event()
+			return
+
+		# B. Center 3D Creature Tap
+		if dist < dial_radius * 0.56:
+			center_clicked.emit()
+			Input.vibrate_handheld(30)
+			accept_event()
+			return
+
 		accept_event()

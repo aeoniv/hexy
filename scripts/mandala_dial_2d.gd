@@ -85,17 +85,20 @@ func _draw() -> void:
 	# Central Human Symbol (Active Habit Trigram Glyph & Caption)
 	var font: Font = get_theme_default_font()
 	if font != null:
-		var tri_name: String = KingWen.trigram_name(active_human_trigram)
-		var tri_glyph: String = KingWen.trigram_glyph(active_human_trigram)
-		var title: String = "HUMAN · %s" % tri_name.to_upper()
-		var tw: float = font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9).x
-		draw_string(font, dial_center + Vector2(-tw * 0.5, hub_r * 0.68), title,
-			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9, Color(0.65, 0.85, 1.0, 0.85))
+		var header: String = "HEAD · MIND & INTENT"
+		var hw: float = font.get_string_size(header, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9).x
+		draw_string(font, dial_center + Vector2(-hw * 0.5, -hub_r * 0.42), header,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9, Color(0.65, 0.88, 1.0, 0.95))
 		
-		# Center Glyph
-		var gw: float = font.get_string_size(tri_glyph, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 22).x
-		draw_string(font, dial_center + Vector2(-gw * 0.5, 7.0), tri_glyph,
-			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 22, Color(1.0, 0.85, 0.3, 0.95))
+		var job: String = "THOUGHT ENGINE"
+		var jw: float = font.get_string_size(job, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 11).x
+		draw_string(font, dial_center + Vector2(-jw * 0.5, 4.0), job,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 11, Color(1.0, 0.85, 0.35, 0.98))
+		
+		var sub: String = "[ TAP TO INQUIRE ]"
+		var sw: float = font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8).x
+		draw_string(font, dial_center + Vector2(-sw * 0.5, hub_r * 0.54), sub,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8, Color(0.55, 0.78, 0.95, 0.8))
 
 func _gui_input(event: InputEvent) -> void:
 	var is_press: bool = false

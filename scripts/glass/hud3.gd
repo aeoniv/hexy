@@ -280,12 +280,13 @@ func _build_body() -> void:
 	body.set_anchors_preset(Control.PRESET_FULL_RECT)
 	body_band.add_child(body)
 	body.machine_station_clicked.connect(_on_machine_diamond_tapped)
+	body.center_clicked.connect(_on_body_center_tapped)
 	body.dial_dragged.connect(_on_body_dial_dragged)
 
 	creature_field = Control.new()
 	creature_field.name = "CreatureField"
 	creature_field.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	creature_field.mouse_filter = Control.MOUSE_FILTER_STOP
+	creature_field.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	creature_field.gui_input.connect(_on_creature_input)
 	body_band.add_child(creature_field)
 	_layout_stage.call_deferred()
@@ -359,6 +360,7 @@ func _build_earth() -> void:
 	bands.add_child(earth)
 	earth.station_tapped.connect(_on_earth_station_tapped)
 	earth.hub_tapped.connect(_on_earth_hub_tapped)
+	earth.ring_slot_tapped.connect(_on_earth_ring_tapped)
 
 
 ## 5. THE COMPOSER: ask, a mic that is honest about being a stub, and send.
@@ -430,6 +432,7 @@ func bind(store: Node, qwen: Node, mnn: Node, wmn: Node) -> void:
 	if _store != null:
 		_join(_store, "head_changed", _on_head_changed)
 		_join(_store, "body_changed", _on_body_changed)
+		_join(_store, "earth_changed", _on_earth_changed)
 		_join(_store, "flipped", _on_flipped)
 		_join(_store, "hexagram_changed", _on_body_changed)
 		_join(_store, "machine_changed", _on_family_changed)
@@ -567,11 +570,7 @@ func _on_human_dot_tapped(trigram: int) -> void:
 
 func _on_head_hub_tapped() -> void:
 	var at: Vector2 = _hub_point(head)
-	var hb: int = _head_bits()
-	var upper_name: String = KingWen.trigram_name(KingWen.upper(hb))
-	var lower_name: String = KingWen.trigram_name(KingWen.lower(hb))
-	bubble.say("HEAD (HUMAN SENSORS / ORACLE)\n%s\nTrigrams: %s over %s" % [
-		_figure_word(hb), upper_name, lower_name], at)
+	bubble.say("🌙 HEAD (MIND & INTENT)\nThought Prior: Qwen 0.5B Active\nFocus: Human Consciousness\n[Inquiring Thought Engine...]", at)
 	if _qwen != null:
 		_stream = ""
 		_awaiting = true
@@ -579,7 +578,12 @@ func _on_head_hub_tapped() -> void:
 
 
 func _on_machine_diamond_tapped(trigram: int) -> void:
-	bubble.say(_sentence_of(0, trigram), _point_in_root(body, body.station_position(trigram)))
+	var at: Vector2 = _point_in_root(body, body.station_position(trigram))
+	var s_text: String = _sentence_of(0, trigram)
+	var tri_name: String = KingWen.trigram_name(trigram)
+	bubble.say("☀️ SENSOR: %s\n%s" % [tri_name, s_text], at)
+	if _creature != null and _creature.has_method("tap"):
+		_creature.tap(_to_stage(at))
 
 
 ## The twelve earth stations, in the order they are drawn.
@@ -587,16 +591,14 @@ func _on_earth_station_tapped(index: int) -> void:
 	var at: Vector2 = _point_in_root(earth, earth.station_position(index))
 	match index:
 		0:
-			_cast_head()
-			if _wmn != null and _wmn.has_method("broadcast"):
-				_wmn.broadcast(_head_dict(), _body_dict())
-			bubble.say("head cast: %s" % _figure_word(_head_bits()), at)
+			_cast_earth()
+			bubble.say("CAST ALTAR: %s" % _figure_word(_earth_bits()), at)
 		1:
-			_walk_head(head.head_slot() - 1, "tap")
-			bubble.say("head %s" % _figure_word(_head_bits()), at)
+			_walk_earth(earth.earth_slot() - 1, "tap")
+			bubble.say("earth %s" % _figure_word(_earth_bits()), at)
 		2:
-			_walk_head(head.head_slot() + 1, "tap")
-			bubble.say("head %s" % _figure_word(_head_bits()), at)
+			_walk_earth(earth.earth_slot() + 1, "tap")
+			bubble.say("earth %s" % _figure_word(_earth_bits()), at)
 		3:
 			_enhanced = not _enhanced
 			stage.visible = _enhanced
@@ -635,11 +637,22 @@ func _on_earth_station_tapped(index: int) -> void:
 ## The earth hub: Master Casting Altar and mesh broadcast.
 func _on_earth_hub_tapped() -> void:
 	var at: Vector2 = _hub_point(earth)
-	_cast_head()
-	if _wmn != null and _wmn.has_method("broadcast"):
-		_wmn.broadcast(_head_dict(), _body_dict())
+	_cast_earth()
 	bubble.say("CAST ALTAR (EARTH)\nThrew 6 coins -> %s\nBroadcasting to %d peers" % [
-		_figure_word(_head_bits()), _peer_count()], at)
+		_figure_word(_earth_bits()), _peer_count()], at)
+
+
+func _on_earth_ring_tapped(slot: int) -> void:
+	_walk_earth(slot, "tap")
+
+
+func _on_body_center_tapped() -> void:
+	var at: Vector2 = _hub_point(body)
+	var bb: int = _body_bits()
+	bubble.say("☀️ BODY (MACHINE PHYSICAL STATE)\n%s\nGeometry: %s | Civil Fire: %s\nStillness: %.1fs / 2.5s" % [
+		_figure_word(bb), _geometry_word(), _pacing_phrase(), _pacing_phrase()], at)
+	if _creature != null and _creature.has_method("tap"):
+		_creature.tap(_to_stage(at))
 
 
 func _on_body_dial_dragged(delta_ang: float) -> void:
@@ -714,8 +727,11 @@ func _on_submitted(text: String) -> void:
 
 func _on_head_changed(_h: Dictionary) -> void:
 	head.set_head_bits(_head_bits())
+
+
+func _on_earth_changed(_e: Dictionary) -> void:
 	if earth != null:
-		earth.set_hexagram(_head_bits())
+		earth.set_hexagram(_earth_bits())
 
 
 func _on_body_changed(_b: Dictionary) -> void:
@@ -765,7 +781,7 @@ func _refresh_dials() -> void:
 	head.set_head_bits(_head_bits())
 	body.set_body_bits(_body_bits())
 	if earth != null:
-		earth.set_hexagram(_head_bits())
+		earth.set_hexagram(_earth_bits())
 	head.active_human_trigram = int(_store.human.get("trigram", 0))
 	body.active_machine_trigram = int(_store.machine.get("trigram", 7))
 	if _senses != null and _senses.has_method("scores"):
@@ -1127,3 +1143,50 @@ static func _join(who_node: Object, what: String, to: Callable) -> void:
 		return
 	if not who_node.is_connected(what, to):
 		who_node.connect(what, to)
+
+
+func _walk_earth(slot: int, why: String) -> void:
+	var idx: int = posmod(slot, 64)
+	var hex: Dictionary = HuohoutuData.get_head_hex(idx)
+	var bits: int = int(hex.get("bits", 2))
+	_write_earth(bits, ([] as Array[int]), why, idx)
+
+
+func _cast_earth() -> void:
+	var now: int = _now_ms()
+	var cast: Dictionary = Cast.tap_cast(Cast.seed_of(now, _who, 0))
+	var bits: int = int(cast.get("bits", 0)) & 63
+	var throws: Array[int] = ([] as Array[int])
+	for v in (cast.get("throws", []) as Array):
+		throws.append(int(v))
+	var id: int = int(HuohoutuData.get_by_bits(bits).get("id", 1))
+	_write_earth(bits, throws, "tap", HuohoutuData.find_head_index_by_id(id))
+
+
+func _write_earth(bits: int, throws: Array[int], why: String, slot: int) -> void:
+	if earth != null:
+		earth.set_earth_slot(slot)
+	if _store == null or not _store.has_method("set_earth"):
+		return
+	_store.set_earth({
+		"bits": bits,
+		"moving": 0,
+		"throws": throws,
+		"when": _now_ms(),
+		"who": _who,
+		"source": why,
+	})
+	if _wmn != null and _wmn.has_method("broadcast"):
+		_wmn.broadcast(_earth_dict(), _body_dict())
+
+
+func _earth_bits() -> int:
+	if _store != null and _store.has_method("earth_bits"):
+		return int(_store.earth_bits())
+	return earth.hex_bits if earth != null else 2
+
+
+func _earth_dict() -> Dictionary:
+	if _store != null and _store.get("earth") is Dictionary:
+		return _store.earth as Dictionary
+	return {}
