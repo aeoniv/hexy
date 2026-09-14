@@ -62,3 +62,15 @@ All three parameters default to live values (`ModelStore.detect_total_ram_bytes(
 `DisplayServer.window_get_size()`, `OS.get_name()`) when omitted, but the
 function is fully deterministic and side-effect free when they're supplied
 explicitly — which is what the test suite does.
+
+## Getting an APK
+
+`*.apk` is gitignored and plugin AARs are never vendored. The APK comes from
+GitHub Actions (`.github/workflows/android-apk.yml`): every push to `main`
+or a `claude/**` branch uploads `hexy-debug-apk` as a workflow artifact, and
+a tag `v*` attaches `hexy-debug.apk` to the GitHub Release. The workflow
+fetches Godot 4.7.1, its export templates, `godot-lib` from
+`android_source.zip`, MNN 3.6.1, builds `ixmnn` and `ixmesh` with the
+pinned NDK 27 and CMake 3.22.1, and exports with the preset in
+`ci/export_presets.android.cfg`. Models are loaded from external storage on
+device, never packed into the APK.

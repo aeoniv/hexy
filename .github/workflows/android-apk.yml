@@ -1,0 +1,127 @@
+name: android-apk
+
+# Builds the two Godot Android plugins (ixmnn, ixmesh) and exports a debug
+# APK of hexy. The APK is never committed (*.apk is gitignored); it is
+# published as a workflow artifact on every push and as a GitHub Release
+# asset on tags v*. Models are never in the APK: ModelStore loads them from
+# external storage on device (see docs/).
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: 4.7.1
+  MNN_VERSION: 3.6.1
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Godot editor and export templates
+        run: |
+          set -eu
+          mkdir -p "$HOME/godot" "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip -d "$HOME/godot"
+          mv "$HOME/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" "$HOME/godot/godot"
+          curl -sSL -o templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q templates.tpz -d "$HOME/tpl"
+          mv "$HOME/tpl/templates/"* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+          rm -f godot.zip templates.tpz
+          "$HOME/godot/godot" --version
+
+      - name: godot-lib for the plugin build
+        run: |
+          set -eu
+          unzip -q -j "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip" \
+            libs/release/godot-lib.template_release.aar -d android_plugin/libs
+          ls -la android_plugin/libs
+
+      - name: MNN prebuilt runtime
+        run: |
+          set -eu
+          curl -sSL -o mnn.zip "https://github.com/alibaba/MNN/releases/download/${MNN_VERSION}/mnn_${MNN_VERSION}_android_armv7_armv8_cpu_opencl_vulkan.zip"
+          unzip -q mnn.zip -d mnn
+          mkdir -p android_plugin/libs/mnn-jni
+          cp -r mnn/mnn_${MNN_VERSION}_android_armv7_armv8_cpu_opencl_vulkan/arm64-v8a android_plugin/libs/mnn-jni/
+          cp -r mnn/mnn_${MNN_VERSION}_android_armv7_armv8_cpu_opencl_vulkan/armeabi-v7a android_plugin/libs/mnn-jni/
+          rm -rf mnn mnn.zip
+          ls android_plugin/libs/mnn-jni/arm64-v8a
+
+      - name: Android NDK and CMake the plugin pins
+        run: |
+          set -eu
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "ndk;27.0.12077973" "cmake;3.22.1" "platforms;android-35" "build-tools;35.0.0" >/dev/null
+
+      - name: Build and stage plugin AARs
+        working-directory: android_plugin
+        run: |
+          set -eu
+          chmod +x gradlew
+          ./gradlew --no-daemon exportAllAars
+          ls -R ../addons/ixmnn/bin ../addons/ixmesh/bin
+
+      - name: Debug keystore
+        run: |
+          set -eu
+          keytool -genkeypair -v -keystore "$HOME/debug.keystore" -storepass android -keypass android \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Editor settings for export
+        run: |
+          set -eu
+          mkdir -p "$HOME/.config/godot"
+          JAVA_DIR="$(dirname "$(dirname "$(readlink -f "$(which java)")")")"
+          cat > "$HOME/.config/godot/editor_settings-4.7.tres" <<TRES
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/java_sdk_path = "${JAVA_DIR}"
+          export/android/android_sdk_path = "${ANDROID_HOME}"
+          export/android/debug_keystore = "${HOME}/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          TRES
+          cp ci/export_presets.android.cfg export_presets.cfg
+
+      - name: Import project and install the Android build template
+        run: |
+          set -eu
+          "$HOME/godot/godot" --headless --path . --import || true
+          "$HOME/godot/godot" --headless --path . --install-android-build-template
+          ls android/build | head
+
+      - name: Export debug APK
+        run: |
+          set -eu
+          mkdir -p build
+          "$HOME/godot/godot" --headless --path . --export-debug "Android" build/hexy-debug.apk
+          ls -la build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hexy-debug-apk
+          path: build/hexy-debug.apk
+          if-no-files-found: error
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/hexy-debug.apk
