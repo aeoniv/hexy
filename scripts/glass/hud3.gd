@@ -153,6 +153,11 @@ var btn_send: Button = null
 
 var bubble: GlassBubble = null
 
+## THE GEAR'S OWN PANEL: the whole base app drawn as gauges, hidden until the
+## configure button is pressed. It is a sibling laid OVER the bands, never one
+## of them, so the three dials measure the same whether it stands or not.
+var dashboard: HexyDashboard = null
+
 var _store: Node = null
 var _qwen: Node = null
 var _mnn: Node = null
@@ -528,11 +533,14 @@ func bind(store: Node, qwen: Node, mnn: Node, wmn: Node) -> void:
 		_join(_store, "room_changed", _on_room_changed)
 		_join(_store, "answer_changed", _on_answer_changed)
 	_join(_mnn, "token", _on_token)
+	_build_dashboard()
 	_refresh_dials()
 
 
 func set_senses(senses: Node) -> void:
 	_senses = senses
+	if dashboard != null:
+		dashboard.set_senses(senses)
 	_refresh_dials()
 
 
@@ -584,6 +592,8 @@ func mic_listening() -> bool:
 ## The alchemy is held only so the glass can say what it last did.
 func set_alchemy(alchemy: Node) -> void:
 	_alchemy = alchemy
+	if dashboard != null:
+		dashboard.set_alchemy(alchemy)
 
 
 func alchemy() -> Node:
@@ -1107,9 +1117,34 @@ func config_text() -> String:
 	return "\n".join(lines)
 
 
+## THE GEAR OPENS THE DASHBOARD. config_text() is still the words, and the
+## telemetry tests still read them; the finger gets the gauges.
 func _on_configure_pressed() -> void:
-	var at: Vector2 = _point_in_root(status_panel, status_panel.size - Vector2(24.0, -10.0))
-	bubble.open_large(config_text(), at)
+	toggle_dashboard()
+
+
+## The dashboard, opened or shut. Returns whether it now stands.
+func toggle_dashboard() -> bool:
+	if dashboard == null:
+		_build_dashboard()
+	if dashboard == null:
+		return false
+	return bool(dashboard.toggle())
+
+
+func dashboard_open() -> bool:
+	return dashboard != null and bool(dashboard.is_open())
+
+
+## Built once, the moment the glass is handed the core, and laid over
+## everything else on the root -- above the radar pane, above the bands.
+func _build_dashboard() -> void:
+	if dashboard != null or root == null:
+		return
+	dashboard = HexyDashboard.new()
+	root.add_child(dashboard)
+	dashboard.set_host(self)
+	dashboard.bind(_store, _mnn, _wmn, _senses, _alchemy, _qwen)
 
 
 ## What the model is, what the fruit fly connectome is living, and what it is allowed to be on this phone.

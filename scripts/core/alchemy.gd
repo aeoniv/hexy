@@ -105,3 +105,30 @@ func inject(bits: int, when: int, source: String = "tap", who: String = "") -> v
 ## Decoupled: head dial tracks human breath and intention; it no longer overwrites the body.
 func _on_head_changed(_h: Dictionary) -> void:
 	pass
+
+
+## WHAT THE TWO FIRES ARE DOING, as one small read-only dictionary.
+##
+## The glass wants to draw the civil dwell as an arc and the martial
+## refractory as a countdown, and it must not reach into Pacing's privates to
+## do it. Everything here is read; nothing is changed.
+##
+## The needed dwell follows the DEVICE: a fold held open in flex gets the
+## longer breath its profile asks for (civil_fire_flex_multiplier), which is
+## the 2.5 s slab breath doubled to 5 s.
+func state() -> Dictionary:
+	var profile: Dictionary = DeviceProfile.resolve()
+	var flex: bool = bool(profile.get("has_hinge", false)) and bool(profile.get("is_dual_pane", false))
+	var mult: float = float(profile.get("civil_fire_flex_multiplier", 1.0)) if flex else 1.0
+	var now: int = _last_now_ms if _last_now_ms > 0 else Time.get_ticks_msec()
+	var flip: Dictionary = _store.last_flip if _store != null else {}
+	return {
+		"dwell_s": float(pacing.dwell()) if pacing != null else 0.0,
+		"dwell_needed_s": Pacing.CIVIL_FIRE_THRESHOLD * mult,
+		"refractory_s": float(pacing.refractory_s(now)) if pacing != null else 0.0,
+		"refractory_needed_s": Pacing.MUTATION_COOLDOWN,
+		"last_reason": String(flip.get("reason", "")),
+		"last_line": int(flip.get("line", 0)),
+		"flex": flex,
+		"bits": int(pacing.bits) if pacing != null else 0,
+	}

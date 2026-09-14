@@ -212,3 +212,11 @@ func _flip(target: int, now_s: float, kind: String) -> Dictionary:
 	var template: String = CIVIL_REASON if kind == "civil" else MARTIAL_REASON
 	var reason: String = template % [b + 1, LINE_NAMES[b], YANG_WORD if to_yang else YIN_WORD]
 	return {"bits": bits, "line": b, "to_yang": to_yang, "reason": reason, "kind": kind}
+
+
+## Seconds still to wait before the MARTIAL fire may turn another line, given
+## the host's clock. 0.0 means it is armed. The glass draws this as an arc; no
+## other caller needs it, and nothing here changes state.
+func refractory_s(now_ms: int) -> float:
+	var since: float = float(now_ms) / 1000.0 - _last_flip_s
+	return clampf(MUTATION_COOLDOWN - since, 0.0, MUTATION_COOLDOWN)
