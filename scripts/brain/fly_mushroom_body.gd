@@ -33,6 +33,18 @@ const DECAY_PER_SEC := 0.002
 # Generated deterministically via fixed seed
 var _proj_weights: PackedFloat32Array = PackedFloat32Array()
 
+# Sparse claw projection: in Drosophila biology, each Kenyon cell receives
+# input from only ~6-8 claws. Compressed Sparse Row (CSR) buffers eliminate
+# iterating over the ~75% zero weights in the projection matrix.
+var _claw_idx: PackedInt32Array = PackedInt32Array()
+var _claw_sign: PackedFloat32Array = PackedFloat32Array()
+var _claw_ptrs: PackedInt32Array = PackedInt32Array()
+
+# Reusable scratch buffers to eliminate per-feed heap allocations
+var _sense_vals: PackedFloat32Array = PackedFloat32Array()
+var _best_val: PackedFloat32Array = PackedFloat32Array()
+var _best_idx: PackedInt32Array = PackedInt32Array()
+
 # Associative synaptic weight matrix, flattened [out * NUM_KCS + kc].
 # Positive = Approach / Facilitate; Negative = Suppress
 var _weights: PackedFloat32Array = PackedFloat32Array()
@@ -52,6 +64,9 @@ var seed: int = DEFAULT_SEED
 
 func _init(p_seed: int = -1) -> void:
 	seed = install_seed() if p_seed < 0 else p_seed
+	_sense_vals.resize(NUM_INPUTS)
+	_best_val.resize(SPARSITY)
+	_best_idx.resize(SPARSITY)
 	_init_projection_matrix()
 	_init_synaptic_weights()
 	context_hash.resize(8)
@@ -61,6 +76,12 @@ func _init(p_seed: int = -1) -> void:
 ## Initializes deterministic pseudo-random projection matrix (16 inputs -> 256 KCs)
 func _init_projection_matrix() -> void:
 	_proj_weights.resize(NUM_KCS * NUM_INPUTS)
+	_claw_idx.clear()
+	_claw_sign.clear()
+	_claw_ptrs.resize(NUM_KCS + 1)
+	_claw_ptrs[0] = 0
+	var cur_ptr: int = 0
+
 	# Deterministic LCG seed to ensure byte-for-byte reproducibility
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
@@ -72,9 +93,16 @@ func _init_projection_matrix() -> void:
 			var v: float = 0.0
 			if r < 0.2:
 				v = -1.0
+				_claw_idx.append(inp)
+				_claw_sign.append(-1.0)
+				cur_ptr += 1
 			elif r > 0.8:
 				v = 1.0
+				_claw_idx.append(inp)
+				_claw_sign.append(1.0)
+				cur_ptr += 1
 			_proj_weights[kc * NUM_INPUTS + inp] = v
+		_claw_ptrs[kc + 1] = cur_ptr
 
 
 ## Initializes associative weights from Kenyon Cells to MBONs
@@ -94,40 +122,38 @@ func encode_context(sensory_inputs: Array) -> PackedInt32Array:
 	if sensory_inputs.size() < NUM_INPUTS:
 		return active_kcs
 
-	var sense_vals: PackedFloat32Array = PackedFloat32Array()
-	sense_vals.resize(NUM_INPUTS)
 	for inp in range(NUM_INPUTS):
-		sense_vals[inp] = float(sensory_inputs[inp])
+		_sense_vals[inp] = float(sensory_inputs[inp])
 
-	# Running top-K (SPARSITY) by score, kept sorted descending in place.
-	var best_val: PackedFloat32Array = PackedFloat32Array()
-	best_val.resize(SPARSITY)
-	best_val.fill(-INF)
-	var best_idx: PackedInt32Array = PackedInt32Array()
-	best_idx.resize(SPARSITY)
-	best_idx.fill(-1)
+	_best_val.fill(-INF)
+	_best_idx.fill(-1)
+
+	var s: PackedFloat32Array = _sense_vals
+	var c_idx: PackedInt32Array = _claw_idx
+	var c_sgn: PackedFloat32Array = _claw_sign
+	var c_ptr: PackedInt32Array = _claw_ptrs
 
 	for kc in range(NUM_KCS):
-		var base: int = kc * NUM_INPUTS
 		var sum_val := 0.0
-		# No "if w != 0.0" branch here: with ~60% of weights zero, the branch
-		# itself costs more in the interpreter than a multiply-by-zero does.
-		for inp in range(NUM_INPUTS):
-			sum_val += sense_vals[inp] * _proj_weights[base + inp]
-		if sum_val > best_val[SPARSITY - 1]:
+		var start_idx: int = c_ptr[kc]
+		var end_idx: int = c_ptr[kc + 1]
+		for p in range(start_idx, end_idx):
+			sum_val += s[c_idx[p]] * c_sgn[p]
+
+		if sum_val > _best_val[SPARSITY - 1]:
 			var pos := SPARSITY - 1
-			while pos > 0 and best_val[pos - 1] < sum_val:
-				best_val[pos] = best_val[pos - 1]
-				best_idx[pos] = best_idx[pos - 1]
+			while pos > 0 and _best_val[pos - 1] < sum_val:
+				_best_val[pos] = _best_val[pos - 1]
+				_best_idx[pos] = _best_idx[pos - 1]
 				pos -= 1
-			best_val[pos] = sum_val
-			best_idx[pos] = kc
+			_best_val[pos] = sum_val
+			_best_idx[pos] = kc
 
 	active_kcs.clear()
 	context_hash.fill(0)
 
 	for i in range(SPARSITY):
-		var kc_idx: int = best_idx[i]
+		var kc_idx: int = _best_idx[i]
 		active_kcs.append(kc_idx)
 
 		# Pack into 256-bit bitmask (8 x 32-bit ints)
