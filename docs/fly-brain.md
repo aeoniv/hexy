@@ -30,8 +30,21 @@ Formerly packaged as addons/ixffbrain. It is not an Android plugin: no Kotlin, n
 6. **Live Calcium Radar 2D**:
    - GCaMP fluorescence activity visualization with 8 Bagua trigrams and 6 neuromodulator gauges.
 
-## Performance targets (asserted by tests/test_fly_perf.gd, not yet measured on device)
-- Memory footprint: $< 1.5\text{ MB}$ RAM.
-- Computation time: $< 0.04\text{ ms}$ per frame at 60 FPS.
+## Performance targets
+
+Run the measurement yourself:
+
+```
+godot --headless --path . -s res://tests/test_fly_perf.gd
+```
+
+- Device goal (documented, not yet measured on a Fold 4 or A22): $< 1.5\text{ MB}$ RAM, $< 0.04\text{ ms}$ (40 us) per `feed()` at 60 FPS.
+- Measured on this x86 dev machine (headless Godot 4.5, 10 000-iteration run, `Character.feed_senses()` + `Character.get_fly_state()` per iteration, after a 500-call warmup):
+  - Mean: **~365 us/frame** (`FLY_FEED_MEAN_US`), about 9x the 40 us device goal -- expected, since the goal is for on-device (mobile CPU, likely with more optimized/compiled paths) and this is an interpreted-GDScript headless desktop run.
+  - p95: **~405 us/frame** (`FLY_FEED_P95_US`).
+  - `get_fly_state()` alone: **~16 us/call** (`FLY_STATE_READ_MEAN_US`) -- cheap; safe to call every HUD redraw.
+  - Memory delta over 10 000 feeds: **~163 KB** (`FLY_MEM_DELTA_BYTES`), well under the 1.5 MB target.
+  - Per-module breakdown (10 000 calls each): giant_fiber.step ~0.4 us, central_complex.step ~2.7 us, circadian_clock.update ~0.6 us, mushroom_body.encode_context ~270 us (the dominant cost -- a 256-Kenyon-cell x 16-input projection plus top-16 winner-take-all, done once per feed), mushroom_body.decay ~45 us, fly_brain.state() ~13 us.
+- `mushroom_body.encode_context()` was optimized during this measurement pass: it used to build 256 `Dictionary` objects per call and `sort_custom()` them with a lambda just to keep the top 16 (~880 us/call). It's now a running top-K insertion over a flat `PackedFloat32Array` projection matrix (previously an `Array` of `Array`s, which boxes every element as a `Variant`) -- same Winner-Take-All selection and output, ~3x faster (~270 us/call). No test's assertions or `state()` key set changed.
 - Zero neural network inference during continuous background operation.
 - Hardware-gated for Samsung Galaxy Z Fold 4 (Tabletop Flex-Mode & 12 GB RAM) and budget devices (Galaxy A22).

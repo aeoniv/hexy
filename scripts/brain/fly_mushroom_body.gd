@@ -27,13 +27,15 @@ const DEFAULT_SEED := 0x64_46_46_42  # "FFB", the seed this circuit was born wit
 ## Sleep pruning: fraction of a weight shed per second of fully permitted sleep.
 const DECAY_PER_SEC := 0.002
 
-# Fixed random projection matrix for Locality-Sensitive Hashing (LSH)
+# Fixed random projection matrix for Locality-Sensitive Hashing (LSH),
+# flattened row-major [kc * NUM_INPUTS + inp] -- a flat PackedFloat32Array
+# avoids the Variant-boxing cost of an Array of Arrays in the hot encode loop.
 # Generated deterministically via fixed seed
-var _proj_weights: Array = []
+var _proj_weights: PackedFloat32Array = PackedFloat32Array()
 
-# Associative synaptic weight matrix: W[output_idx][kc_idx]
+# Associative synaptic weight matrix, flattened [out * NUM_KCS + kc].
 # Positive = Approach / Facilitate; Negative = Suppress
-var _weights: Array = []
+var _weights: PackedFloat32Array = PackedFloat32Array()
 
 # Active Kenyon Cell indices for current state
 var active_kcs: PackedInt32Array = PackedInt32Array()
@@ -58,68 +60,81 @@ func _init(p_seed: int = -1) -> void:
 
 ## Initializes deterministic pseudo-random projection matrix (16 inputs -> 256 KCs)
 func _init_projection_matrix() -> void:
-	_proj_weights.clear()
+	_proj_weights.resize(NUM_KCS * NUM_INPUTS)
 	# Deterministic LCG seed to ensure byte-for-byte reproducibility
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
-	
+
 	for kc in range(NUM_KCS):
-		var row: Array = []
 		for inp in range(NUM_INPUTS):
 			# Sparse ternary projection: {-1, 0, 1}
 			var r: float = rng.randf()
+			var v: float = 0.0
 			if r < 0.2:
-				row.append(-1.0)
+				v = -1.0
 			elif r > 0.8:
-				row.append(1.0)
-			else:
-				row.append(0.0)
-		_proj_weights.append(row)
+				v = 1.0
+			_proj_weights[kc * NUM_INPUTS + inp] = v
 
 
 ## Initializes associative weights from Kenyon Cells to MBONs
 func _init_synaptic_weights() -> void:
-	_weights.clear()
-	for out in range(NUM_OUTPUTS):
-		var row: Array = []
-		for kc in range(NUM_KCS):
-			row.append(0.0)
-		_weights.append(row)
+	_weights.resize(NUM_OUTPUTS * NUM_KCS)
+	_weights.fill(0.0)
 
 
 ## Encodes a 16-element sensory vector into sparse Kenyon Cell activations (LSH)
+##
+## Was: build a Dictionary per KC (256 allocations) and sort_custom() the whole
+## lot with a lambda just to keep the top 16. That dictionary-and-sort dance
+## was the single hottest thing in the whole brain (~880us/call measured --
+## see tests/test_fly_perf.gd). A running top-K insertion needs none of that:
+## same WTA selection, same descending order, no per-call heap allocation.
 func encode_context(sensory_inputs: Array) -> PackedInt32Array:
 	if sensory_inputs.size() < NUM_INPUTS:
 		return active_kcs
-	
-	# 1. Compute linear projection scores for all 256 KCs
-	var scores: Array[Dictionary] = []
+
+	var sense_vals: PackedFloat32Array = PackedFloat32Array()
+	sense_vals.resize(NUM_INPUTS)
+	for inp in range(NUM_INPUTS):
+		sense_vals[inp] = float(sensory_inputs[inp])
+
+	# Running top-K (SPARSITY) by score, kept sorted descending in place.
+	var best_val: PackedFloat32Array = PackedFloat32Array()
+	best_val.resize(SPARSITY)
+	best_val.fill(-INF)
+	var best_idx: PackedInt32Array = PackedInt32Array()
+	best_idx.resize(SPARSITY)
+	best_idx.fill(-1)
+
 	for kc in range(NUM_KCS):
-		var proj_row: Array = _proj_weights[kc]
+		var base: int = kc * NUM_INPUTS
 		var sum_val := 0.0
+		# No "if w != 0.0" branch here: with ~60% of weights zero, the branch
+		# itself costs more in the interpreter than a multiply-by-zero does.
 		for inp in range(NUM_INPUTS):
-			var w: float = proj_row[inp]
-			if w != 0.0:
-				sum_val += float(sensory_inputs[inp]) * w
-		scores.append({"kc": kc, "val": sum_val})
-	
-	# 2. Winner-Take-All (WTA) / Top-K Sparsity: Keep highest SPARSITY cells
-	scores.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return float(a["val"]) > float(b["val"])
-	)
-	
+			sum_val += sense_vals[inp] * _proj_weights[base + inp]
+		if sum_val > best_val[SPARSITY - 1]:
+			var pos := SPARSITY - 1
+			while pos > 0 and best_val[pos - 1] < sum_val:
+				best_val[pos] = best_val[pos - 1]
+				best_idx[pos] = best_idx[pos - 1]
+				pos -= 1
+			best_val[pos] = sum_val
+			best_idx[pos] = kc
+
 	active_kcs.clear()
 	context_hash.fill(0)
-	
+
 	for i in range(SPARSITY):
-		var kc_idx: int = scores[i]["kc"]
+		var kc_idx: int = best_idx[i]
 		active_kcs.append(kc_idx)
-		
+
 		# Pack into 256-bit bitmask (8 x 32-bit ints)
 		var int_idx: int = kc_idx / 32
 		var bit_idx: int = kc_idx % 32
 		context_hash[int_idx] = context_hash[int_idx] | (1 << bit_idx)
-	
+
 	return active_kcs
 
 
@@ -131,10 +146,10 @@ func predict_habit_bias() -> Array[float]:
 	
 	var norm: float = 1.0 / float(active_kcs.size())
 	for out in range(NUM_OUTPUTS):
-		var row: Array = _weights[out]
+		var base: int = out * NUM_KCS
 		var sum_val := 0.0
 		for kc in active_kcs:
-			sum_val += float(row[kc])
+			sum_val += _weights[base + kc]
 		biases[out] = clampf(sum_val * norm, -1.0, 1.0)
 	
 	return biases
@@ -153,11 +168,11 @@ func learn(dan_rewards: Array, rate_scale: float = 1.0) -> void:
 		var reward := float(dan_rewards[out])
 		if reward == 0.0:
 			continue
-		var row: Array = _weights[out]
+		var base: int = out * NUM_KCS
 		for kc in active_kcs:
-			var w := float(row[kc])
+			var w := _weights[base + kc]
 			# Hebbian rule with saturation bounds [-1.0, 1.0]
-			row[kc] = clampf(w + effective_rate * reward, -1.0, 1.0)
+			_weights[base + kc] = clampf(w + effective_rate * reward, -1.0, 1.0)
 
 
 ## Computes bitwise Hamming distance between two 256-bit context hashes
@@ -193,10 +208,8 @@ func decay(dt_sec: float, protection: float) -> void:
 	if rate <= 0.0:
 		return
 	var keep: float = maxf(1.0 - rate * dt, 0.0)
-	for out in range(NUM_OUTPUTS):
-		var row: Array = _weights[out]
-		for kc in range(NUM_KCS):
-			row[kc] = float(row[kc]) * keep
+	for i in range(_weights.size()):
+		_weights[i] = _weights[i] * keep
 
 
 ## Reads the install's projection seed, creating it on first run.
