@@ -288,6 +288,12 @@ func set_host(host: Node) -> void:
 # -- opening and closing -----------------------------------------------------
 
 func open() -> void:
+	var p := get_parent_control()
+	if p != null and p.size.x > 8.0 and p.size.y > 8.0:
+		size = p.size
+		set_anchors_preset(Control.PRESET_FULL_RECT)
+		if backdrop != null:
+			backdrop.size = p.size
 	visible = true
 	move_to_front()
 	_refresh()
