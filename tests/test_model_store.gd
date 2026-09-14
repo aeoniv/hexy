@@ -42,5 +42,27 @@ func _init() -> void:
 	OS.unset_environment("HEXY_CHAT_MODEL")
 	OS.unset_environment("HEXY_RAM_BYTES")
 	
+	# Test 5: MemTotal read out of a meminfo PAGE, not out of a file gate.
+	# The Fold answers false to FileAccess.file_exists("/proc/meminfo") and -1
+	# to OS.get_memory_info()["physical"], so the only number it will ever give
+	# comes from parsing this page; when the parse was skipped the phone sat on
+	# the 4 GiB floor and resolved generic_slab instead of galaxy_z_fold4.
+	var page := "MemTotal:       11522060 kB
+MemFree:         1234 kB
+"
+	var parsed := ModelStore.parse_meminfo(page)
+	print("Test 5 (meminfo page): %d bytes (%.1f GiB)" % [
+		parsed, float(parsed) / (1024.0 * 1024.0 * 1024.0)])
+	assert(parsed == 11522060 * 1024, "MemTotal must be read as kB and returned as bytes")
+	assert(ModelStore.parse_meminfo("") == 0, "an empty page must yield nothing, not a guess")
+	assert(ModelStore.parse_meminfo("MemFree: 12 kB") == 0, "only MemTotal counts")
+
+	# Test 6: a Fold-sized page resolves the Fold, not the fallback slab.
+	var fold := DeviceProfile.resolve(parsed, Vector2i(904, 2316), "Android")
+	print("Test 6 (Fold cover): profile=%s layout=%s lane=%s" % [
+		fold["id"], fold["layout"], fold["chat_lane"]])
+	assert(fold["id"] == "galaxy_z_fold4", "11 GiB at 2.562:1 is the Fold, not a generic slab")
+	assert(fold["layout"] == "tall_slab", "the cover screen is a tall slab")
+
 	print("--- ALL MODEL STORE TESTS PASSED PERFECTLY ---")
 	quit(0)

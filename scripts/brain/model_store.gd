@@ -67,26 +67,56 @@ static func detect_total_ram_bytes() -> int:
 		if env_val.is_valid_int():
 			return env_val.to_int()
 	
-	# 2. Linux / Android /proc/meminfo
-	if FileAccess.file_exists(MEMINFO):
-		var f := FileAccess.open(MEMINFO, FileAccess.READ)
-		if f:
-			while not f.eof_reached():
-				var line := f.get_line()
-				if line.begins_with(MEMINFO_KEY):
-					var parts := line.split(" ", false)
-					if parts.size() >= 2 and parts[1].is_valid_int():
-						var kb: int = parts[1].to_int()
-						return kb * 1024
-			f.close()
+	# 2. The engine's own figure, where the platform gives one.
+	var physical: int = int(OS.get_memory_info().get("physical", -1))
+	if physical > 0:
+		return physical
+
+	# 3. Linux / Android /proc/meminfo, OPENED WITHOUT ASKING FIRST. On Android
+	# FileAccess.file_exists() answers false for a procfs entry that opens and
+	# reads perfectly well, so the gate that used to stand here threw the real
+	# number away and left the phone on the 4 GiB floor.
+	var text: String = _read_meminfo()
+	var parsed: int = parse_meminfo(text)
+	if parsed > 0:
+		return parsed
 	
-	# 3. Desktop / Engine heuristic fallback
+	# 4. Desktop / Engine heuristic fallback
 	# If running on desktop without meminfo, treat as developer workstation (16 GiB)
 	if OS.get_name() in ["Windows", "macOS", "Linux"]:
 		return 16 * 1024 * 1024 * 1024
 	
 	# Safe default for unknown devices: assume 4 GB floor
 	return 4 * 1024 * 1024 * 1024
+
+
+## The text of /proc/meminfo, by whichever door the platform leaves open:
+## FileAccess first, then a plain `cat`. Empty when there is no such file.
+static func _read_meminfo() -> String:
+	var f := FileAccess.open(MEMINFO, FileAccess.READ)
+	if f != null:
+		var text: String = f.get_as_text()
+		f.close()
+		if text.strip_edges() != "":
+			return text
+	var out: Array = []
+	if OS.execute("cat", [MEMINFO], out, false) == 0 and not out.is_empty():
+		return String(out[0])
+	return ""
+
+
+## MemTotal, in bytes, from the text of a meminfo file. Zero when the text
+## carries no such line. Pure, so a headless test can hold it to a fixed page.
+static func parse_meminfo(text: String) -> int:
+	for raw in text.split("
+"):
+		var line: String = String(raw).strip_edges()
+		if not line.begins_with(MEMINFO_KEY):
+			continue
+		var parts: PackedStringArray = line.split(" ", false)
+		if parts.size() >= 2 and parts[1].is_valid_int():
+			return parts[1].to_int() * 1024
+	return 0
 
 
 static func get_external_storage_dir() -> String:

@@ -151,6 +151,15 @@ func _fly_lamp() -> void:
 		hud._store.get_character().get_instance_id() if hud._store != null else -1,
 		oracle.store.get_character().get_instance_id() if oracle.store != null else -1,
 		hud.radar_layout(), "fed" if dial != null and dial.is_visible_in_tree() else "cold"])
+	## THE INPUTS THE PROFILE WAS RESOLVED FROM, said out loud, because a lamp
+	## that names the answer and not the question cannot tell a wrong table
+	## from a wrong measurement.
+	var view: Vector2i = prof.get("resolved_viewport", Vector2i(1, 1))
+	print("hexy ram: ram=%d aspect=%.3f os=%s layout=%s lane=%s" % [
+		int(prof.get("resolved_ram_bytes", -1)),
+		float(view.y) / maxf(1.0, float(view.x)),
+		String(prof.get("resolved_os_name", "?")),
+		String(prof.get("layout", "?")), String(prof.get("chat_lane", "?"))])
 	for _i in 5:
 		await get_tree().create_timer(2.0).timeout
 		print("hexy fly: gyro=%s grav=%s" % [str(Input.get_gyroscope()), str(Input.get_gravity())])
