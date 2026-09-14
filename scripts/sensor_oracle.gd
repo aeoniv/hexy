@@ -474,7 +474,7 @@ func build_sense_vector() -> PackedFloat32Array:
 func build_brain_sample(raw_acc: Vector3) -> Dictionary:
 	return {
 		"accel": raw_acc,
-		"gyro_yaw_rate": filtered_gyro.z,
+		"gyro_yaw_rate": filtered_gyro.z + (float(store.get("swarm_yaw")) if store != null and store.get("swarm_yaw") != null else 0.0),
 		"solar_hour": solar_hour,
 		"heading_deg": current_heading_deg,
 		"senses": build_sense_vector(),

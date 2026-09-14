@@ -24,6 +24,20 @@ const NEURO_COLORS := [
 var central_complex: RefCounted = null
 var character: RefCounted = null
 
+## THE STATE DICTIONARY, WHICH IS THE ONLY THING THE GLASS HANDS OVER.
+## `set_state` fills these from one `get_fly_state()` call, so the shipping
+## surface never reaches into a brain subsystem for a member. When nothing has
+## been fed the radar falls back to `central_complex` / `character` exactly as
+## it did before, which is how the brain's own scenes still drive it.
+var _fed: bool = false
+var _heading: float = 0.0
+var _coherence: float = 0.0
+var _startled: bool = false
+var _activity: PackedFloat32Array = PackedFloat32Array()
+var _mods: PackedFloat32Array = PackedFloat32Array()
+## fabric peer id -> their heading in radians. Drawn as ticks on the outer ring.
+var _peers: Dictionary = {}
+
 @export var radar_radius: float = 72.0
 @export var ring_thickness: float = 18.0
 @export var show_neuromodulators: bool = true
@@ -35,6 +49,59 @@ func _init() -> void:
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(220, 260)
+
+
+## ONE DICTIONARY IN, THE WHOLE DIAL OUT. The keys are Character's fixed
+## `get_fly_state()` keys and nothing else.
+##
+## The eight wedges are not in that dictionary -- the character publishes a
+## heading and a coherence, not the ellipsoid body's raw calcium -- so the bump
+## is rebuilt here: a cosine hill centred on the heading, sharpened by
+## coherence, normalised to sum 1. A flat 0.125 ring is exactly what zero
+## coherence means, which is the honest picture of a fly that is not oriented.
+func set_state(fs: Dictionary) -> void:
+	if fs.is_empty():
+		return
+	_fed = true
+	_heading = float(fs.get("heading_rad", 0.0))
+	_coherence = clampf(float(fs.get("coherence", 0.0)), 0.0, 1.0)
+	_startled = bool(fs.get("is_startled", false))
+	_activity = bump_of(_heading, _coherence)
+	_mods = PackedFloat32Array([
+		float(fs.get("dopamine", 0.0)),
+		float(fs.get("serotonin", 0.0)),
+		float(fs.get("octopamine", 0.0)),
+		float(fs.get("gaba", 0.0)),
+		_coherence,
+		float(fs.get("acetylcholine", 0.0)),
+	])
+
+
+## The eight-wedge calcium bump for a heading and a coherence. Static and pure,
+## so a test can read it without a tree.
+static func bump_of(heading: float, coherence: float) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	var total: float = 0.0
+	var sharp: float = 0.2 + 2.8 * clampf(coherence, 0.0, 1.0)
+	for i in range(8):
+		var ang: float = float(i) * TAU / 8.0
+		var v: float = pow(maxf(0.0, 0.5 + 0.5 * cos(ang - heading)), sharp)
+		out.append(v)
+		total += v
+	if total <= 0.0:
+		return PackedFloat32Array([0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125])
+	for i in range(8):
+		out[i] = out[i] / total
+	return out
+
+
+## The swarm, as MeshFabric.peer_headings keeps it: peer id -> radians.
+func set_peer_headings(headings: Dictionary) -> void:
+	_peers = headings.duplicate()
+
+
+func peer_heading_count() -> int:
+	return _peers.size()
 
 
 func _process(_delta: float) -> void:
@@ -50,8 +117,16 @@ func _draw() -> void:
 	draw_arc(center, radar_radius, 0.0, TAU, 48, Color(0.12, 0.16, 0.22, 0.8), ring_thickness, true)
 	
 	# 2. Draw 8 Calcium Activity Wedges
-	var activities: Array = central_complex.activity if (central_complex and "activity" in central_complex) else [0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125]
-	var current_heading: float = central_complex.current_heading if (central_complex and "current_heading" in central_complex) else 0.0
+	var activities: Array = [0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125]
+	var current_heading: float = 0.0
+	if _fed:
+		activities = Array(_activity)
+		current_heading = _heading
+	elif central_complex != null:
+		if "activity" in central_complex:
+			activities = central_complex.activity
+		if "current_heading" in central_complex:
+			current_heading = central_complex.current_heading
 	
 	for i in range(8):
 		var start_angle: float = float(i) * tau_slice - (tau_slice * 0.5)
@@ -74,31 +149,47 @@ func _draw() -> void:
 	# 3. Inner Heading Cursor Needle
 	var needle_dir := Vector2(cos(current_heading), sin(current_heading))
 	var needle_end := center + needle_dir * (radar_radius - ring_thickness * 0.6)
-	draw_line(center, needle_end, Color(1.0, 0.95, 0.3, 0.95), 2.5, true)
-	draw_circle(center, 4.0, Color(1.0, 0.95, 0.3, 0.95))
+	var needle_col := Color(1.0, 0.35, 0.25, 0.95) if _startled else Color(1.0, 0.95, 0.3, 0.95)
+	draw_line(center, needle_end, needle_col, 2.5, true)
+	draw_circle(center, 4.0, needle_col)
 	
+	# 3b. THE SWARM ON THE OUTER RING. Every peer that has pulsed a heading at
+	# us gets one short tick outside the wedges -- the only thing this radar
+	# ever says about somebody else's body, and it says it without a name.
+	var tick_r: float = radar_radius + ring_thickness * 0.5 + 3.0
+	for pid in _peers:
+		var pa: float = float(_peers[pid])
+		var dir := Vector2(cos(pa), sin(pa))
+		draw_line(center + dir * tick_r, center + dir * (tick_r + 7.0),
+			Color(0.55, 0.8, 1.0, 0.85), 2.0, true)
+
 	# 4. Neuromodulator Spectrum Gauges
-	if show_neuromodulators and character != null and "_fullness" in character:
-		var bar_y := center.y + radar_radius + 36.0
-		var bar_w := size.x * 0.8
-		var bar_x := (size.x - bar_w) * 0.5
-		var bar_h := 7.0
-		var spacing := 14.0
+	if show_neuromodulators and _fed:
+		_draw_bars(center, Array(_mods))
+	elif show_neuromodulators and character != null and "_fullness" in character:
+		_draw_bars(center, Array(character._fullness))
+
+
+## The six bars, wherever the numbers came from.
+func _draw_bars(center: Vector2, fullness_arr: Array) -> void:
+	var bar_y := center.y + radar_radius + 36.0
+	var bar_w := size.x * 0.8
+	var bar_x := (size.x - bar_w) * 0.5
+	var bar_h := 7.0
+	var spacing := 14.0
+	for n in range(mini(6, fullness_arr.size())):
+		var y: float = bar_y + float(n) * spacing
+		var val: float = clampf(float(fullness_arr[n]), 0.0, 1.0)
 		
-		var fullness_arr: Array = character._fullness
-		for n in range(mini(6, fullness_arr.size())):
-			var y: float = bar_y + float(n) * spacing
-			var val: float = clampf(float(fullness_arr[n]), 0.0, 1.0)
-			
-			# Label
-			draw_string(ThemeDB.fallback_font, Vector2(bar_x, y - 2), NEURO_NAMES[n], HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.65, 0.72, 0.8))
-			# Value text
-			draw_string(ThemeDB.fallback_font, Vector2(bar_x + bar_w - 28, y - 2), "%d%%" % int(val * 100.0), HORIZONTAL_ALIGNMENT_RIGHT, -1, 9, Color(0.85, 0.9, 0.95))
-			
-			# Bar track
-			draw_rect(Rect2(bar_x, y, bar_w, bar_h), Color(0.12, 0.15, 0.20, 0.9), true)
-			# Fill
-			var fill_color: Color = NEURO_COLORS[n]
-			if val < 0.5:
-				fill_color = fill_color.lerp(Color(0.4, 0.4, 0.4), 0.5)
-			draw_rect(Rect2(bar_x, y, bar_w * val, bar_h), fill_color, true)
+		# Label
+		draw_string(ThemeDB.fallback_font, Vector2(bar_x, y - 2), NEURO_NAMES[n], HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.65, 0.72, 0.8))
+		# Value text
+		draw_string(ThemeDB.fallback_font, Vector2(bar_x + bar_w - 28, y - 2), "%d%%" % int(val * 100.0), HORIZONTAL_ALIGNMENT_RIGHT, -1, 9, Color(0.85, 0.9, 0.95))
+		
+		# Bar track
+		draw_rect(Rect2(bar_x, y, bar_w, bar_h), Color(0.12, 0.15, 0.20, 0.9), true)
+		# Fill
+		var fill_color: Color = NEURO_COLORS[n]
+		if val < 0.5:
+			fill_color = fill_color.lerp(Color(0.4, 0.4, 0.4), 0.5)
+		draw_rect(Rect2(bar_x, y, bar_w * val, bar_h), fill_color, true)

@@ -43,6 +43,11 @@ const HEAD_H: float = 300.0
 const EARTH_H: float = 300.0
 const COMPOSER_H: float = 54.0
 const BAND_GAP: int = 8
+## The left column the radar takes on a fold that is open, in pixels, and the
+## two sizes the radar itself is given in its two placements.
+const RADAR_PANE_W: float = 300.0
+const RADAR_TALL_H: float = 420.0
+const RADAR_DISC_H: float = 190.0
 
 ## THE STAGE IS THE WHOLE GLASS, which is how the owner's own scene did it.
 ##
@@ -120,6 +125,16 @@ var body_band: Control = null
 var body: BodyDialTap = null
 var earth: EarthDial2D = null
 
+## THE CALCIUM RADAR, the fly's own ellipsoid body drawn where a person can
+## see it. It is fed one `get_fly_state()` dictionary a frame and nothing else,
+## and where it stands is DeviceProfile's decision, not this file's:
+##   dual pane   a column of its own down the left, the bands moved off it
+##   tall slab   a small disc in a band of its own directly under the body
+## Either way it is laid out beside the three dials and never over them.
+var radar: Control = null
+var radar_pane: CenterContainer = null
+var pad: MarginContainer = null
+
 var stage: SubViewportContainer = null
 var view: SubViewport = null
 var creature_field: Control = null
@@ -150,6 +165,9 @@ var _enhanced: bool = true
 ## not throw a panel over the head dial at boot: the bubble is a REPLY.
 var _awaiting: bool = false
 var _pacing: Script = null
+## Which of the two radar placements is standing. Re-read on every resize, and
+## the radar is only moved when the answer actually changed.
+var _radar_layout: String = ""
 
 
 # -- building ----------------------------------------------------------------
@@ -177,7 +195,7 @@ func _ready() -> void:
 
 	_build_stage()
 
-	var pad := MarginContainer.new()
+	pad = MarginContainer.new()
 	pad.name = "Pad"
 	pad.set_anchors_preset(Control.PRESET_FULL_RECT)
 	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -196,11 +214,75 @@ func _ready() -> void:
 	_build_body()
 	_build_earth()
 	_build_composer()
+	_build_radar()
 
 	bubble = GlassBubble.new()
 	root.add_child(bubble)
 
 	set_process(true)
+
+
+## THE RADAR AND ITS LEFT PANE. The pane is a container of its own so the
+## radar is centred in it without this file doing arithmetic, and the bands are
+## pushed off it by the one margin that already exists.
+func _build_radar() -> void:
+	radar_pane = CenterContainer.new()
+	radar_pane.name = "RadarPane"
+	radar_pane.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	radar_pane.offset_left = 8.0
+	radar_pane.offset_right = 8.0 + RADAR_PANE_W
+	radar_pane.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	radar_pane.visible = false
+	root.add_child(radar_pane)
+
+	radar = FlyCalciumRadar2D.new()
+	radar.name = "CalciumRadar"
+	radar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_apply_radar_layout()
+
+
+## WHERE THE RADAR STANDS, asked of DeviceProfile and nobody else. A fold open
+## has room for a column beside the glass; a slab does not, and gets the disc.
+func _apply_radar_layout() -> void:
+	if radar == null or root == null or bands == null or pad == null:
+		return
+	var box: Vector2i = Vector2i(root.size)
+	if box.x < 8 or box.y < 8:
+		box = DisplayServer.window_get_size()
+	var profile: Dictionary = DeviceProfile.resolve(-1, box, "")
+	var want: String = "dual_pane" if bool(profile.get("is_dual_pane", false)) else "tall_slab"
+	if want == _radar_layout and radar.get_parent() != null:
+		return
+	_radar_layout = want
+	if radar.get_parent() != null:
+		radar.get_parent().remove_child(radar)
+	if want == "dual_pane":
+		radar_pane.visible = true
+		radar_pane.add_child(radar)
+		radar.radar_radius = 108.0
+		radar.ring_thickness = 24.0
+		radar.show_neuromodulators = true
+		radar.custom_minimum_size = Vector2(RADAR_PANE_W, RADAR_TALL_H)
+		pad.add_theme_constant_override("margin_left", int(RADAR_PANE_W) + 16)
+	else:
+		radar_pane.visible = false
+		radar.radar_radius = 66.0
+		radar.ring_thickness = 15.0
+		radar.show_neuromodulators = false
+		radar.custom_minimum_size = Vector2(220.0, RADAR_DISC_H)
+		radar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		bands.add_child(radar)
+		bands.move_child(radar, body_band.get_index() + 1)
+		pad.add_theme_constant_override("margin_left", 8)
+
+
+## The radar's placement, as a word: "dual_pane" or "tall_slab".
+func radar_layout() -> String:
+	return _radar_layout
+
+
+func radar_dial() -> Control:
+	return radar
 
 
 ## 1. THE STATUS STRIP: one line that keeps a person informed, newest first,
@@ -773,6 +855,21 @@ func _on_token(t: String) -> void:
 
 func _process(_delta: float) -> void:
 	status_label.text = _status_line()
+	_feed_radar()
+
+
+## ONE DICTIONARY A FRAME, and the swarm's headings beside it. Both are read
+## duck-typed through the objects bind() handed over; the glass names no brain
+## and no transport.
+func _feed_radar() -> void:
+	if radar == null or not radar.is_visible_in_tree():
+		return
+	if _store != null and _store.has_method("get_character"):
+		var ch: Variant = _store.get_character()
+		if ch != null and ch.has_method("get_fly_state"):
+			radar.set_state(ch.get_fly_state() as Dictionary)
+	if _wmn != null and _wmn.has_method("peer_headings"):
+		radar.set_peer_headings(_wmn.peer_headings() as Dictionary)
 
 
 func _refresh_dials() -> void:
@@ -802,6 +899,7 @@ func _refresh_room() -> void:
 func _layout_stage() -> void:
 	if root == null or stage == null or body_band == null:
 		return
+	_apply_radar_layout()
 	var box: Vector2 = root.size
 	if box.x < 8.0 or box.y < 8.0:
 		return
@@ -1216,6 +1314,8 @@ func _write_earth(bits: int, throws: Array[int], why: String, slot: int) -> void
 		"who": _who,
 		"source": why,
 	})
+	if _store.has_method("note_cast"):
+		_store.note_cast("cast_confirmed")
 	if _wmn != null and _wmn.has_method("broadcast"):
 		_wmn.broadcast(_earth_dict(), _body_dict())
 

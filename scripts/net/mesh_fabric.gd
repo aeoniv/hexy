@@ -54,6 +54,9 @@ signal swarm_heading_received(peer_id: String, heading_rad: float, oa: float)
 
 var peer_headings: Dictionary = {}
 var peer_respirations: Dictionary = {}
+## fabric src id -> the whole last bio payload we heard from them, so a radar
+## can draw a peer's heading, breath and habit without a second message kind.
+var peer_bio: Dictionary = {}
 
 const Envelope := preload("res://scripts/net/event_envelope.gd")
 const IdentityScript := preload("res://scripts/social/identity.gd")
@@ -228,8 +231,14 @@ func _on_transport_peer_lost(id: String) -> void:
 	_peer_src.erase(id)
 	_peer_cls.erase(id)
 	_peer_names.erase(id)
+	var fid: String = String(_peer_src.get(id, ""))
+	if fid != "":
+		peer_headings.erase(fid)
+		peer_respirations.erase(fid)
+		peer_bio.erase(fid)
 	peer_headings.erase(id)
 	peer_respirations.erase(id)
+	peer_bio.erase(id)
 	peer_lost.emit(id)
 
 
@@ -266,6 +275,7 @@ func _on_transport_event(peer_id: String, data: Dictionary) -> void:
 		var oa_val: float = float(body_dict.get("oa", 0.5))
 		peer_headings[src_id] = h_val
 		peer_respirations[src_id] = oa_val
+		peer_bio[src_id] = body_dict.duplicate(true)
 		swarm_heading_received.emit(src_id, h_val, oa_val)
 		
 	fabric_event.emit(src_id, kind_str, body_dict, str(data["prov"]))
@@ -289,16 +299,43 @@ func seen_count() -> int:
 	return _seen.size()
 
 
-## Broadcasts current Central Complex heading and respiration state to swarm peers
-func broadcast_bio_state(heading_rad: float, oa: float) -> void:
-	emit_event("fly_bio_pulse", {
-		"heading": heading_rad,
-		"oa": oa,
-		"t": Time.get_ticks_msec()
-	})
+## THE ORGANISM ON THE WIRE. One pulse: which way the central complex is
+## pointing, how hard the body is breathing, and the six-line habit the
+## mushroom body has learned. It rides at ttl 1 on purpose -- a heading is a
+## fact about a body in a room and stops in that room (EventEnvelope's privacy
+## law, which also strips `head` from anything a relay touches).
+## Returns the envelope so a caller (and a test) can read what went out.
+func broadcast_bio_state(heading_rad: float, oa: float, habit_bias: Array = [],
+		q6: PackedFloat32Array = PackedFloat32Array()) -> Dictionary:
+	return emit_event("fly_bio_pulse", bio_payload(heading_rad, oa, habit_bias, q6), 1)
 
 
-## Computes Kuramoto phase coupling angular adjustment toward peer consensus
+## The payload builder, pure and testable on its own. Floats are rounded to
+## three decimals because nothing downstream draws finer than that and a phone
+## should not pay for digits nobody reads.
+static func bio_payload(heading_rad: float, oa: float, habit_bias: Array = [],
+		q6: PackedFloat32Array = PackedFloat32Array()) -> Dictionary:
+	var habit := PackedFloat32Array()
+	for h in habit_bias:
+		habit.append(snappedf(float(h), 0.001))
+	var body := {
+		"heading": snappedf(heading_rad, 0.001),
+		"oa": snappedf(oa, 0.001),
+		"habit_bias": habit,
+		"t": Time.get_ticks_msec(),
+	}
+	if q6.size() > 0:
+		var mass := PackedFloat32Array()
+		for v in q6:
+			mass.append(snappedf(float(v), 0.001))
+		body["q6"] = mass
+	return body
+
+
+## KURAMOTO, AND SOMEBODY LISTENS NOW. The value is an extra yaw rate, in
+## radians per second, that pulls this body toward the swarm consensus; Wmn
+## ticks it into HexyStore.swarm_yaw twice a second and the oracle adds it to
+## the gyro sample. Two peers at +0.5 and -0.5 cancel; one peer at +1.0 pulls.
 func compute_kuramoto_coupling(current_heading: float, coupling_gain: float = 0.15) -> float:
 	if peer_headings.is_empty():
 		return 0.0

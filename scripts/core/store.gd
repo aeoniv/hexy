@@ -52,10 +52,20 @@ var human: Dictionary = _empty_family()
 
 const CharacterScript := preload("res://scripts/brain/character.gd")
 
+## The most the room may turn this body, in radians per second.
+const MAX_SWARM_YAW: float = 1.0
+
 ## {bits:int, moving:int, peers:int}
 var room: Dictionary = _empty_room()
 
 var answer: String = ""
+
+## THE SWARM'S PULL, in radians per second. MeshFabric computes a Kuramoto
+## coupling from the headings of everyone in the room and Wmn ticks it in here
+## twice a second; the sensor oracle adds it to the gyro yaw rate it samples,
+## so a room full of hexys slowly turns to face the same way. Zero means a
+## room of one, which is also what it reads with no mesh at all.
+var swarm_yaw: float = 0.0
 
 ## Biological Fruit Fly Character Homeostat
 var character: RefCounted = null
@@ -88,10 +98,26 @@ func _on_character_line_closed(line: int) -> void:
 	})
 
 
+## The swarm's pull on this body. Clamped: a coupling is a nudge, never a spin.
+func set_swarm_yaw(rad_per_s: float) -> void:
+	swarm_yaw = clampf(rad_per_s, -MAX_SWARM_YAW, MAX_SWARM_YAW)
+
+
 func get_character() -> RefCounted:
 	if character == null:
 		character = CharacterScript.new()
 	return character
+
+
+## A CAST LANDED. The glass owns the cast gestures, so the glass must say so:
+## call this the moment a cast is confirmed and committed, and the mushroom
+## body gets its dopamine for the context that was live when it happened.
+## Any name from FlyBrain.REWARDS works; the default is the cast.
+func note_cast(kind: String = "cast_confirmed") -> float:
+	var ch: RefCounted = get_character()
+	if ch == null or not ch.has_method("reward_event"):
+		return 0.0
+	return float(ch.reward_event(kind))
 
 
 static func _empty_hexagram() -> Dictionary:

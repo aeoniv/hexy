@@ -23,6 +23,9 @@ extends Node3D
 const BallScript := preload("res://scripts/creature_ball_3d.gd")
 const MandalaScript := preload("res://scripts/sensor_mandala_3d.gd")
 
+## How long the phone buzzes when the giant fibre fires, in milliseconds.
+const STARTLE_BUZZ_MS: int = 120
+
 ## A machine node was tapped: the glass should cast.
 signal throw_requested(trigram: int)
 ## The solid turned to another geometry (0 ico, 1 rhombic dodeca, 2 triaconta).
@@ -35,6 +38,10 @@ var camera: Camera3D = null
 var _store: Node = null
 var _senses: Node = null
 var _node_hit: bool = false
+## THE STARTLE EDGE. The giant fibre either fires or it does not; a phone that
+## buzzed once a frame while a fly was escaping would be a phone nobody keeps
+## in a pocket. So the pulse is sent on the false -> true crossing alone.
+var _was_startled: bool = false
 
 
 func _init() -> void:
@@ -72,6 +79,15 @@ func _process(_delta: float) -> void:
 			var dfb_v: float = float(fly.get("gaba", 0.2))
 			var curl_v: float = float(fly.get("curl", 0.0))
 			ball.set_fly_brain_state(h_rad, oa_v, da_v, dfb_v, curl_v)
+			_pulse_on_startle(bool(fly.get("is_startled", false)))
+
+
+## ONE BUZZ PER ESCAPE, and only where there is something to buzz. Desktop and
+## the test rig have no vibrator, and asking for one there is a no-op at best.
+func _pulse_on_startle(now_startled: bool) -> void:
+	if now_startled and not _was_startled and OS.has_feature("mobile"):
+		Input.vibrate_handheld(STARTLE_BUZZ_MS)
+	_was_startled = now_startled
 
 
 # -- wiring ------------------------------------------------------------------

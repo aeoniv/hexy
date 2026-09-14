@@ -41,6 +41,11 @@ const FIGURE_TTL := 2
 ## A chirp is a measurement between two phones and is meaningless anywhere else
 ## -- the same ruling EventEnvelope makes for `chirp` in PRIVATE_BODY_KEYS.
 const CHIRP_TTL := 1
+## THE ORGANISM'S OWN BEAT, and it is not the room's. A figure is news and goes
+## out when it changes; a heading is a continuous fact and goes out on a clock,
+## twice a second, which is fast enough for a swarm to turn together and slow
+## enough that a pocketful of phones is not a radio.
+const BIO_PERIOD_MS := 500
 
 var fabric: MeshFabric = null
 var clock := ChirpClock.new()
@@ -67,6 +72,10 @@ var _heard := {}
 var _peer_body := {}
 var _store: Node = null
 var _binding := false
+## Whether the bio pulse goes out at all. A test that only wants figures on the
+## wire turns it off; the app leaves it on.
+var bio_pulse := true
+var _bio_next_ms := 0
 
 
 func fabric_id() -> String:
@@ -366,6 +375,7 @@ func _process(_delta: float) -> void:
 		peer_gone.emit(who)
 	if not gone.is_empty():
 		_publish_room()
+	_bio_beat(now)
 	if presence.due(now):
 		send_chirp()
 		if not _self_h.is_empty():
@@ -373,6 +383,69 @@ func _process(_delta: float) -> void:
 				{WIRE_KEY: Envelope6.to_wire(Envelope6.KIND_FIGURE,
 					int(_self_h["bits"]), _payload_of(_self_h))},
 				FIGURE_TTL)
+
+
+## -- THE ORGANISM ON THE WIRE ------------------------------------------------
+
+## Twice a second: the body's heading and breath and the six-line habit go out
+## to the room, and the room's answer comes back as one number -- the Kuramoto
+## coupling, written into the store as `swarm_yaw`. That is the whole feedback
+## loop, and it is the reason the coupling exists: the sensor oracle adds
+## `store.swarm_yaw` to the gyro yaw rate it samples, so a phone standing in a
+## room of hexys is turned, a little, by the ones around it.
+func _bio_beat(now: int) -> void:
+	if not bio_pulse or fabric == null or _store == null:
+		return
+	if now < _bio_next_ms:
+		return
+	_bio_next_ms = now + BIO_PERIOD_MS
+	var fly: Dictionary = _fly_state()
+	if fly.is_empty():
+		return
+	var heading := float(fly.get("heading_rad", 0.0))
+	fabric.broadcast_bio_state(
+		heading,
+		float(fly.get("octopamine", 0.5)),
+		(fly.get("habit_bias", []) as Array),
+		_q6_mass())
+	if _store.has_method("set_swarm_yaw"):
+		_store.set_swarm_yaw(fabric.compute_kuramoto_coupling(heading))
+
+
+## The character's state, duck-typed. A store too old to have one is silent.
+func _fly_state() -> Dictionary:
+	if _store == null or not _store.has_method("get_character"):
+		return {}
+	var ch: Variant = _store.get_character()
+	if ch == null or not ch.has_method("get_fly_state"):
+		return {}
+	return ch.get_fly_state() as Dictionary
+
+
+## The 64-corner Q6 mass, IF the store has learned to publish one. It does not
+## today -- the cloud lives in Alchemy's Pacing, not in the store -- so this is
+## the seam rather than the feature, and the payload simply carries no `q6`.
+func _q6_mass() -> PackedFloat32Array:
+	if _store != null and _store.has_method("q6_mass"):
+		var raw: Variant = _store.q6_mass()
+		if raw is PackedFloat32Array:
+			return raw
+		if raw is Array or raw is PackedFloat64Array:
+			var out := PackedFloat32Array()
+			for v in raw:
+				out.append(float(v))
+			return out
+	return PackedFloat32Array()
+
+
+## What the swarm is saying, for a glass that wants to draw it: peer id ->
+## heading in radians, and peer id -> their last whole bio payload.
+func peer_headings() -> Dictionary:
+	return fabric.peer_headings if fabric != null else {}
+
+
+func peer_bio() -> Dictionary:
+	return fabric.peer_bio if fabric != null else {}
 
 
 ## -- SHAPES ------------------------------------------------------------------
