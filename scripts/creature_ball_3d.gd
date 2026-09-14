@@ -25,6 +25,19 @@ enum GeometryMode {
 @export var sensor_mode_enabled: bool = false
 @export var is_thinking: bool = false
 
+var target_heading_yaw: float = 0.0
+var octopamine_level: float = 0.5
+var dopamine_level: float = 0.5
+var dfb_sleep_level: float = 0.2
+var startle_curl: float = 0.0
+
+func set_fly_brain_state(heading_angle_rad: float, oa: float, da: float, dfb: float, curl: float = 0.0) -> void:
+	target_heading_yaw = heading_angle_rad
+	octopamine_level = clampf(oa, 0.0, 1.0)
+	dopamine_level = clampf(da, 0.0, 1.0)
+	dfb_sleep_level = clampf(dfb, 0.0, 1.0)
+	startle_curl = clampf(curl, 0.0, 1.0)
+
 func set_thinking(val: bool) -> void:
 	is_thinking = val
 var gravity_strain: Vector3 = Vector3.ZERO
@@ -448,9 +461,13 @@ func _compute_base_vertices(bits: int, ext: float, fold: float) -> Array[Vector3
 	return tips
 
 func _update_geometry(anim_time: float) -> void:
-	var breath: float = sin(anim_time * 2.5) * 0.035
-	var current_ext: float = extension + breath
-	var current_fold: float = fold_factor + sin(anim_time * 1.5) * 0.02
+	if cord_immediate_mesh == null or face_immediate_mesh == null:
+		return
+	var breath_freq: float = lerpf(1.2, 3.8, octopamine_level)
+	var breath_amp: float = lerpf(0.02, 0.05, octopamine_level)
+	var breath: float = sin(anim_time * breath_freq) * breath_amp
+	var current_ext: float = (extension + breath) * (1.0 - startle_curl * 0.45)
+	var current_fold: float = fold_factor + sin(anim_time * 1.5) * 0.02 + (startle_curl * 0.25)
 	
 	var tips: Array[Vector3] = _compute_base_vertices(hexagram_bits, current_ext, current_fold)
 	
@@ -633,6 +650,8 @@ func _process(delta: float) -> void:
 		gravity_strain = gravity_strain.lerp(Vector3.ZERO, delta * 3.0)
 	
 	# Real Physical Sensor Orientation with natural organic breath (No touch tumbling)
+	if not is_dragging:
+		current_rot.x = lerp_angle(current_rot.x, target_heading_yaw, delta * 2.0)
 	current_rot.x = fmod(current_rot.x, TAU)
 	current_rot.y = clamp(current_rot.y, -PI * 0.45, PI * 0.45)
 	transform.basis = Basis()

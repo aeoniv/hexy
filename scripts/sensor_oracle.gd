@@ -90,16 +90,31 @@ var current_machine_tri: int = 7 # Heaven
 var current_human_tri: int = 7   # Heaven
 
 const FlyCentralComplexScript := preload("res://scripts/brain/fly_central_complex.gd")
+const FlyGiantFiberScript := preload("res://scripts/brain/fly_giant_fiber.gd")
+
 var central_complex: RefCounted = null
+var giant_fiber: RefCounted = null
 
 
 func _ready() -> void:
 	central_complex = FlyCentralComplexScript.new()
+	giant_fiber = FlyGiantFiberScript.new()
 	anchor_grav = Vector3(0.0, -9.8, 0.0)
 	filtered_grav = anchor_grav
 	var time_dict = Time.get_time_dict_from_system()
 	solar_hour = float(time_dict.get("hour", 12)) + float(time_dict.get("minute", 0)) / 60.0
 	_classify_both_trigrams()
+
+
+## Detects Samsung Galaxy Z Fold 4 Tabletop Flex Mode:
+## - Hinge angled (gravity split between Y and Z axes: |y| in 4.5..9.0 and |z| in 3.5..8.5)
+## - Phone is stationary on a desk (filtered_jerk < 0.25 and filtered_gyro.length() < 0.2)
+func is_flex_mode_tabletop() -> bool:
+	var y_component := absf(filtered_grav.y)
+	var z_component := absf(filtered_grav.z)
+	var is_angled := (y_component >= 4.5 and y_component <= 9.0) and (z_component >= 3.5 and z_component <= 8.5)
+	var is_resting_flat := filtered_jerk < 0.25 and filtered_gyro.length() < 0.2
+	return is_angled and is_resting_flat
 
 
 func set_enabled(val: bool) -> void:
@@ -154,8 +169,18 @@ func _process(delta: float) -> void:
 		
 	_sample_hardware_extensions()
 	
+	if giant_fiber != null:
+		giant_fiber.step(delta, raw_acc)
+	
 	if central_complex != null:
 		central_complex.step(delta, filtered_gyro.z, 0.015)
+		# Stimulus injection from machine and human trigram attractors
+		var stim := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+		if current_machine_tri >= 0 and current_machine_tri < 8:
+			stim[current_machine_tri] += 0.5
+		if current_human_tri >= 0 and current_human_tri < 8:
+			stim[current_human_tri] += 0.5
+		central_complex.inject_stimulus(stim, delta * 0.3)
 	
 	var time_dict = Time.get_time_dict_from_system()
 	solar_hour = float(time_dict.get("hour", 12)) + float(time_dict.get("minute", 0)) / 60.0
@@ -200,8 +225,10 @@ func _process(delta: float) -> void:
 	if target_bits != current_hex_bits:
 		if target_bits == last_target_bits:
 			var stillness: float = clamp(1.0 - (filtered_jerk / 1.6 + filtered_gyro.length() / 1.2), 0.0, 1.0)
-			if stillness > 0.4:
-				civil_fire_dwell += delta * stillness * 1.15
+			var is_tabletop: bool = is_flex_mode_tabletop()
+			if stillness > 0.4 or is_tabletop:
+				var rate_multiplier: float = 2.0 if is_tabletop else 1.15
+				civil_fire_dwell += delta * maxf(stillness, 0.5) * rate_multiplier
 				if civil_fire_dwell >= CIVIL_FIRE_THRESHOLD and (now - last_mutation_time >= 2.0):
 					var diff: int = current_hex_bits ^ target_bits
 					var bit_to_flip: int = 0

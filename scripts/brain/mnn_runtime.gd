@@ -1,4 +1,4 @@
-﻿extends RefCounted
+extends RefCounted
 class_name MnnRuntime
 ## Alibaba MNN Runtime bridge for on-device Qwen LLM and GTE embeddings.
 ## Connects to the native IxMnn Android plugin on device, or uses an offline fallback.
@@ -130,6 +130,21 @@ func _format_prompt(prompt: String) -> String:
 	if ModelStore.wants_no_think(_chat_model):
 		return prompt + QWEN_NO_THINK
 	return prompt
+
+## Formats prompt with dynamic Drosophila biological state context
+func format_biological_prompt(user_query: String, bio_telemetry: Dictionary) -> String:
+	var mood_prefix := ""
+	if not bio_telemetry.is_empty():
+		var da := int(bio_telemetry.get("da", 0.5) * 100.0)
+		var oa := int(bio_telemetry.get("oa", 0.5) * 100.0)
+		var dfb := int(bio_telemetry.get("dfb", 0.2) * 100.0)
+		var compass: String = bio_telemetry.get("compass_trigram", "Heaven 乾")
+		var posture: String = bio_telemetry.get("posture", "Upright")
+		var circadian: String = bio_telemetry.get("circadian_phase", "Day")
+		mood_prefix = "[Organism State: DA=%d%%, OA=%d%%, Rest=%d%% | Heading: %s | Posture: %s | Phase: %s]\n" % [
+			da, oa, dfb, compass, posture, circadian
+		]
+	return _format_prompt(mood_prefix + user_query)
 
 func chat(prompt: String) -> String:
 	if available():

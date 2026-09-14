@@ -69,11 +69,33 @@ const MOOD_STEADY := "steady"
 const MOOD_QUIET := "quiet"
 const MOOD_SLUGGISH := "sluggish"
 
+const FlyMushroomBodyScript := preload("res://scripts/brain/fly_mushroom_body.gd")
+const FlyGiantFiberScript := preload("res://scripts/brain/fly_giant_fiber.gd")
+const FlyCircadianClockScript := preload("res://scripts/brain/fly_circadian_clock.gd")
+
 var _fullness: Array[float] = [0.6, 0.6, 0.6, 0.6, 0.6, 0.0]
 var _last_tick_ms := -1
 var _was_open: Array[bool] = [true, true, true, true, true, false]
 var _last_spoke_ms := -1
 var enable_connectome_coupling: bool = true
+
+var mushroom_body: RefCounted = null
+var giant_fiber: RefCounted = null
+var circadian_clock: RefCounted = null
+
+
+func _init() -> void:
+	mushroom_body = FlyMushroomBodyScript.new()
+	giant_fiber = FlyGiantFiberScript.new()
+	circadian_clock = FlyCircadianClockScript.new()
+	giant_fiber.startled.connect(_on_giant_fiber_startled)
+
+
+func _on_giant_fiber_startled(intensity: float, _reason: String) -> void:
+	# Flight arousal spike (Octopamine)
+	_set_fullness(LINE_BREATH, _fullness[LINE_BREATH] + 0.25 * intensity)
+	# Mild suppression of rest due to acute startle
+	_set_fullness(LINE_REST, clampf(_fullness[LINE_REST] * (1.0 - 0.2 * intensity), 0.0, 1.0))
 
 
 static func _rate_per_ms(line0: int) -> float:
@@ -216,13 +238,18 @@ func _lowest_need_line() -> int:
 	return best_line
 
 
-## Returns the Q6 bias vector in [-1.0, 1.0]^6 for Q6Lattice
-func to_q6_bias() -> PackedFloat64Array:
+## Returns the Q6 bias vector in [-1.0, 1.0]^6 for Q6Lattice, optionally blended with learned habit biases
+func to_q6_bias(incorporate_habits: bool = true) -> PackedFloat64Array:
 	var p := PackedFloat64Array()
 	p.resize(NEED_COUNT)
 	for i in NEED_COUNT:
 		p[i] = _fullness[i]
-	return FlyConductanceScript.to_q6_bias(p)
+	var base_bias: PackedFloat64Array = FlyConductanceScript.to_q6_bias(p)
+	if incorporate_habits and mushroom_body != null:
+		var habit_biases: Array[float] = mushroom_body.predict_habit_bias()
+		for i in NEED_COUNT:
+			base_bias[i] = clampf(float(base_bias[i]) * 0.85 + habit_biases[i] * 0.15, -1.0, 1.0)
+	return base_bias
 
 
 ## Returns biological metadata for a line (0..5)

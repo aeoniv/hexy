@@ -82,7 +82,26 @@ func tick(now_ms: int) -> Dictionary:
 	return out
 
 
-## A cast at the head lands in the body whole, and the fires go quiet while it
-## settles. This is the ONE direction the two figures speak in.
+## An explicit cast lands in the body whole, re-anchoring pacing and locking out both fires.
+func inject(bits: int, when: int, source: String = "tap", who: String = "") -> void:
+	if _injecting or _store == null:
+		return
+	_injecting = true
+	var b: int = bits & 63
+	var w: int = maxi(when, _last_now_ms)
+	pacing.inject(b, w)
+	_store.set_body({
+		"bits": b,
+		"moving": 0,
+		"throws": [],
+		"when": w,
+		"who": who,
+		"source": source,
+		"seq_index": HexyStore.seq_index_of(b, false),
+	})
+	_injecting = false
+
+
+## Decoupled: head dial tracks human breath and intention; it no longer overwrites the body.
 func _on_head_changed(_h: Dictionary) -> void:
 	pass

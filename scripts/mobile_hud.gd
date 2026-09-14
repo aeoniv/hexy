@@ -7,6 +7,11 @@ const SensorOracle = preload("res://scripts/sensor_oracle.gd")
 const MeshFabric = preload("res://scripts/net/mesh_fabric.gd")
 const IdentityScript = preload("res://scripts/social/identity.gd")
 const ReadingWordsScript = preload("res://scripts/creature/reading_words.gd")
+const FlyCalciumRadar2DScript = preload("res://scripts/brain/fly_calcium_radar_2d.gd")
+const CharacterScript = preload("res://scripts/brain/character.gd")
+
+var character: RefCounted = null
+var calcium_radar: Control = null
 
 @onready var top_bar: PanelContainer = $TopBar
 @onready var lbl_title: Label = $TopBar/Margin/HBox/Title
@@ -76,9 +81,18 @@ func _ready() -> void:
 	if mandala_dial.has_signal("center_hub_clicked"):
 		mandala_dial.center_hub_clicked.connect(_on_center_hub_clicked)
 	
+	character = CharacterScript.new()
 	sensor_oracle = SensorOracle.new()
 	sensor_oracle.enabled = true
 	add_child(sensor_oracle)
+	
+	calcium_radar = FlyCalciumRadar2DScript.new()
+	calcium_radar.name = "CalciumRadar2D"
+	calcium_radar.central_complex = sensor_oracle.central_complex
+	calcium_radar.character = character
+	calcium_radar.visible = false
+	add_child(calcium_radar)
+	
 	sensor_oracle.shake_started.connect(_on_shake_started)
 	sensor_oracle.shake_progress.connect(_on_shake_progress)
 	sensor_oracle.shake_cast_completed.connect(_on_shake_cast_completed)
@@ -259,6 +273,13 @@ func _on_autonomous_mutation_stepped(new_bits: int, moving_line: int, reason: St
 		if b_dial.has_method("select_by_id"):
 			b_dial.select_by_id(body_hex_id)
 	
+	# Reinforce Mushroom Body Hebbian habit memory
+	if character and character.mushroom_body != null:
+		if reason.contains("Civil Fire"):
+			character.mushroom_body.learn([0.1, 0.0, 0.0, 0.3, 0.8, 0.0])
+		elif reason.contains("Martial Fire"):
+			character.mushroom_body.learn([0.8, 0.0, 0.8, -0.2, 0.2, 0.0])
+	
 	_update_huohoutu_ui(reason)
 
 func _on_human_station_clicked(tri_idx: int) -> void:
@@ -332,6 +353,42 @@ func _on_sensor_telemetry_updated(g: Vector3, heading: float, jerk: float, lower
 		var snap: Dictionary = sensor_oracle.get_telemetry_snapshot()
 		if mandala_3d_node and mandala_3d_node.has_method("update_telemetry"):
 			mandala_3d_node.update_telemetry(snap)
+			
+		# Live Fly-Brain Subsystem Tick & Context Encoding
+		if character:
+			character.tick(Time.get_ticks_msec())
+			if character.mushroom_body != null:
+				var sensory_16: Array = [
+					snap.get("lux", 0.0) / 1000.0,
+					snap.get("battery", 50.0) / 100.0,
+					snap.get("solar_hour", 12.0) / 24.0,
+					snap.get("kinetic_excitation", 0.0),
+					absf(g.x) / 9.8,
+					absf(g.y) / 9.8,
+					absf(g.z) / 9.8,
+					jerk / 5.0,
+					float(lower_tri) / 7.0,
+					float(upper_tri) / 7.0,
+					heading / 360.0,
+					1.0 if sensor_oracle.is_flex_mode_tabletop() else 0.0,
+					snap.get("proximity", 0.0),
+					0.5, 0.5, 0.5
+				]
+				character.mushroom_body.encode_context(sensory_16)
+			
+			if creature_node and creature_node.has_method("set_fly_brain_state"):
+				var h_rad: float = sensor_oracle.central_complex.heading_angle() if sensor_oracle.central_complex else 0.0
+				var oa_v: float = character.get_fullness(character.LINE_BREATH)
+				var da_v: float = character.get_fullness(character.LINE_BODY)
+				var dfb_v: float = character.get_fullness(character.LINE_REST)
+				var curl_v: float = sensor_oracle.giant_fiber.get_curl_factor() if sensor_oracle.giant_fiber else 0.0
+				creature_node.set_fly_brain_state(h_rad, oa_v, da_v, dfb_v, curl_v)
+				
+		# Conspecific Kuramoto Swarm Sync
+		if mesh_fabric and sensor_oracle and sensor_oracle.central_complex:
+			var k_shift: float = mesh_fabric.compute_kuramoto_coupling(sensor_oracle.central_complex.current_heading)
+			if k_shift != 0.0:
+				sensor_oracle.central_complex.step(0.016, k_shift * 0.4)
 	last_telemetry_data = {
 		"g": g, "heading": heading, "jerk": jerk,
 		"lower": lower_tri, "upper": upper_tri
@@ -548,6 +605,22 @@ func _on_ask_pressed() -> void:
 			String.num_int64(cur["bits"], 2).pad_zeros(6),
 			moving, changing_need
 		]
+		
+		# Ground with live biological organism telemetry
+		var bio: Dictionary = {}
+		if character:
+			bio["da"] = character.get_fullness(character.LINE_BODY)
+			bio["oa"] = character.get_fullness(character.LINE_BREATH)
+			bio["dfb"] = character.get_fullness(character.LINE_REST)
+			if character.circadian_clock:
+				var cmod: Dictionary = character.circadian_clock.get_circadian_modifiers()
+				bio["circadian_phase"] = cmod.get("phase_name", "Day")
+		if sensor_oracle:
+			if sensor_oracle.central_complex:
+				var tri_idx: int = sensor_oracle.central_complex.dominant_trigram()
+				bio["compass_trigram"] = SensorOracle.TRIGRAM_NAMES[tri_idx]
+			bio["posture"] = "Tabletop Flex-Mode (Sanctuary)" if sensor_oracle.is_flex_mode_tabletop() else "Active Posture"
+		prompt = mnn.format_biological_prompt(prompt, bio)
 	else:
 		lbl_thought.text = "☯ Consulting I-Ching Persona (%s)...\nHexagram #%d %s" % [mnn.short_name(), cur_id, cur["name"]]
 		prompt = "You are the ancient Book of Changes oracle. Speak in brief poetic wisdom on Hexagram #%d %s (%s). Two sentences maximum." % [
@@ -563,6 +636,8 @@ func _on_ask_pressed() -> void:
 
 func _switch_mode(mode: String) -> void:
 	active_mode = mode
+	if calcium_radar:
+		calcium_radar.visible = false
 	tab_companion.modulate = Color(1.0, 1.0, 1.0, 1.0 if mode == "companion" else 0.5)
 	tab_oracle.modulate = Color(1.0, 1.0, 1.0, 1.0 if mode == "oracle" else 0.5)
 	tab_brain.modulate = Color(1.0, 1.0, 1.0, 1.0 if mode == "brain" else 0.5)
@@ -601,6 +676,9 @@ func _switch_mode(mode: String) -> void:
 		if body_dial_container:
 			body_dial_container.visible = false
 		thought_bubble.visible = true
+		if calcium_radar:
+			calcium_radar.visible = true
+			calcium_radar.position = Vector2((size.x - 220) * 0.5, 170.0)
 		btn_cast.text = "🪙 CAST HEAD"
 		btn_cast.modulate = Color(0.5, 0.9, 1.0)
 		btn_ask.text = "🧠 Ask MNN"
@@ -640,3 +718,21 @@ func _switch_mode(mode: String) -> void:
 		btn_prev.visible = false
 		btn_next.visible = false
 		_update_telemetry_view()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED:
+		_check_fold4_dual_pane()
+
+
+func _check_fold4_dual_pane() -> void:
+	var vp_size: Vector2 = get_viewport_rect().size
+	if vp_size.x > 1200.0:
+		# Galaxy Z Fold 4 Unfolded Mode (1812 x 2176) Dual-Pane Studio
+		var mid_x: float = vp_size.x * 0.46
+		if calcium_radar:
+			calcium_radar.visible = true
+			calcium_radar.position = Vector2(mid_x * 0.5 - 110.0, vp_size.y * 0.52)
+		if thought_bubble:
+			thought_bubble.position = Vector2(mid_x + 15.0, 110.0)
+			thought_bubble.size = Vector2(vp_size.x - mid_x - 30.0, 320.0)

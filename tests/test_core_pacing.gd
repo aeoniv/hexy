@@ -253,9 +253,9 @@ func _test_alchemy() -> void:
 	check(String(store.last_flip["reason"]) != "", "the store remembers why the last line turned")
 	check(int(store.last_flip["when"]) > 0, "and when")
 
-	# A head cast lands in the body whole, and the fire goes quiet.
-	store.set_head({"bits": 0b111000, "moving": 0, "when": 70000})
-	check(store.body_bits() == 0b111000, "a head cast is injected into the body")
+	# An injected cast lands in the body whole, and the fire goes quiet.
+	al.inject(0b111000, 70000, "tap")
+	check(store.body_bits() == 0b111000, "an explicit cast is injected into the body")
 	check(String(store.body["source"]) == "tap", "and the body says a person did it")
 	check(al.pacing.bits == 0b111000, "the pacing re-anchored on the cast")
 	check(al.tick(71000).is_empty(), "and both fires are locked out for 2.5 s")

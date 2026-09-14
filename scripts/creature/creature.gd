@@ -55,6 +55,22 @@ func _ready() -> void:
 	add_child(camera)
 	if not ball.machine_node_clicked.is_connected(_on_machine_node_clicked):
 		ball.machine_node_clicked.connect(_on_machine_node_clicked)
+	set_process(true)
+
+
+func _process(_delta: float) -> void:
+	if _store != null and _store.has_method("get_character"):
+		var ch: Variant = _store.get_character()
+		if ch != null and ball != null and ball.has_method("set_fly_brain_state"):
+			var cc: Variant = ch.get("central_complex")
+			var gf: Variant = ch.get("giant_fiber")
+			var nms: Dictionary = ch.get_neuromodulators() if ch.has_method("get_neuromodulators") else {}
+			var h_rad: float = float(cc.get("heading_rad")) if cc != null else 0.0
+			var oa_v: float = float(nms.get("octopamine", 0.5))
+			var da_v: float = float(nms.get("dopamine", 0.5))
+			var dfb_v: float = float(nms.get("gaba", 0.2))
+			var curl_v: float = float(gf.get("startle_intensity")) if (gf != null and gf.get("startle_intensity") != null) else 0.0
+			ball.set_fly_brain_state(h_rad, oa_v, da_v, dfb_v, curl_v)
 
 
 # -- wiring ------------------------------------------------------------------

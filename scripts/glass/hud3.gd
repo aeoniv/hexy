@@ -985,12 +985,51 @@ func _on_configure_pressed() -> void:
 	bubble.open_large(config_text(), at)
 
 
-## What the model is, and what it is allowed to be on this phone.
+## What the model is, what the fruit fly connectome is living, and what it is allowed to be on this phone.
 func brain_text() -> String:
-	var lines: Array[String] = (["BRAIN"] as Array[String])
+	var lines: Array[String] = (["BRAIN & CONNECTOME"] as Array[String])
+	if _store != null and _store.has_method("get_character"):
+		var char_node: Variant = _store.get_character()
+		if char_node != null:
+			lines.append("-- DROSOPHILA CONNECTOME --")
+			var clock: Variant = char_node.get("circadian_clock")
+			if clock != null:
+				lines.append("circadian: %.1fh (%s) PDF: %.2f" % [
+					float(clock.get("simulated_hour")),
+					String(clock.call("get_phase_name")),
+					float(clock.get("pdf_level"))
+				])
+			var cc: Variant = char_node.get("central_complex")
+			if cc != null:
+				lines.append("EB/PB compass: %.1f deg (align: %.2f)" % [
+					rad_to_deg(float(cc.get("heading_rad"))),
+					float(cc.get("target_alignment"))
+				])
+			var mb: Variant = char_node.get("mushroom_body")
+			if mb != null:
+				var kcs: Array = mb.call("get_active_kc_indices") as Array
+				lines.append("mushroom body: %d KCs active | habit: #%d" % [
+					kcs.size(),
+					int(mb.call("predict_habit_hexagram", kcs))
+				])
+			var gf: Variant = char_node.get("giant_fiber")
+			if gf != null:
+				lines.append("giant fiber: startle %.2f (%s)" % [
+					float(gf.get("startle_intensity")),
+					"ESCAPING" if bool(gf.get("in_escape_mode")) else "calm"
+				])
+			if char_node.has_method("get_neuromodulators"):
+				var nms: Dictionary = char_node.get_neuromodulators()
+				lines.append("conductance: DA:%.2f OA:%.2f 5HT:%.2f ACh:%.2f" % [
+					float(nms.get("dopamine", 0.0)),
+					float(nms.get("octopamine", 0.0)),
+					float(nms.get("serotonin", 0.0)),
+					float(nms.get("acetylcholine", 0.0))
+				])
 	if _mnn == null:
 		lines.append("no model is attached")
 		return "\n".join(lines)
+	lines.append("-- ON-DEVICE INFERENCE (MNN) --")
 	lines.append("backend %s" % String(_mnn.backend_name()))
 	lines.append("tier %s" % _tier_phrase())
 	lines.append("on device: %s" % ("yes" if bool(_mnn.available()) else "no"))

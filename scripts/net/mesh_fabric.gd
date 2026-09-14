@@ -50,6 +50,10 @@ signal peer_proximity(id: String, cls: String)
 ## to aim a probe at a peer three hops away that no transport can reach.
 signal bandwidth_changed(id: String, quality: String)
 signal probe_done(id: String, dir: String, bytes: float, seconds: float)
+signal swarm_heading_received(peer_id: String, heading_rad: float, oa: float)
+
+var peer_headings: Dictionary = {}
+var peer_respirations: Dictionary = {}
 
 const Envelope := preload("res://scripts/net/event_envelope.gd")
 const IdentityScript := preload("res://scripts/social/identity.gd")
@@ -224,6 +228,8 @@ func _on_transport_peer_lost(id: String) -> void:
 	_peer_src.erase(id)
 	_peer_cls.erase(id)
 	_peer_names.erase(id)
+	peer_headings.erase(id)
+	peer_respirations.erase(id)
 	peer_lost.emit(id)
 
 
@@ -251,7 +257,18 @@ func _on_transport_event(peer_id: String, data: Dictionary) -> void:
 		return
 	_mark_seen(eid)
 	envelope_received.emit(data)
-	fabric_event.emit(data["src"], data["kind"], data["body"], data["prov"])
+	var src_id: String = str(data["src"])
+	var kind_str: String = str(data["kind"])
+	var body_dict: Dictionary = data.get("body", {})
+	
+	if kind_str == "fly_bio_pulse":
+		var h_val: float = float(body_dict.get("heading", 0.0))
+		var oa_val: float = float(body_dict.get("oa", 0.5))
+		peer_headings[src_id] = h_val
+		peer_respirations[src_id] = oa_val
+		swarm_heading_received.emit(src_id, h_val, oa_val)
+		
+	fabric_event.emit(src_id, kind_str, body_dict, str(data["prov"]))
 	# ttl counts hops the event may still travel, so an envelope that arrived
 	# with ttl 1 has spent its last hop: deliver it, do not pass it on.
 	if Envelope.ttl_of(data) > 1:
@@ -270,3 +287,24 @@ func _mark_seen(eid: String) -> void:
 
 func seen_count() -> int:
 	return _seen.size()
+
+
+## Broadcasts current Central Complex heading and respiration state to swarm peers
+func broadcast_bio_state(heading_rad: float, oa: float) -> void:
+	emit_event("fly_bio_pulse", {
+		"heading": heading_rad,
+		"oa": oa,
+		"t": Time.get_ticks_msec()
+	})
+
+
+## Computes Kuramoto phase coupling angular adjustment toward peer consensus
+func compute_kuramoto_coupling(current_heading: float, coupling_gain: float = 0.15) -> float:
+	if peer_headings.is_empty():
+		return 0.0
+	var sum_sin := 0.0
+	for pid in peer_headings:
+		var target_angle: float = float(peer_headings[pid])
+		sum_sin += sin(target_angle - current_heading)
+	var n: float = float(peer_headings.size())
+	return (coupling_gain / n) * sum_sin

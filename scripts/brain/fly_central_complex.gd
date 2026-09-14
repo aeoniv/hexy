@@ -96,6 +96,36 @@ func coherence() -> float:
 	var mean_v := sum_v / float(WEDGES)
 	return clampf((max_v - mean_v) / max_v, 0.0, 1.0)
 
+## --- FAN-SHAPED BODY (FB) 2D GOAL VECTOR NAVIGATION ---
+var target_heading: float = 0.0
+
+## Sets the allocentric goal heading using an intended hexagram (1..64)
+func set_target_hexagram(hex_id: int) -> void:
+	var h_clamped: int = clampi(hex_id, 1, 64)
+	target_heading = fposmod(float(h_clamped - 1) * (TAU / 64.0), TAU)
+
+## Sets the allocentric goal heading using an intended trigram (0..7)
+func set_target_trigram(trigram_idx: int) -> void:
+	var t_clamped: int = clampi(trigram_idx, 0, 7)
+	target_heading = fposmod(float(t_clamped) * TAU_SLICE, TAU)
+
+## Returns the signed egocentric steering error in radians [-PI, PI].
+## Positive = target is to the left; Negative = target is to the right.
+func steering_error() -> float:
+	var diff := target_heading - current_heading
+	return fposmod(diff + PI, TAU) - PI
+
+## Computes 2D vector path integration steering: Vector2(forward, turn)
+func compute_steering_vector() -> Vector2:
+	var err := steering_error()
+	var forward: float = maxf(cos(err), 0.0)
+	var turn: float = sin(err)
+	return Vector2(forward, turn)
+
+## Returns alignment with goal in [-1.0, 1.0]. (1.0 = perfectly on target)
+func target_alignment() -> float:
+	return cos(steering_error())
+
 func _normalize() -> void:
 	var total := 0.0
 	for i in range(WEDGES):
