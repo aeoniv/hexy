@@ -132,6 +132,28 @@ func _ready() -> void:
 		senses.machine.size() + senses.human.size(),
 	]
 	print(_boot_line)
+	if OS.is_debug_build():
+		_fly_lamp()
+
+
+## A LAMP ON THE FLY'S FEED, debug builds only and printed nowhere else. It
+## answers the four questions a logcat cannot otherwise answer: which profile
+## the phone resolved to, whether the oracle exists, whether the glass and the
+## oracle hold the SAME character, and whether the radar is standing where a
+## frame can reach it. Then it reads the two sensors out loud five times, so a
+## phone that delivers nothing says so instead of looking still.
+func _fly_lamp() -> void:
+	var prof: Dictionary = DeviceProfile.resolve()
+	var dial: Control = hud.radar_dial()
+	print("hexy fly: profile=%s view=%s oracle=%s hud_char=%d oracle_char=%d radar=%s/%s" % [
+		String(prof.get("id", "?")), str(DisplayServer.window_get_size()),
+		"yes" if oracle != null else "no",
+		hud._store.get_character().get_instance_id() if hud._store != null else -1,
+		oracle.store.get_character().get_instance_id() if oracle.store != null else -1,
+		hud.radar_layout(), "fed" if dial != null and dial.is_visible_in_tree() else "cold"])
+	for _i in 5:
+		await get_tree().create_timer(2.0).timeout
+		print("hexy fly: gyro=%s grav=%s" % [str(Input.get_gyroscope()), str(Input.get_gravity())])
 
 
 ## The line printed at boot, for a test to read back.
