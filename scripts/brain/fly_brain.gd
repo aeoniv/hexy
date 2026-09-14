@@ -30,6 +30,22 @@ const TRIGRAM_NAMES: Array[String] = [
 
 const SENSE_COUNT := 16
 
+## DOPAMINERGIC VALENCE TABLE.
+##
+## The mushroom body only learns when a DAN fires, and a DAN only fires when
+## something actually happened. These are the things that happen to Hexy, and
+## what each is worth. Positive is PAM-like (reward, approach); negative is
+## PPL1-like (punishment, avoid).
+const REWARDS := {
+	"cast_confirmed": 1.0,      # a reading was taken and stood
+	"witness_received": 0.6,    # a peer answered across the mesh
+	"find_landed": 0.8,         # the thing looked for was there
+	"owner_tap": 0.4,           # a hand on the glass
+	"startle": -1.0,            # the giant fiber fired
+	"thermal_throttle": -0.6,   # the substrate is cooking
+	"battery_critical": -0.8,   # the substrate is starving
+}
+
 var central_complex: RefCounted = null
 var mushroom_body: RefCounted = null
 var giant_fiber: RefCounted = null
@@ -53,7 +69,21 @@ func _init() -> void:
 
 
 func _on_startled(intensity: float, reason: String) -> void:
+	# A startle IS a punishment signal: the pattern that was live when the fly
+	# was dropped is the pattern it should learn to avoid. Wired here so no
+	# caller has to remember to do it.
+	learn(REWARDS["startle"] * clampf(intensity, 0.0, 1.0))
 	startled.emit(intensity, reason)
+
+
+## Something happened. Name it, and the dopaminergic table decides what it is
+## worth. Unknown names are ignored rather than guessed at.
+func reward_event(kind: String) -> float:
+	if not REWARDS.has(kind):
+		return 0.0
+	var valence: float = float(REWARDS[kind])
+	learn(valence)
+	return valence
 
 
 ## One sample, one step of the whole brain. Every key is optional; a missing
@@ -91,6 +121,12 @@ func feed(sample: Dictionary, dt_sec: float) -> void:
 			v.append(f)
 			last_senses[i] = f
 		mushroom_body.encode_context(v)
+
+	# 5. Sleep pruning. The clock says how much sleep is permitted right now;
+	#    what sleep permits, it also protects, so an association made at night
+	#    fades far slower than one made at noon.
+	var mods: Dictionary = circadian_clock.get_circadian_modifiers()
+	mushroom_body.decay(dt, float(mods.get("dfb_permissiveness", 0.5)))
 
 
 ## Hebbian reinforcement of whatever pattern is currently projected.

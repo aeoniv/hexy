@@ -187,6 +187,7 @@ func _process(delta: float) -> void:
 
 	# ONE BRAIN, ONE STEP, ONCE A TICK.
 	_feed_fly_brain(delta, raw_acc)
+	_check_substrate_punishments()
 
 	# 2. Coin toss divination
 	if jerk > shake_threshold:
@@ -437,6 +438,7 @@ func _execute_coin_toss_cast() -> void:
 		primary_moving = moving_lines[randi() % moving_lines.size()]
 		
 	inject_manual_state(bits, primary_moving)
+	_reward("cast_confirmed")
 	step_mutation_count = 0
 	Input.vibrate_handheld(45)
 	shake_cast_completed.emit(-1, primary_moving, bits)
@@ -478,6 +480,40 @@ func build_brain_sample(raw_acc: Vector3) -> Dictionary:
 		"senses": build_sense_vector(),
 		"peers": current_peer_count,
 	}
+
+
+## THE SUBSTRATE PUNISHES. Two things the phone does to itself are real
+## dopaminergic events, and both are edges rather than levels: the brain learns
+## once per crossing, not once per frame for as long as it is hot or empty.
+const THERMAL_THROTTLE_C := 45.0
+const BATTERY_CRITICAL := 0.10
+
+var _thermal_throttling: bool = false
+var _battery_critical: bool = false
+
+
+## Fires a named reward through the store into the character. Silent when the
+## store is not wired yet, which is every headless test that skips it.
+func _reward(kind: String) -> void:
+	if store == null or not store.has_method("get_character"):
+		return
+	var ch: Variant = store.get_character()
+	if ch == null or not ch.has_method("reward_event"):
+		return
+	ch.reward_event(kind)
+
+
+## Edge-detects the two substrate punishments off the last sampled hardware.
+func _check_substrate_punishments() -> void:
+	var hot: bool = current_thermal >= THERMAL_THROTTLE_C
+	if hot and not _thermal_throttling:
+		_reward("thermal_throttle")
+	_thermal_throttling = hot
+
+	var starving: bool = (current_battery / 100.0) < BATTERY_CRITICAL
+	if starving and not _battery_critical:
+		_reward("battery_critical")
+	_battery_critical = starving
 
 
 func _feed_fly_brain(delta: float, raw_acc: Vector3) -> void:

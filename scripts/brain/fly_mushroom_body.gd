@@ -19,6 +19,14 @@ const NUM_KCS := 256       # Kenyon Cells (Sparse Binary Hash)
 const SPARSITY := 16       # Top-K active KCs per pattern (6.25% firing rate)
 const NUM_OUTPUTS := 6     # Biases for the 6 Needs / Q6 Lines
 
+## The projection seed lives on disk so the same context lands on the same
+## Kenyon cells tomorrow. Written once, on first run, and read ever after.
+const SEED_PATH := "user://fly_mb_seed.json"
+const DEFAULT_SEED := 0x64_46_46_42  # "FFB", the seed this circuit was born with
+
+## Sleep pruning: fraction of a weight shed per second of fully permitted sleep.
+const DECAY_PER_SEC := 0.002
+
 # Fixed random projection matrix for Locality-Sensitive Hashing (LSH)
 # Generated deterministically via fixed seed
 var _proj_weights: Array = []
@@ -36,8 +44,12 @@ var context_hash: PackedInt32Array = PackedInt32Array()
 # Learning rate for Hebbian consolidation
 var learning_rate: float = 0.05
 
+## The seed the KC projection was drawn from. Stable per install.
+var seed: int = DEFAULT_SEED
 
-func _init() -> void:
+
+func _init(p_seed: int = -1) -> void:
+	seed = install_seed() if p_seed < 0 else p_seed
 	_init_projection_matrix()
 	_init_synaptic_weights()
 	context_hash.resize(8)
@@ -49,7 +61,7 @@ func _init_projection_matrix() -> void:
 	_proj_weights.clear()
 	# Deterministic LCG seed to ensure byte-for-byte reproducibility
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 0x64_46_46_42  # "FFB" in hex
+	rng.seed = seed
 	
 	for kc in range(NUM_KCS):
 		var row: Array = []
@@ -164,6 +176,44 @@ static func hamming_distance(hash_a: PackedInt32Array, hash_b: PackedInt32Array)
 			count += 1
 		dist += count
 	return dist
+
+
+## SLEEP CONSOLIDATION (dFB / R5 synaptic downscaling).
+##
+## Sleeping flies prune: every synapse is shaved a little so that only what was
+## reinforced often enough survives the night. `protection` is the circadian
+## permissiveness -- high at night, when the fly is allowed to sleep and the
+## memory it just made must be protected, low at noon, when an unrehearsed
+## association is free to fade.
+func decay(dt_sec: float, protection: float) -> void:
+	var dt: float = maxf(dt_sec, 0.0)
+	if dt <= 0.0:
+		return
+	var rate: float = DECAY_PER_SEC * (1.0 - clampf(protection, 0.0, 1.0))
+	if rate <= 0.0:
+		return
+	var keep: float = maxf(1.0 - rate * dt, 0.0)
+	for out in range(NUM_OUTPUTS):
+		var row: Array = _weights[out]
+		for kc in range(NUM_KCS):
+			row[kc] = float(row[kc]) * keep
+
+
+## Reads the install's projection seed, creating it on first run.
+static func install_seed() -> int:
+	if FileAccess.file_exists(SEED_PATH):
+		var f := FileAccess.open(SEED_PATH, FileAccess.READ)
+		if f != null:
+			var parsed: Variant = JSON.parse_string(f.get_as_text())
+			f.close()
+			if typeof(parsed) == TYPE_DICTIONARY and (parsed as Dictionary).has("seed"):
+				return int((parsed as Dictionary)["seed"])
+	var born: int = DEFAULT_SEED
+	var w := FileAccess.open(SEED_PATH, FileAccess.WRITE)
+	if w != null:
+		w.store_string(JSON.stringify({"seed": born, "born": int(Time.get_unix_time_from_system())}))
+		w.close()
+	return born
 
 
 ## Clears associative habit memory

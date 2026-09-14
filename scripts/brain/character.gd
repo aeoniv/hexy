@@ -111,6 +111,14 @@ func feed_senses(sample: Dictionary, dt_sec: float) -> void:
 		fly_brain.feed(sample, dt_sec)
 
 
+## Something happened that the mushroom body should learn from. See
+## FlyBrain.REWARDS for the names. Returns the valence that was applied.
+func reward_event(kind: String) -> float:
+	if fly_brain == null:
+		return 0.0
+	return float(fly_brain.reward_event(kind))
+
+
 ## The six needs under their transmitter names, for anyone reading the brain.
 func get_neuromodulators() -> Dictionary:
 	return {
