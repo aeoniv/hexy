@@ -68,9 +68,11 @@ func label(bits: int) -> String:
 ## body is the one their senses are walking. A prompt that folded them into one
 ## figure would be describing a moment nobody is in.
 func ground(head_desc: Dictionary, body_desc: Dictionary, machine_sentence: String,
-		human_sentence: String, last_flip: Dictionary = {}) -> String:
+		human_sentence: String, last_flip: Dictionary = {}, state_line: String = "") -> String:
 	var parts: Array[String] = ([] as Array[String])
 	parts.append(SYSTEM_LINE)
+	if state_line != "":
+		parts.append(state_line)
 	parts.append("head " + _figure_line(head_desc))
 	parts.append("body " + _figure_line(body_desc))
 	parts.append("machine: " + machine_sentence)
@@ -104,6 +106,40 @@ static func _flip_line(last_flip: Dictionary) -> String:
 	return "line %d (%s) %s" % [line + 1, Pacing.LINE_NAMES[line], word]
 
 
+## One short number: no leading zero, no trailing zeros ("0.82" -> ".82",
+## "0.00" -> "0"). Keeps the state line short enough for a 0.6B model.
+static func _short_num(v: float) -> String:
+	var s: String = "%.2f" % v
+	while s.ends_with("0"):
+		s = s.substr(0, s.length() - 1)
+	if s.ends_with("."):
+		s = s.substr(0, s.length() - 1)
+	if s.begins_with("0."):
+		s = s.substr(1)
+	return s
+
+
+## One live organism-state line, built from Character.get_fly_state(). Duck
+## typed and disposable: no anatomy, no lecture, just the numbers that are
+## true right now. rest is GABA (the dFB sleep drive), read as a rest signal
+## rather than named after the neuron that carries it.
+static func organism_line(fs: Dictionary, posture: String = "") -> String:
+	var da: String = _short_num(float(fs.get("dopamine", 0.0)))
+	var oa: String = _short_num(float(fs.get("octopamine", 0.0)))
+	var rest: String = _short_num(float(fs.get("gaba", 0.0)))
+	var heading: String = String(fs.get("dominant_trigram", ""))
+	var phase: String = String(fs.get("phase", ""))
+	var startle: String = _short_num(float(fs.get("startle", 0.0)))
+	var segs: Array[String] = ([] as Array[String])
+	segs.append("state DA %s OA %s rest %s" % [da, oa, rest])
+	segs.append("heading %s" % heading)
+	segs.append("phase %s" % phase)
+	segs.append("startle %s" % startle)
+	if posture != "":
+		segs.append("posture %s" % posture)
+	return "[" + " | ".join(segs) + "]"
+
+
 ## The prompt for the two figures currently in the store, plus a question.
 func prompt_now(question: String) -> String:
 	var head_desc: Dictionary = IChing.describe(0, 0)
@@ -111,6 +147,7 @@ func prompt_now(question: String) -> String:
 	var m: String = ""
 	var h: String = ""
 	var flip: Dictionary = {}
+	var state_line: String = ""
 	if _store != null:
 		head_desc = IChing.describe(
 			_store.head_bits(), int(_store.head.get("moving", 0)))
@@ -119,7 +156,10 @@ func prompt_now(question: String) -> String:
 		m = String(_store.machine.get("sentence", ""))
 		h = String(_store.human.get("sentence", ""))
 		flip = _store.last_flip
-	var body: String = ground(head_desc, body_desc, m, h, flip)
+		var ch: Variant = _store.get_character() if _store.has_method("get_character") else null
+		if ch != null and ch.has_method("get_fly_state"):
+			state_line = organism_line(ch.get_fly_state())
+	var body: String = ground(head_desc, body_desc, m, h, flip, state_line)
 	return body + "; question: " + question
 
 

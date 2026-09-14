@@ -20,6 +20,8 @@ func _initialize() -> void:
 	print("\n--- TEST CORE QWEN (ground + ask + thought + judgements) ---")
 	_test_judgements()
 	_test_ground()
+	_test_organism_line()
+	_test_prompt_now_state()
 	await _test_ask()
 	await _test_cooldown()
 	if failures == 0:
@@ -126,6 +128,54 @@ func _test_ask() -> void:
 	check(text.contains(" | "), "judgement, machine and human are parted by ' | '")
 	check(text.contains("the room is still"), "the machine sentence came back whole")
 	check(text.contains("the breath is slow"), "the human sentence came back whole")
+	store.queue_free()
+	parts[1].queue_free()
+	qwen.queue_free()
+
+
+## A minimal stand-in for Character: only get_fly_state, duck typed like the
+## real one. Returns a different dict on each call so the two prompts it
+## feeds can be told apart.
+class StubCharacter:
+	extends RefCounted
+	var calls: int = 0
+
+	func get_fly_state() -> Dictionary:
+		calls += 1
+		if calls == 1:
+			return {"dopamine": 0.82, "octopamine": 0.45, "gaba": 0.14,
+				"dominant_trigram": "Thunder", "phase": "dawn", "startle": 0.0}
+		return {"dopamine": 0.10, "octopamine": 0.20, "gaba": 0.30,
+			"dominant_trigram": "Water", "phase": "dusk", "startle": 0.9}
+
+
+func _test_organism_line() -> void:
+	var fs: Dictionary = {"dopamine": 0.82, "octopamine": 0.45, "gaba": 0.14,
+		"dominant_trigram": "Thunder", "phase": "dawn", "startle": 0.0}
+	var line: String = Qwen.organism_line(fs)
+	check(line == "[state DA .82 OA .45 rest .14 | heading Thunder | phase dawn | startle 0]",
+		"organism_line matches the fixture exactly, got: %s" % line)
+	var with_posture: String = Qwen.organism_line(fs, "flex")
+	check(with_posture.ends_with("| posture flex]"),
+		"organism_line appends posture only when given")
+
+
+func _test_prompt_now_state() -> void:
+	var parts: Array = _build()
+	var store: HexyStore = parts[0]
+	var qwen: Qwen = parts[2]
+	var stub := StubCharacter.new()
+	store.character = stub
+	var first: String = qwen.prompt_now("what is this moment?")
+	var second: String = qwen.prompt_now("what is this moment?")
+	check(first.contains("[state") and second.contains("[state"),
+		"prompt_now carries a live state line when get_fly_state exists")
+	check(first != second, "two different fly states make two different prompts")
+	var system_part: String = first.split("; question:")[0]
+	check(system_part.length() < 900,
+		"system part stays under 900 chars, got %d" % system_part.length())
+	check(not first.to_lower().contains("connectome"),
+		"the prompt never lectures the model about the connectome")
 	store.queue_free()
 	parts[1].queue_free()
 	qwen.queue_free()
