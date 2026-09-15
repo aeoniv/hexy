@@ -708,6 +708,11 @@ func control_text() -> String:
 ## computes all four every beat and pushes them in through
 ## [method set_phase_snapshot]. With nobody pushing, the rows read "—", which
 ## is the honest thing for a panel nobody has told anything.
+## N3 -- the organism's stage, as pushed in on the phase snapshot.
+var _stage: int = 0
+var _stage_word: String = ""
+
+
 func _build_phase(box: VBoxContainer) -> void:
 	for key in PHASE_ROWS:
 		var line := HBoxContainer.new()
@@ -759,6 +764,12 @@ static func _mark_bars(marks: Array, days: Array) -> String:
 ## dashboard stands open; every key is optional and a missing one leaves its
 ## row alone rather than blanking it.
 func set_phase_snapshot(d: Dictionary) -> void:
+	## N3 -- THE STAGE IS PUSHED, NOT WORKED OUT. It came off "/body" at the
+	## front; this panel spells it out and computes nothing about it.
+	if d.has("stage"):
+		_stage = int(d["stage"])
+		_stage_word = String(d.get("stage_word", ""))
+		_sync_gauge_row()
 	if d.has("seconds"):
 		_set_phase_row("seconds", String(d["seconds"]))
 	elif d.has("radar_phase"):
@@ -1726,13 +1737,14 @@ func _sync_gauge_row() -> void:
 func gauge_text() -> String:
 	if _gauge == null:
 		return "gauge —"
-	var stage: int = 0
-	if _store != null and _store.has_method("body_path"):
-		stage = int(_gauge.call("stage_of", _store.call("body_path"), 0))
-	return "gauge  offset %+.2fh  conf %.2f  stage %d %s" % [
+	## THE STAGE IS THE ORGANISM'S OWN, pushed in on the phase snapshot off
+	## "/body". Nothing here reads the store's walk any more.
+	var stage: int = _stage
+	var word: String = _stage_word if _stage_word != "" else "ordinary"
+	return "gauge  offset %+.2fh  conf %.2f  stage %d %s (%s)" % [
 		float(_gauge.call("get_field", "clock_offset_h", 0.0)),
 		float(_gauge.call("get_field", "confidence", 0.0)),
-		stage, String(_gauge.call("stage_name", stage))]
+		stage, String(_gauge.call("stage_name", stage)), word]
 
 
 ## A CORRECTION FROM THE GLASS, refused unless the gauge itself allows it.

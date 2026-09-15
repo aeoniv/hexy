@@ -122,14 +122,19 @@ static func parse_meminfo(text: String) -> int:
 static func get_external_storage_dir() -> String:
 	if OS.get_name() == "Android":
 		# Standard Android external files path: /storage/emulated/0/Android/data/<pkg>/files
+		# user_data is .../<pkg>/files whether Godot hands back /data/user/0/<pkg>/files
+		# or the canonical /data/data/<pkg>/files -- the old code matched on those
+		# two literal prefixes and, on a device where neither matched exactly,
+		# glued the whole unstripped path in as the "package name". get_file()
+		# reads the same answer (the path segment just before "/files") off
+		# EITHER shape without caring which prefix the platform used.
 		var user_data: String = OS.get_user_data_dir()
-		# user_data is /data/user/0/<pkg>/files
-		if "/data/user/0/" in user_data or "/data/data/" in user_data:
-			var pkg := user_data.get_slice("/data/user/0/", 1).get_slice("/files", 0)
-			if pkg == "":
-				pkg = user_data.get_slice("/data/data/", 1).get_slice("/files", 0)
-			if pkg != "":
-				return "/storage/emulated/0/Android/data/%s/files" % pkg
+		var base: String = user_data
+		if base.ends_with("/files"):
+			base = base.substr(0, base.length() - "/files".length())
+		var pkg: String = base.get_file()
+		if pkg != "":
+			return "/storage/emulated/0/Android/data/%s/files" % pkg
 		# Common fallback
 		return "/storage/emulated/0/Android/data/app.ix64.hexy/files"
 	return "user://models"
@@ -138,22 +143,25 @@ static func get_external_storage_dir() -> String:
 static func check_model_files_exist(dir_name: String) -> bool:
 	if dir_name == "":
 		return false
-	
+
 	# Check Android external files path
 	var ext_root := get_external_storage_dir()
 	var config_path := ext_root.path_join(dir_name).path_join("config.json")
-	if FileAccess.file_exists(config_path):
-		return true
-		
+	var ext_ok := FileAccess.file_exists(config_path)
+
 	# Check alternative user://models path
 	var local_config := "user://models".path_join(dir_name).path_join("config.json")
-	if FileAccess.file_exists(local_config):
+	var user_ok := FileAccess.file_exists(local_config)
+
+	print("hexy mnn: weights %s ext=%s user=%s" % [ext_root.path_join(dir_name), ext_ok, user_ok])
+
+	if ext_ok or user_ok:
 		return true
-		
+
 	# On desktop/mock environments, allow standard dirs
 	if OS.get_name() != "Android":
 		return true
-		
+
 	return false
 
 

@@ -153,4 +153,40 @@ func _test_the_app_producer() -> void:
 			{"strength": 1.0, "solar_hour": 9.0}, {"in_phase": true}))
 	check(acted.size() == 1, "five more in the same tenth of a second stay quiet (%d)" % acted.size())
 
+	## Clear the door-level throttle (ACT_EVERY_MS) between groups below so
+	## each check is actually exercising the kind/cooldown gate, not just the
+	## 100ms door throttle that would otherwise mask it.
+	await create_timer(0.15).timeout
+
+	## IDLE, EVEN IN PHASE, IS NOT NEWS. wmn's heartbeat marks these "idle";
+	## an idle neighbour must never chirp the speaker.
+	var before_idle: int = acted.size()
+	topic.publish("/sense", HexyMsg.sense("pheromone", "peer", T0 + 100,
+		{"strength": 1.0, "solar_hour": 9.0}, {"in_phase": true, "kind": "idle", "who": "peer_idle"}))
+	check(acted.size() == before_idle, "an idle in-phase neighbour stays quiet (%d acts)" % acted.size())
+
+	await create_timer(0.15).timeout
+
+	## A CAST, IN PHASE, IS NEWS.
+	var before_cast: int = acted.size()
+	topic.publish("/sense", HexyMsg.sense("pheromone", "peer", T0 + 101,
+		{"strength": 1.0, "solar_hour": 9.0}, {"in_phase": true, "kind": "cast", "who": "peer_a"}))
+	check(acted.size() == before_cast + 1, "a cast in phase is answered (%d acts)" % acted.size())
+
+	## A SECOND CAST FROM THE SAME PEER, still inside the 10 s cooldown, must
+	## not chirp again -- one peer cannot ring the speaker on its own.
+	topic.publish("/sense", HexyMsg.sense("pheromone", "peer", T0 + 102,
+		{"strength": 1.0, "solar_hour": 9.0}, {"in_phase": true, "kind": "cast", "who": "peer_a"}))
+	check(acted.size() == before_cast + 1,
+		"a second cast from the same peer inside 10s stays quiet (%d acts)" % acted.size())
+
+	await create_timer(0.15).timeout
+
+	## A DIFFERENT PEER is not covered by peer_a's cooldown.
+	var before_other: int = acted.size()
+	topic.publish("/sense", HexyMsg.sense("pheromone", "peer", T0 + 103,
+		{"strength": 1.0, "solar_hour": 9.0}, {"in_phase": true, "kind": "cast", "who": "peer_b"}))
+	check(acted.size() == before_other + 1,
+		"a cast from a different peer is answered regardless (%d acts)" % acted.size())
+
 	app.queue_free()

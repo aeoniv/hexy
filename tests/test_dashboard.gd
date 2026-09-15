@@ -675,7 +675,9 @@ func _run_phase_panel() -> void:
 	var declared: Dictionary = app.addons.doors() as Dictionary
 	check(not declared.is_empty(), "the loader declares at least one door (got %s)" % str(declared))
 	if not declared.is_empty():
-		var door: String = String(declared.keys()[0])
+		var declared_keys: Array = declared.keys()
+		declared_keys.sort()
+		var door: String = String(declared_keys[0])
 		## THE LIVE HOLDER, NOT THE DECLARATION. The add-on took this door at
 		## boot, so the broker already has an answer -- and the proof that the
 		## row is READ off the broker rather than off the loader's table is that
@@ -687,7 +689,7 @@ func _run_phase_panel() -> void:
 		var was: String = String(app.broker.holder(door))
 		app.broker.release_door(door, was)
 		check(String(app.broker.holder(door)) == "", "the door is given back")
-		check(String(dash.doors_text()).contains("%s: hexy_example" % door),
+		check(String(dash.doors_text()).contains("%s: %s" % [door, String(declared[door])]),
 			"and with nobody standing on it the row falls back to the declaration")
 		check(app.broker.acquire(door, "compound_eye"), "another organ takes it")
 		var held: String = String(dash.doors_text())

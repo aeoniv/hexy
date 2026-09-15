@@ -10,6 +10,9 @@ extends RefCounted
 ## glass read were not the halves that were being stepped.
 ##
 ## STEP ORDER, and it matters:
+##   0. Optic Lobe    -- lamina/medulla/lobula, when a compound_eye frame has
+##                      arrived. It runs first because the giant fiber and the
+##                      central complex both read what it says.
 ##   1. Giant Fiber   -- the reflex is first because it overrides everything.
 ##   2. Central Complex -- heading integrates the gyro and the compass.
 ##   3. Circadian Clock -- the slow envelope over arousal.
@@ -19,6 +22,7 @@ const FlyCentralComplexScript := preload("res://scripts/brain/fly_central_comple
 const FlyMushroomBodyScript := preload("res://scripts/brain/fly_mushroom_body.gd")
 const FlyGiantFiberScript := preload("res://scripts/brain/fly_giant_fiber.gd")
 const FlyCircadianClockScript := preload("res://scripts/brain/fly_circadian_clock.gd")
+const FlyOpticLobeScript := preload("res://scripts/brain/fly_optic_lobe.gd")
 
 ## Re-emitted from the giant fiber so nobody has to reach inside for it.
 signal startled(intensity: float, reason: String)
@@ -50,6 +54,7 @@ var central_complex: RefCounted = null
 var mushroom_body: RefCounted = null
 var giant_fiber: RefCounted = null
 var circadian_clock: RefCounted = null
+var optic_lobe: RefCounted = null
 
 ## Last 16-input vector actually projected, kept so learn() can reinforce the
 ## pattern that was live when the reward arrived.
@@ -62,6 +67,7 @@ func _init() -> void:
 	mushroom_body = FlyMushroomBodyScript.new()
 	giant_fiber = FlyGiantFiberScript.new()
 	circadian_clock = FlyCircadianClockScript.new()
+	optic_lobe = FlyOpticLobeScript.new()
 	last_senses.resize(SENSE_COUNT)
 	last_senses.fill(0.0)
 	_pending.resize(SENSE_COUNT)
@@ -93,14 +99,33 @@ func reward_event(kind: String) -> float:
 func feed(sample: Dictionary, dt_sec: float) -> void:
 	var dt: float = maxf(dt_sec, 0.0001)
 
+	# 0. Optic lobe: the eye's frame, when one arrived. Nothing else reads the
+	#    frame; the two things the rest of the brain gets are a looming drive
+	#    and an optic drift, both computed here and read below.
+	if sample.has("eye") and optic_lobe != null:
+		optic_lobe.step(dt, sample["eye"])
+	elif optic_lobe != null:
+		optic_lobe.step(dt, null)
+
 	# 1. Giant fiber: the escape reflex reads raw acceleration.
 	var accel: Vector3 = sample.get("accel", Vector3(0.0, -9.8, 0.0))
 	giant_fiber.step(dt, accel)
+	#    AND THE LOOMING SHADOW, which is the other half of what the giant
+	#    fiber has always claimed to answer to (see its own docstring). This is
+	#    the giant fiber's OWN trigger -- the same one its freefall and shock
+	#    checks call one line earlier -- so a looming escape is the same
+	#    startle, with the same signal, the same punishment and the same curl,
+	#    and not a second path beside it.
+	if optic_lobe != null and optic_lobe.startle_drive > 0.0:
+		giant_fiber._trigger_startle(clampf(optic_lobe.startle_drive, 0.0, 1.0), "looming")
 
 	# 2. Central complex: yaw rate turns the bump; an absolute compass bearing,
 	#    when the phone has one, pulls it toward the world instead of drifting.
+	#    The optic lobe's drift rides in on the SAME angular-velocity input:
+	#    a world sliding past the eye is the optomotor evidence that the body
+	#    turned, and the P-EN shift neurons cannot tell that from the gyro.
 	var yaw_rate: float = float(sample.get("gyro_yaw_rate", 0.0))
-	central_complex.step(dt, yaw_rate, 0.0)
+	central_complex.step(dt, yaw_rate + optic_drift_rate(), 0.0)
 	if sample.has("heading_deg"):
 		var world_rad: float = fposmod(deg_to_rad(float(sample["heading_deg"])), TAU)
 		var diff: float = fposmod(world_rad - central_complex.current_heading + PI, TAU) - PI
@@ -170,6 +195,8 @@ func state() -> Dictionary:
 		"startle": float(giant_fiber.startle_intensity),
 		"curl": float(giant_fiber.get_curl_factor()),
 		"is_startled": bool(giant_fiber.is_startled),
+		"looming": float(optic_lobe.looming) if optic_lobe != null else 0.0,
+		"optic_drift_rad": float(optic_lobe.drift_rad()) if optic_lobe != null else 0.0,
 		"pdf": float(circadian_clock.pdf_level),
 		"phase": String(mods.get("phase_name", "Day")),
 		"solar_hour": float(circadian_clock.solar_hour),
@@ -193,7 +220,7 @@ func state() -> Dictionary:
 ## ROUTING TABLE (organ -> circuit):
 ##   ocelli       -> circadian clock            (lux, measured; see update_lux)
 ##   halteres     -> central complex + giant fiber
-##   compound_eye -> central complex + mushroom body
+##   compound_eye -> optic lobe + central complex + mushroom body
 ##   antenna      -> mushroom body + central complex
 ##   pheromone    -> circadian clock (social zeitgeber) + mushroom body
 ##   tarsi        -> the homeostat (Character; not this file's circuits)
@@ -226,6 +253,12 @@ var _pending: PackedFloat32Array = PackedFloat32Array()
 var _accel: Vector3 = Vector3(0.0, -9.8, 0.0)
 var _yaw_rate: float = 0.0
 var _heading_deg: float = NAN
+## The last compound_eye frame, spent by the optic lobe on the next tick.
+var _eye_frame: Variant = null
+
+## THE MOST THE EYE MAY TURN THE COMPASS, IN RADIANS PER SECOND. Small on
+## purpose: the optomotor reflex corrects a drift, it does not steer.
+const OPTIC_DRIFT_MAX_RAD_PER_SEC: float = 0.2
 ## How many sense messages have been routed since the last tick, so a caller
 ## can tell a quiet bus from a broken one.
 var routed: int = 0
@@ -288,6 +321,11 @@ func route_sense(msg: Dictionary) -> String:
 			if not is_nan(hd):
 				_heading_deg = hd
 		"compound_eye":
+			## THE FRAME ITSELF, kept for the optic lobe to spend on the next
+			## tick. What the eye publishes today is one 0..1 scalar, so the
+			## lobe runs its one-cell case; a real luminance grid arrives here
+			## unchanged and the same chain reads it as a grid.
+			_eye_frame = value
 			## Eight trigram scores, straight into the ring attractor as a
 			## stimulus, and into the first eight projection slots.
 			var scores: Array = _floats(value, 8)
@@ -348,6 +386,7 @@ func bus_tick(dt_sec: float) -> void:
 	for f in _pending:
 		senses.append(float(f))
 	var sample: Dictionary = {
+		"eye": _eye_frame,
 		"accel": _accel,
 		"gyro_yaw_rate": _yaw_rate,
 		"senses": senses,
@@ -355,7 +394,16 @@ func bus_tick(dt_sec: float) -> void:
 	if not is_nan(_heading_deg):
 		sample["heading_deg"] = _heading_deg
 	feed(sample, dt_sec)
+	_eye_frame = null
 	routed = 0
+
+
+## THE EYE'S CONTRIBUTION TO THE HEADING, IN RADIANS PER SECOND, capped.
+func optic_drift_rate() -> float:
+	if optic_lobe == null:
+		return 0.0
+	var unit: float = clampf(optic_lobe.drift_rad() / (PI * 0.5), -1.0, 1.0)
+	return unit * OPTIC_DRIFT_MAX_RAD_PER_SEC
 
 
 ## THE CIRCADIAN PHASE, as a Phase message's two live fields. `weeks` and

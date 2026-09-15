@@ -133,8 +133,27 @@ func available() -> bool:
 	return ModelStore.check_model_files_exist(_runtime.chat_model())
 
 
+## Diagnostic twin of [available]: "" when available, else which gate failed
+## and, for the weights gate, the directory it looked for. Never used for
+## control flow -- only for the boot line and logcat, so a caller can see WHY
+## `mnn=no` instead of guessing between the plugin and the weights.
+func why_unavailable() -> String:
+	if not _runtime.available():
+		return "plugin"
+	var dir: String = _runtime.chat_model()
+	if not ModelStore.check_model_files_exist(dir):
+		return "weights:%s" % dir
+	return ""
+
+
 func backend_name() -> String:
 	return "mnn" if available() else "mock"
+
+
+## Whether the last generate() actually went to the real runtime (true) or the
+## mock (false).
+func live() -> bool:
+	return _live
 
 
 func tier() -> String:
@@ -209,9 +228,11 @@ func generate(prompt: String, max_tokens: int = 80) -> Signal:
 			load_tier(_tier if _tier != "" else TIER_FLOOR)
 		if _loaded:
 			_live = true
+			print("hexy.mnn generate live=%s loaded=%s" % [_live, _loaded])
 			_runtime.chat_stream(prompt, Q6Core.cast_version())
 			return done
 	_live = false
+	print("hexy.mnn generate live=%s loaded=%s" % [_live, _loaded])
 	_mock.start(prompt, max_tokens)
 	return done
 

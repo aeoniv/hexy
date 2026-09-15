@@ -167,14 +167,28 @@ var _mic_listening: bool = false
 ## for the radar and the figure, "/phase" for the four timescales, and the
 ## gauge for every word, band, chapter and threshold it puts on the glass.
 ## Neither is ever written from this file.
+## The add-on topic this glass reads: "/sense/peer_bearing", built from the
+## bus's own fan-out convention rather than spelled out by hand.
+const BEARING_TOPIC := "/sense/peer_bearing"
+
 var _topic: RefCounted = null
 var _gauge: RefCounted = null
 var _body_sub: int = -1
 var _phase_sub: int = -1
+## W11/N4 -- the third read. A bearing is a THING SOMEBODY ELSE WORKED OUT
+## (addons/hexy_ecoloc) and the glass only looks at it: one more Sub, one more
+## retained dictionary, and not one preload of brain/senses/net to get it.
+var _bearing_sub: int = -1
 ## The last Body and the last Phase off the bus, retained here so a beat that
 ## arrives between two publishes still draws the live figure.
 var _body: Dictionary = {}
 var _phase_msg: Dictionary = {}
+## peer id -> allocentric bearing in radians, as the eco-location add-on
+## worked it out. A peer whose bearing came back null (no fix anywhere on the
+## wire -- which is every peer on the LAN backend today) is NOT in here: the
+## radar's set_peer_bearings takes a float per id and has no null arm, so such
+## a peer keeps the proximity RING it already stands on and grows no arrow.
+var _peer_bearings: Dictionary = {}
 
 ## Whether a question left the composer since the last beat.
 var _spoke: bool = false
@@ -188,6 +202,18 @@ var _prev_body: int = -1
 var _cur_body: int = -1
 var _still_since_day: int = -1
 var _stage: int = -1
+## N3 -- THE STAGE IS THE ORGANISM'S NOW. The front computes nothing about it:
+## it reads the first-person word off the /body Sub. The int beside it is only
+## the WIRE FORM the room already speaks (wmn peer_stage, the radar's own
+## phase ring, the gauge's stage table for a name and a gloss), so the word is
+## decoded to an index off the gauge's own stage_names and nothing more.
+var _stage_word: String = ""
+const STAGE_INDEX: Dictionary = {
+	"": 0,            ## Ordinary World
+	"approach": 4,    ## Crossing the Threshold
+	"refusal": 2,     ## Refusal
+	"reward": 7,      ## Reward
+}
 var _phase: float = -1.0
 ## The last gauge estimate, read back at most once a minute -- it walks the
 ## whole ring buffer and a beat is four times a second, which would be a week
@@ -560,19 +586,27 @@ func set_bus(topic: RefCounted, gauge: RefCounted) -> void:
 			_topic.unsubscribe(_body_sub)
 		if _phase_sub >= 0:
 			_topic.unsubscribe(_phase_sub)
+		if _bearing_sub >= 0:
+			_topic.unsubscribe(_bearing_sub)
 	_body_sub = -1
 	_phase_sub = -1
+	_bearing_sub = -1
 	_topic = topic
 	if _topic == null:
 		return
 	_body_sub = int(_topic.subscribe(HexyTopic.TOPIC_BODY, Callable(self, "_on_body_msg")))
 	_phase_sub = int(_topic.subscribe(HexyTopic.TOPIC_PHASE, Callable(self, "_on_phase_msg")))
+	_bearing_sub = int(_topic.subscribe(BEARING_TOPIC, Callable(self, "_on_peer_bearing_msg")))
 	var b: Dictionary = _topic.last(HexyTopic.TOPIC_BODY)
 	if not b.is_empty():
 		_on_body_msg(b)
 	var p: Dictionary = _topic.last(HexyTopic.TOPIC_PHASE)
 	if not p.is_empty():
 		_on_phase_msg(p)
+
+	var pb: Dictionary = _topic.last(BEARING_TOPIC)
+	if not pb.is_empty():
+		_on_peer_bearing_msg(pb)
 	if dials != null and dials.has_method("set_bus"):
 		dials.set_bus(_topic, _gauge)
 	if dashboard != null and dashboard.has_method("set_bus"):
@@ -595,6 +629,25 @@ func _on_body_msg(msg: Dictionary) -> void:
 
 func _on_phase_msg(msg: Dictionary) -> void:
 	_phase_msg = msg.duplicate()
+
+
+## A PEER'S BEARING, OFF THE BUS. The Sense value is
+## {who, bearing_rad (float or null), dist_m (float or null), band, t_ns}.
+## A real bearing is kept; a null one ERASES whatever this peer had, so a
+## phone that loses its fix loses its arrow rather than keeping a stale one.
+func _on_peer_bearing_msg(msg: Dictionary) -> void:
+	var v: Variant = msg.get("value", null)
+	if typeof(v) != TYPE_DICTIONARY:
+		return
+	var d: Dictionary = v
+	var who: String = String(d.get("who", ""))
+	if who == "":
+		return
+	var bearing: Variant = d.get("bearing_rad", null)
+	if bearing == null or not is_finite(float(bearing)):
+		_peer_bearings.erase(who)
+		return
+	_peer_bearings[who] = fposmod(float(bearing), TAU)
 
 
 func set_addons(addons: Node) -> void:
@@ -700,6 +753,8 @@ func _feed_dashboard() -> void:
 		"days_toward": [int(float(_phase_msg.get("weeks", 0.0)) * 7.0)],
 		"chapter_title": String(ch.get("title", "")),
 		"stage_name": String(ch.get("stage_name", "")),
+		"stage": int(ch.get("stage", 0)),
+		"stage_word": _stage_word,
 	})
 
 
@@ -733,6 +788,11 @@ func _feed_radar() -> void:
 			radar.set_peer_phase(_wmn.peer_phase() as Dictionary)
 		if _wmn.has_method("peer_stage") and radar.has_method("set_peer_stage"):
 			radar.set_peer_stage(_wmn.peer_stage() as Dictionary)
+	## THE BEARINGS ARE THE ADD-ON'S GIFT, not the room's. Pushed every beat
+	## beside the headings so a peer that has one points at where they are and
+	## a peer that has none keeps its ring.
+	if radar.has_method("set_peer_bearings"):
+		radar.set_peer_bearings(_peer_bearings)
 	if _heading != null and _heading.has_method("heading_rad"):
 		radar.set_compass({
 			"heading_rad": _heading.heading_rad(),
@@ -755,7 +815,6 @@ func _feed_radar() -> void:
 ## is still the phase every other phone in the room compares itself against,
 ## and the chapter still comes from a rule table -- the gauge's own.
 func _feed_clock() -> void:
-	var day: int = _today()
 	var wall: float = _wall_hour()
 	## THE ESTIMATE, READ BACK ONCE A MINUTE. The front no longer SAMPLES
 	## anything: the light, the motion, the screen and the spoken word all
@@ -766,15 +825,16 @@ func _feed_clock() -> void:
 		_est_at_ms = now_ms
 		_phase_est = (_gauge.call("estimate") as Dictionary) if _gauge != null else {}
 	_phase = fposmod(_internal_hour(wall), 24.0) / 24.0
-	var days_still: int = maxi(0, day - _still_since_day)
 	var now_bits: int = _body_bits()
 	if _cur_body < 0:
 		_cur_body = now_bits
 		_prev_body = now_bits
-	## THE WHOLE WALK, NOT ONE STEP, and the rules are the gauge's own data
-	## table rather than a const block: a second interpretation of the same
-	## walk is a second gauge.json, not a second build.
-	_stage = _stage_of(_body_path(), days_still)
+	## THE STAGE ARRIVES, IT IS NOT WORKED OUT. Whatever the organism published
+	## on "/body" is what the room shows; a front with no Body yet shows the
+	## ordinary world, which is the honest stage for a body nobody has heard
+	## from.
+	_stage_word = String(_body.get("stage", ""))
+	_stage = int(STAGE_INDEX.get(_stage_word, 0))
 	var shown: float = own_phase()
 	if _wmn != null and _wmn.has_method("set_own_phase"):
 		_wmn.set_own_phase(shown, _stage)
@@ -823,13 +883,6 @@ func _phase_name(internal_h: float) -> String:
 	if _gauge == null:
 		return ""
 	return String(_gauge.call("phase_name", internal_h))
-
-
-## THE CHAPTER A WALK IS IN, off the gauge's own rule table.
-func _stage_of(walked: Array, days_still: int) -> int:
-	if _gauge == null or walked.is_empty():
-		return maxi(_stage, 0)
-	return int(_gauge.call("stage_of", walked, days_still))
 
 
 ## THE TWO KEYS A Body MESSAGE DOES NOT CARRY. Documented in HexyMsg as a
@@ -925,6 +978,7 @@ func _day_dict() -> Dictionary:
 			else _internal_hour(_wall_hour())),
 		"phase": own_phase(),
 		"stage": _stage,
+		"stage_word": _stage_word,
 		"confidence": float(_gauge.call("get_field", "confidence", 0.0)) if _gauge != null else 0.0,
 		"days_still": maxi(0, _today() - _still_since_day),
 	}
@@ -968,10 +1022,10 @@ func _marks() -> Array:
 
 
 ## THE CHAPTER THIS FIGURE IS STANDING IN, as the beat already worked it out,
-## with every name and gloss off the gauge's own stage table. `_stage` is -1
-## until the first beat; a caller asking before then gets stage 0 for
-## whatever figure is standing, which is the honest chapter for a figure
-## nobody has watched move yet.
+## with every name and gloss off the gauge's own stage table. The stage itself
+## is the ORGANISM'S, read off "/body"; this file only spells it out. `_stage`
+## is -1 until the first beat; a caller asking before then gets stage 0, which
+## is the honest chapter for a body nobody has heard from yet.
 func current_chapter() -> Dictionary:
 	var bits: int = _body_bits()
 	var s: int = maxi(_stage, 0)
@@ -981,6 +1035,8 @@ func current_chapter() -> Dictionary:
 	return {
 		"stage": s,
 		"stage_name": stage_name,
+		## The organism's own word, unglossed, exactly as it arrived.
+		"stage_word": _stage_word,
 		"gloss": gloss,
 		"hexagram_no": KingWen.number(bits),
 		"hexagram_name": hexagram_name,

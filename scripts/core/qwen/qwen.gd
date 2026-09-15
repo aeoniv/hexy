@@ -29,6 +29,12 @@ var _spoken_key: int = -1
 ## The stream as it arrives, concatenated RAW. Tokens carry their own spacing,
 ## so gluing them with anything of our own would double it or lose it.
 var _stream: String = ""
+## When the current ask() started, for the ms= field of the hexy.qwen trace.
+var _ask_started_ms: int = 0
+## Whether the generate() just started was live, read right after the call --
+## mnn clears its own `_live` before `done` fires, so `_on_done` is too late
+## to ask; this is the only honest place to catch it.
+var _ask_was_live: bool = false
 
 
 func bind(store: HexyStore, mnn: Mnn) -> void:
@@ -169,8 +175,11 @@ func prompt_now(question: String) -> String:
 func ask(question: String) -> Signal:
 	_busy = true
 	_stream = ""
+	_ask_started_ms = Clock.now_ms()
 	var prompt: String = prompt_now(question)
-	return _mnn.generate(prompt, max_tokens())
+	var sig: Signal = _mnn.generate(prompt, max_tokens())
+	_ask_was_live = _mnn.live()
+	return sig
 
 
 ## Ask "What is this moment?" on the store's own beat, at most once per 3 s.
@@ -238,14 +247,22 @@ func _on_token(t: String) -> void:
 
 func _on_done(text: String) -> void:
 	_busy = false
+	var model_chars: int = text.strip_edges().length()
 	var out: String = text.strip_edges()
+	var fell_back: bool = false
 	if out == "":
 		out = _stream.strip_edges()
 	if out == "":
 		out = Judgements.for_bits(_store.primary() if _store != null else 0)
+		fell_back = true
 	out = clip(out)
 	if _store != null:
 		_store.set_answer(out)
+	var backend: String = _mnn.backend_name() if _mnn != null else "mock"
+	var live: bool = _ask_was_live
+	var elapsed_ms: int = Clock.now_ms() - _ask_started_ms
+	print("hexy.qwen backend=%s live=%s ms=%d chars=%d fallback=%s" % [
+		backend, live, elapsed_ms, model_chars, fell_back])
 	answer_ready.emit(out)
 
 

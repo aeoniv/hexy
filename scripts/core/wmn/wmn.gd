@@ -40,6 +40,18 @@ const PHASE_WINDOW: float = 0.1
 ## figure-cast rate. (see _take_figure / _publish_pheromone)
 const PHEROMONE_PERIOD_MS := 1000
 
+## The two ways a peer can smell of themselves. A CAST is news -- somebody
+## threw a figure. An IDLE is only presence: the heartbeat that goes out every
+## Presence.HEARTBEAT_MS carrying the organism's own latest Body, so a phone
+## that arrives and says nothing still reaches the room's /sense within about
+## two seconds. Both land on the same "pheromone" organ; meta.kind is the only
+## difference, and it is there so a device logcat can tell them apart.
+const PHEROMONE_IDLE := "idle"
+const PHEROMONE_CAST := "cast"
+## Payload key that marks a figure as the presence heartbeat rather than a
+## cast. Absent on every figure a hexy actually threw.
+const WIRE_IDLE_KEY := "idle"
+
 ## One kind on the fabric, because the kind that matters is in byte 0 of the
 ## payload. A fabric that had to learn a new `kind` string for every sort of
 ## figure would be a fabric this folder had forked rather than reused.
@@ -221,9 +233,7 @@ func broadcast(head: Dictionary, body: Dictionary, earth: Dictionary = {}) -> Di
 	## bus, or nothing latched yet -- a Body minted from the store bits this
 	## same payload already carries under "body" (the legacy trigram byte).
 	## See the class doc comment for the legacy-vs-Body key table.
-	var msg_body: Dictionary = {}
-	if _bus != null and _bus.has_method("last"):
-		msg_body = _bus.last(HexyTopicScript.TOPIC_BODY)
+	var msg_body: Dictionary = _own_body()
 	if msg_body.is_empty():
 		msg_body = HexyMsgScript.body_from_bits(int(body.get("bits", 0)) & 63)
 	payload["bw"] = HexyMsgScript.body_to_wire(msg_body)
@@ -313,6 +323,9 @@ func _take_figure(src: String, bits: int, payload: Dictionary) -> void:
 		ledger.append(h, [fabric_id()])
 	_peer_body[src] = int(h["body"])
 	var msg_body: Dictionary = {}
+	## An idle heartbeat and a cast carry the same Body shape; only this flag
+	## says which mouth it came out of. See _presence_pulse().
+	var kind := PHEROMONE_IDLE if bool(payload.get(WIRE_IDLE_KEY, false)) else PHEROMONE_CAST
 	if payload.has("bw") and typeof(payload["bw"]) == TYPE_DICTIONARY:
 		msg_body = HexyMsgScript.body_from_wire(payload["bw"], now_ms() * 1000000)
 		_peer_body_msg[src] = msg_body
@@ -321,7 +334,7 @@ func _take_figure(src: String, bits: int, payload: Dictionary) -> void:
 	peer_figure.emit(src, h)
 	_publish_room()
 	if not msg_body.is_empty():
-		_publish_pheromone(src, msg_body)
+		_publish_pheromone(src, msg_body, kind)
 
 
 ## "wmn shows the body to peers, and brings peers in as a sense": every
@@ -329,7 +342,8 @@ func _take_figure(src: String, bits: int, payload: Dictionary) -> void:
 ## once a second per peer -- see PHEROMONE_PERIOD_MS. value is the peer's
 ## Body as heard; meta names who it was, how close (band), and whether their
 ## circadian phase agrees with ours closely enough to call it "in phase".
-func _publish_pheromone(src: String, msg_body: Dictionary) -> void:
+func _publish_pheromone(src: String, msg_body: Dictionary,
+		kind: String = PHEROMONE_CAST) -> void:
 	if _bus == null or not _bus.has_method("publish"):
 		return
 	var now := now_ms()
@@ -340,9 +354,10 @@ func _publish_pheromone(src: String, msg_body: Dictionary) -> void:
 	var in_phase := false
 	if their_phase != null and _own_phase >= 0.0:
 		in_phase = phase_gap(float(their_phase), _own_phase) < PHASE_WINDOW
-	print("hexy.pheromone %s in_phase=%s" % [src, str(in_phase)])
+	print("hexy.pheromone %s kind=%s in_phase=%s" % [src, kind, str(in_phase)])
 	var meta := {
 		"who": src,
+		"kind": kind,
 		"band": String(peer_proximity().get(src, "")),
 		"in_phase": in_phase,
 		"phase": their_phase,
@@ -546,11 +561,60 @@ func _process(_delta: float) -> void:
 	_bio_beat(now)
 	if presence.due(now):
 		send_chirp()
-		if not _self_h.is_empty():
-			fabric.emit_event(WIRE_KIND,
-				{WIRE_KEY: Envelope6.to_wire(Envelope6.KIND_FIGURE,
-					int(_self_h["bits"]), _payload_of(_self_h))},
-				FIGURE_TTL)
+		_presence_pulse()
+
+
+## THE HEARTBEAT IS A PHEROMONE TOO. Every Presence.HEARTBEAT_MS (two seconds)
+## the local figure goes out again, and it now goes out with the same slim "bw"
+## body-wire a cast carries: bits, heading, phase, stage, glow. Before this a
+## peer only became a pheromone Sense when it CAST, so a phone that walked in
+## and stood there was, to every nose in the room, not there at all.
+##
+## Two rules keep the wire honest. NOTHING GOES OUT WITH NOTHING TO SAY: no
+## figure ever cast and no Body latched means no packet. AND NO INVENTED BODY:
+## "bw" rides only when the organism actually has one, never a zero Body minted
+## to fill the key. The receiver throttles per peer (PHEROMONE_PERIOD_MS), so a
+## two-second heartbeat can never outrun one Sense a second.
+func _presence_pulse() -> void:
+	if fabric == null:
+		return
+	var msg_body: Dictionary = _own_body()
+	if _self_h.is_empty() and msg_body.is_empty():
+		return
+	var bits := 0
+	var payload: Dictionary = {}
+	if not _self_h.is_empty():
+		bits = int(_self_h["bits"]) & 63
+		payload = _payload_of(_self_h)
+	else:
+		# Never cast: the head is whatever the store holds (zero is a fine
+		# answer), and the figure is presence rather than news -- "room".
+		if _store != null:
+			bits = _store.head_bits() & 63
+		payload = {
+			"moving": 0,
+			"body": HexyMsgScript.body_bits(msg_body),
+			"body_moving": 0,
+			"throws": [],
+			"when": now_ms(),
+			"who": _who,
+			"source": "room",
+			"sig": "",
+		}
+	if not msg_body.is_empty():
+		payload["bw"] = HexyMsgScript.body_to_wire(msg_body)
+	payload[WIRE_IDLE_KEY] = true
+	fabric.emit_event(WIRE_KIND,
+		{WIRE_KEY: Envelope6.to_wire(Envelope6.KIND_FIGURE, bits, payload)},
+		FIGURE_TTL)
+
+
+## The organism's own latest Body, or {} when it has never had one. The bus is
+## the only source: wmn does not mint a Body, it only carries one.
+func _own_body() -> Dictionary:
+	if _bus == null or not _bus.has_method("last"):
+		return {}
+	return _bus.last(HexyTopicScript.TOPIC_BODY) as Dictionary
 
 
 ## -- THE ORGANISM ON THE WIRE ------------------------------------------------

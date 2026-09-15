@@ -62,10 +62,12 @@ static func sense(organ: String, door: String, t_ns: int, value, meta: Dictionar
 ##                     circadian fraction lives on the Phase message instead
 ##                     (see below), so nothing is invented that state() does
 ##                     not already hand out.
-##  - stage         -> no direct source today (peers() carries a per-peer
-##                     "stage" int/journey-chapter, but no first-person
-##                     equivalent exists yet); kept as "" until a real writer
-##                     shows up. Documented in the report as a gap.
+##  - stage         -> Character.stage(), the organism's own FIRST-PERSON stage
+##                     machine (scripts/brain/fly_stage.gd): "" while nothing
+##                     pulls, then "approach" / "refusal" / "reward". Written
+##                     by the brain on every Body and read by the glass; the
+##                     per-peer "stage" int on peers() is the journey chapter
+##                     of somebody else's walk and is a different thing.
 static func body(t_ns: int, bits: int, lines: Array, heading_rad: float,
 		activity: Array, glow: float, phase: String, stage: String = "") -> Dictionary:
 	var lines6: Array = lines.duplicate()
@@ -103,7 +105,8 @@ static func body(t_ns: int, bits: int, lines: Array, heading_rad: float,
 ## FlyCalciumRadar2D.bump_of() uses, so body_to_radar_state() round-trips the
 ## same picture the radar would draw -- duplicated here on purpose so msg.gd
 ## never preloads scripts/brain.
-static func body_from_fly_state(fs: Dictionary, bits: int, t_ns: int = 0) -> Dictionary:
+static func body_from_fly_state(fs: Dictionary, bits: int, t_ns: int = 0,
+		stage: String = "") -> Dictionary:
 	var heading: float = float(fs.get("heading_rad", 0.0))
 	var coherence: float = clampf(float(fs.get("coherence", 0.0)), 0.0, 1.0)
 	var lines: Array = [
@@ -115,7 +118,8 @@ static func body_from_fly_state(fs: Dictionary, bits: int, t_ns: int = 0) -> Dic
 		float(fs.get("fruitless", 0.0)),
 	]
 	var activity := _bump_of(heading, coherence)
-	return body(t_ns, bits, lines, heading, activity, coherence, String(fs.get("phase", "Day")))
+	return body(t_ns, bits, lines, heading, activity, coherence,
+		String(fs.get("phase", "Day")), stage)
 
 
 ## The dict FlyCalciumRadar2D.set_state() accepts: heading_rad, coherence,
@@ -148,6 +152,10 @@ static func body_to_wire(b: Dictionary) -> Dictionary:
 		"heading_rad": float(b.get("heading_rad", 0.0)),
 		"phase": b.get("phase", null),
 		"stage": b.get("stage", null),
+		## GLOW RIDES BESIDE THE HEADING because a peer that is lit is a
+		## different neighbour from a peer that is dim, and one float is a
+		## price the presence pulse can pay. (see Wmn._presence_pulse)
+		"glow": clampf(float(b.get("glow", 0.0)), 0.0, 1.0),
 	}
 
 
@@ -159,7 +167,7 @@ static func body_from_wire(row: Dictionary, t_ns: int = 0) -> Dictionary:
 		[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
 		float(row.get("heading_rad", 0.0)),
 		[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-		0.0,
+		float(row.get("glow", 0.0)),
 		String(row.get("phase", "")) if row.get("phase") != null else "",
 		String(row.get("stage", "")) if row.get("stage") != null else "")
 

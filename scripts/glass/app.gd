@@ -242,8 +242,9 @@ func _ready() -> void:
 	_ticker.timeout.connect(_on_tick)
 	add_child(_ticker)
 
+	var _mnn_why: String = mnn.why_unavailable()
 	_boot_line = "hexy base: mnn=%s mesh=%s senses=%d" % [
-		"yes" if mnn.available() else "no",
+		"yes" if _mnn_why == "" else "no(%s)" % _mnn_why,
 		"lan" if wmn.force_lan else "nearby",
 		senses.machine.size() + senses.human.size(),
 	]
@@ -342,6 +343,12 @@ const ACT_EVERY_MS: int = 100
 var _act_at: Dictionary = {}  # door -> Clock.now_ms() of the last Act sent
 var _was_startled: bool = false
 
+## No peer may set the speaker off more than once in this many ms, even on a
+## real cast -- a room full of in-phase casters must not turn into a chorus.
+const SPEAKER_COOLDOWN_MS: int = 10000  # 10 s, one chirp per peer per window
+
+var _speaker_song_at: Dictionary = {}  # peer "who" -> Clock.now_ms() of last song act
+
 
 ## True when `door` may act now; records the stamp when it may.
 func _act_due(door: String) -> bool:
@@ -376,16 +383,28 @@ func _on_bus_body(_msg: Dictionary) -> void:
 	_was_startled = startled
 
 
-## A CONSPECIFIC, IN PHASE, IS ANSWERED WITH A WING SONG. `in_phase` is the
-## peer row's own word (see sentence.gd and the radar) and the only thing that
-## separates a fly that happens to be near from one that is keeping the same
-## hours.
+## A CONSPECIFIC, IN PHASE, IS ANSWERED WITH A WING SONG -- but only when the
+## pheromone is NEWS. `kind` tells idle heartbeat (a peer merely still there,
+## published every couple seconds by wmn) from cast (the peer actually
+## signalled). A missing `kind` counts as cast, for peers on wire versions
+## before the field existed. `in_phase` is the peer row's own word (see
+## sentence.gd and the radar) and the only thing that separates a fly that
+## happens to be near from one that is keeping the same hours.
 func _on_bus_sense_act(msg: Dictionary) -> void:
 	if String(msg.get("organ", "")) != "pheromone":
 		return
-	if not bool((msg.get("meta", {}) as Dictionary).get("in_phase", false)):
+	var meta: Dictionary = msg.get("meta", {})
+	if not bool(meta.get("in_phase", false)):
 		return
-	_send_act("speaker", HexyActs.SONG_HZ, {"why": "in_phase"})
+	if String(meta.get("kind", "cast")) != "cast":
+		return
+	var who: String = String(meta.get("who", ""))
+	var now: int = Clock.now_ms()
+	var last: int = int(_speaker_song_at.get(who, -SPEAKER_COOLDOWN_MS - 1))
+	if now - last < SPEAKER_COOLDOWN_MS:
+		return
+	if _send_act("speaker", HexyActs.SONG_HZ, {"why": "in_phase"}):
+		_speaker_song_at[who] = now
 
 
 ## A TAP IS AN EVENT, NOT A SAMPLE, so it never rides `organs.poll()`. Only

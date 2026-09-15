@@ -70,6 +70,7 @@ const MOOD_QUIET := "quiet"
 const MOOD_SLUGGISH := "sluggish"
 
 const FlyBrainScript := preload("res://scripts/brain/fly_brain.gd")
+const FlyStageScript := preload("res://scripts/brain/fly_stage.gd")
 
 var _fullness: Array[float] = [0.6, 0.6, 0.6, 0.6, 0.6, 0.0]
 var _last_tick_ms := -1
@@ -82,6 +83,11 @@ var enable_connectome_coupling: bool = true
 ## read-only windows onto it so that nothing that used to reach for
 ## character.mushroom_body has to learn a new word.
 var fly_brain: RefCounted = null
+
+## N3 -- THE FIRST-PERSON STAGE. The organism's own say about which part of an
+## approach it is standing in, driven by nothing but what this file already
+## has, and carried out on every Body as `stage`.
+var fly_stage: RefCounted = null
 
 var mushroom_body: RefCounted:
 	get:
@@ -99,9 +105,18 @@ var central_complex: RefCounted:
 	get:
 		return fly_brain.central_complex if fly_brain != null else null
 
+## N6 -- THE EYE'S CIRCUIT. Stepped inside the fly brain's own step order on
+## every bus_tick, and read from here the way the other four are: its looming
+## drives the giant fiber and its drift leans the central complex, both inside
+## the brain, so nothing outside has to know it is there to be affected by it.
+var optic_lobe: RefCounted:
+	get:
+		return fly_brain.optic_lobe if fly_brain != null else null
+
 
 func _init() -> void:
 	fly_brain = FlyBrainScript.new()
+	fly_stage = FlyStageScript.new()
 	fly_brain.startled.connect(_on_giant_fiber_startled)
 
 
@@ -116,7 +131,10 @@ func feed_senses(sample: Dictionary, dt_sec: float) -> void:
 func reward_event(kind: String) -> float:
 	if fly_brain == null:
 		return 0.0
-	return float(fly_brain.reward_event(kind))
+	var valence: float = float(fly_brain.reward_event(kind))
+	if fly_stage != null:
+		fly_stage.note_reward(valence)
+	return valence
 
 
 ## The six needs under their transmitter names, for anyone reading the brain.
@@ -140,6 +158,8 @@ func get_fly_state() -> Dictionary:
 
 
 func _on_giant_fiber_startled(intensity: float, _reason: String) -> void:
+	if fly_stage != null:
+		fly_stage.note_startle()
 	# Flight arousal spike (Octopamine)
 	_set_fullness(LINE_BREATH, _fullness[LINE_BREATH] + 0.25 * intensity)
 	# Mild suppression of rest due to acute startle
@@ -427,6 +447,8 @@ func route_sense(msg: Dictionary) -> String:
 				_field(value, "strength", 1.0) * PHEROMONE_STRENGTH, 0.0, 1.0)
 			if strength > 0.0:
 				feed(LINE_CONNECTION + 1, strength, ATTESTED, maxi(now_ms, _last_tick_ms))
+				if fly_stage != null:
+					fly_stage.note_contact(maxi(now_ms, _last_tick_ms))
 			if fly_brain != null:
 				fly_brain.route_sense(msg)
 			return organ
@@ -445,6 +467,8 @@ func bus_tick(now_ms: int, dt_sec: float = -1.0) -> void:
 	tick(now_ms)
 	if fly_brain != null:
 		fly_brain.bus_tick(dt)
+	if fly_stage != null:
+		fly_stage.step(maxi(now_ms, _last_tick_ms), _fullness[LINE_CONNECTION])
 	publish_body(now_ms)
 	publish_phase(now_ms)
 
@@ -452,7 +476,12 @@ func bus_tick(now_ms: int, dt_sec: float = -1.0) -> void:
 ## THE BODY, AS A MESSAGE. `bits` is the threshold readout of the six fills,
 ## computed here and stored nowhere.
 func body_msg(now_ms: int = 0) -> Dictionary:
-	return HexyMsg.body_from_fly_state(get_fly_state(), lines(), now_ms * 1_000_000)
+	return HexyMsg.body_from_fly_state(get_fly_state(), lines(), now_ms * 1_000_000, stage())
+
+
+## THE STAGE THE ORGANISM SAYS IT IS IN. "" until something pulls at it.
+func stage() -> String:
+	return String(fly_stage.stage()) if fly_stage != null else ""
 
 
 func phase_msg(now_ms: int = 0) -> Dictionary:

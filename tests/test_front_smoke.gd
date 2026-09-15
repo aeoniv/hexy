@@ -36,6 +36,7 @@ func _initialize() -> void:
 	print("\n--- TEST FRONT SMOKE (one sentence, one room, one composer) ---")
 	await _run()
 	await _run_phase_spine()
+	await _run_peer_bearing()
 	await _run_room_survives_the_dashboard(Vector2i(1812, 2176), "fold inner")
 	await _run_room_survives_the_dashboard(Vector2i(2176, 1812), "fold landscape")
 	await _run_room_survives_the_dashboard(Vector2i(1080, 2408), "phone")
@@ -47,6 +48,70 @@ func _initialize() -> void:
 		print("--- FRONT SMOKE TESTS FAILED: ", failures, " ---\n")
 		quit(1)
 
+
+## N4 -- A BEARING OFF THE BUS REACHES THE ROOM.
+##
+## The eco-location add-on says where a peer is as a Sense on
+## "/sense/peer_bearing" and NOTHING ELSE: no call into the glass, no shared
+## object. So this asks the only question that matters -- publish one on the
+## front's own bus and see whether the radar's bearing for that peer moved.
+## A null bearing (the LAN case, where no fix exists anywhere on the wire)
+## must ERASE the arrow rather than freeze it.
+func _run_peer_bearing() -> void:
+	var packed: PackedScene = load(SCENE)
+	if packed == null:
+		return
+	var app: Node = packed.instantiate()
+	root.size = Vector2i(1080, 2408)
+	root.content_scale_size = Vector2i(1080, 2408)
+	root.add_child(app)
+	await process_frame
+	await process_frame
+	var front: Node = app.get("front")
+	if front == null:
+		check(false, "the app mounted a Front for the bearing section")
+		app.queue_free()
+		return
+	var topic: RefCounted = front.topic()
+	if topic == null:
+		topic = HexyTopic.new()
+		front.set_bus(topic, front.gauge())
+	check(topic != null, "the front stands on a bus")
+
+	var radar: Control = front.radar as Control
+	check(radar != null and radar.has_method("set_peer_bearings"),
+		"the radar takes peer bearings")
+	if radar == null:
+		app.queue_free()
+		return
+	radar.set_peer_proximity({"peerbear01": "room"})
+	radar.set_peer_headings({"peerbear01": 0.0})
+
+	# -- a real bearing arrives ---------------------------------------------
+	var ok: bool = topic.publish(HexyTopic.TOPIC_SENSE, HexyMsg.sense(
+		"pheromone", "peer_bearing", 0,
+		{"who": "peerbear01", "bearing_rad": 1.25, "dist_m": 12.0,
+			"band": "room", "t_ns": 0}, {"who": "peerbear01"}))
+	check(ok, "a peer_bearing Sense is a valid Sense the bus accepts")
+	front.beat()
+	var bearings: Dictionary = radar.get("_bearings") as Dictionary
+	check(bearings.has("peerbear01"),
+		"a /sense/peer_bearing Sense reaches radar.set_peer_bearings")
+	check(bearings.has("peerbear01") and absf(float(bearings["peerbear01"]) - 1.25) < 0.001,
+		"and it is the bearing the add-on worked out")
+
+	# -- a null bearing takes the arrow away --------------------------------
+	topic.publish(HexyTopic.TOPIC_SENSE, HexyMsg.sense(
+		"pheromone", "peer_bearing", 0,
+		{"who": "peerbear01", "bearing_rad": null, "dist_m": null,
+			"band": "far", "t_ns": 0}, {"who": "peerbear01"}))
+	front.beat()
+	bearings = radar.get("_bearings") as Dictionary
+	check(not bearings.has("peerbear01"),
+		"a null bearing leaves the peer on its ring with no arrow")
+
+	app.queue_free()
+	await process_frame
 
 func _run() -> void:
 	var packed: PackedScene = load(SCENE)
@@ -604,28 +669,47 @@ func _run_phase_spine() -> void:
 	check(line.length() <= SENTENCE_MAX, "the bar still fits in %d (%d)" % [SENTENCE_MAX, line.length()])
 	check(line == line.to_lower(), "and is still lowercase")
 
-	# -- 7. the journey reads the whole path ---------------------------------
-	check(store.has_method("body_path"), "the store remembers where the body has been")
-	## Walk the body somewhere, somewhere else, then back to the first: only a
-	## path-aware rule can call that THE ROAD BACK, and stage_of never could.
+	# -- 7. N3: the stage ARRIVES on /body; the front works nothing out -------
+	## The front used to read the store's walk through the gauge and call the
+	## chapter itself. It does not any more: whatever the organism publishes
+	## as Body.stage is what the room shows, and the only thing this file can
+	## do to move it is publish one.
+	check(not front.has_method("_stage_of"),
+		"the front no longer has a stage rule of its own")
+	var topic: HexyTopic = app.get("topic") as HexyTopic
+	check(topic != null, "the app has the one topic")
 	store.set_body({"bits": 0b000111, "moving": 0})
 	store.set_body({"bits": 0b001111, "moving": 0})
 	store.set_body({"bits": 0b000111, "moving": 0})
 	check(store.body_path().size() >= 3, "three steps of walk are remembered")
 	front.beat()
-	var walked: Array[int] = store.body_path()
-	check(int(gauge.stage_of(walked, 0)) == front._stage,
-		"the front's stage is the GAUGE's reading of the whole path")
-	## Stage 8 is "The Road Back" in the gauge's own stage table: only a
-	## path-aware rule can name it, and a single-step rule never could.
-	check(front._stage == 8,
-		"and returning to old ground fires The Road Back (got %d)" % front._stage)
-	check(String(gauge.stage_name(front._stage)) == "The Road Back",
-		"which the gauge's own stage table spells out")
+	check(String(front.current_chapter().get("stage_word", "x")) == "",
+		"a walk alone moves no stage: the organism has not said one")
+
+	## A Body with a first-person stage on it, straight down the bus.
+	var reward: Dictionary = HexyMsg.body(Clock.now_ns(), 0b000111,
+		[0.5, 0.5, 0.5, 0.5, 0.5, 0.6], 0.0, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+		0.5, "Day", "reward")
+	check(String(reward.get("stage", "")) == "reward", "a Body can carry a stage")
+	topic.publish(HexyTopic.TOPIC_BODY, reward)
+	front.beat()
 	var chapter: Dictionary = front.current_chapter() as Dictionary
-	check(String(chapter.get("stage_name", "")) == "The Road Back",
-		"and the chapter the sheets are handed says so too")
+	check(String(chapter.get("stage_word", "")) == "reward",
+		"the front shows the organism's own word (got '%s')" % String(chapter.get("stage_word", "")))
+	check(String(chapter.get("stage_name", "")) == "Reward",
+		"which the gauge's own stage table spells out for the room")
 	check(String(chapter.get("gloss", "")) != "", "with the gauge's gloss under it")
+	check(String(chapter.get("title", "")).begins_with("Reward"),
+		"and the chapter title the sheets are handed says so too")
+
+	## And back to "" when the organism says so.
+	var ordinary: Dictionary = HexyMsg.body(Clock.now_ns(), 0b000111,
+		[0.5, 0.5, 0.5, 0.5, 0.5, 0.1], 0.0, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+		0.5, "Day", "")
+	topic.publish(HexyTopic.TOPIC_BODY, ordinary)
+	front.beat()
+	check(String(front.current_chapter().get("stage_word", "x")) == "",
+		"and it returns to the ordinary world when the organism does")
 
 	app.queue_free()
 	await process_frame

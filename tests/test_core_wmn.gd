@@ -17,7 +17,7 @@ var _fails := 0
 ## EVERY CHECK IS COUNTED. A compile error in a depended script makes a whole
 ## section skip silently, and a suite that prints ALL PASS because it ran
 ## nothing is worse than a red one. Raise this floor when checks are added.
-const MIN_CHECKS := 45
+const MIN_CHECKS := 52
 var _checks := 0
 
 
@@ -39,6 +39,7 @@ func _initialize() -> void:
 	_test_presence()
 	_test_earth_hook()
 	_test_pheromone_on_bus()
+	await _test_idle_pheromone()
 	await _test_loopback()
 
 	print("checks: ", _checks, " (floor ", MIN_CHECKS, ")")
@@ -333,6 +334,99 @@ func _test_pheromone_on_bus() -> void:
 	wmn.queue_free()
 
 
+## N1 -- A PEER THAT ONLY STANDS THERE STILL SMELLS OF ITSELF. Two wmn on
+## loopback, neither of them ever casting a figure: the presence heartbeat
+## carries the latched Body, so within about two seconds each one is a
+## "pheromone" Sense on the other's bus -- marked kind=idle, and never more
+## than one a second per peer. Then one of them casts, and the same organ
+## says kind=cast.
+func _test_idle_pheromone() -> void:
+	print("
+[ N1: presence alone becomes a pheromone ]")
+	var token := "wmn-idle-%d" % Time.get_ticks_usec()
+	var a: Node = WmnScript.new()
+	var b: Node = WmnScript.new()
+	for n in [a, b]:
+		n.session_token = token
+		n.force_lan = true
+		n.keep_ledger = false
+		n.bio_pulse = false
+		root.add_child(n)
+	_check(a.start("idle-alpha") == OK and b.start("idle-beta") == OK,
+		"two silent nodes join the mesh")
+	var topic_a := HexyTopicScript.new()
+	var topic_b := HexyTopicScript.new()
+	a.attach_bus(topic_a)
+	b.attach_bus(topic_b)
+	# Each organism has a Body -- nobody has thrown anything.
+	topic_a.publish(HexyTopicScript.TOPIC_BODY, HexyMsgScript.body(11, 0b100100,
+		[0.1, 0.2, 0.3, 0.4, 0.5, 0.6], 0.75,
+		[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 0.6, "", ""))
+	topic_b.publish(HexyTopicScript.TOPIC_BODY, HexyMsgScript.body(11, 0b001001,
+		[], 2.0, [], 0.2, "", ""))
+
+	var seen: Array[Dictionary] = []
+	topic_b.subscribe(HexyTopicScript.TOPIC_SENSE, func(m):
+		if String(m.get("organ", "")) == "pheromone":
+			seen.append(m))
+
+	await _wait(8.0, func(): return a.fabric.peer_count() >= 1 and b.fabric.peer_count() >= 1)
+	var aid: String = a.fabric_id()
+	var from_a := func() -> Array:
+		return seen.filter(func(m): return String(m.get("meta", {}).get("who", "")) == aid)
+	# ~2 s is the heartbeat; allow the mesh a little slack on a busy runner.
+	var t0 := Time.get_ticks_msec()
+	await _wait(6.0, func(): return not from_a.call().is_empty())
+	var first: Array = from_a.call()
+	_check(not first.is_empty(),
+		"a peer that never cast still reached beta's /sense (took %d ms)"
+			% (Time.get_ticks_msec() - t0))
+	if not first.is_empty():
+		var m: Dictionary = first[0]
+		_check(String(m.get("door", "")) == "radio", "through the radio door")
+		_check(String(m.get("meta", {}).get("who", "")) == aid, "and meta.who names the peer")
+		_check(String(m.get("meta", {}).get("kind", "")) == WmnScript.PHEROMONE_IDLE,
+			"marked kind=idle, not a cast (got %s)" % String(m.get("meta", {}).get("kind", "")))
+		_check(m.get("meta", {}).has("in_phase"),
+			"and the meta still flags in_phase")
+		var v: Dictionary = m.get("value", {}) as Dictionary
+		_check(int(v.get("bits", -1)) == 0b100100
+			and is_equal_approx(float(v.get("heading_rad", 0.0)), 0.75),
+			"the idle Body carries alpha's bits and heading (got %s)" % str(v))
+		_check(is_equal_approx(float(v.get("glow", -1.0)), 0.6),
+			"and the glow beside them")
+
+	# THROTTLE: one a second per peer, whatever the heartbeat does.
+	var mark: int = from_a.call().size()
+	var t1 := Time.get_ticks_msec()
+	# Wall clock, not frames: _wait counts frames and a headless runner is fast.
+	await _wait(12.0, func(): return Time.get_ticks_msec() - t1 >= 2500)
+	var window_ms: int = Time.get_ticks_msec() - t1
+	var grew: int = from_a.call().size() - mark
+	_check(grew <= int(ceil(float(window_ms) / 1000.0)) + 1,
+		"the throttle holds at one pheromone a second per peer (%d in %d ms)"
+			% [grew, window_ms])
+
+	# A CAST STILL READS AS A CAST.
+	var cast_seen := func() -> bool:
+		return from_a.call().any(func(m):
+			return String(m.get("meta", {}).get("kind", "")) == WmnScript.PHEROMONE_CAST)
+	var t2 := 0.0
+	while t2 < 8.0 and not cast_seen.call():
+		a.broadcast({"bits": 0b101010, "moving": 0}, {"bits": 0b100100, "moving": 0})
+		var w := 0.0
+		while w < 0.5:
+			await process_frame
+			w += 1.0 / 60.0
+		t2 += 0.5
+	_check(cast_seen.call(), "and a thrown figure still arrives as kind=cast")
+
+	a.stop()
+	b.stop()
+	a.queue_free()
+	b.queue_free()
+
+
 # --- 6. two nodes on loopback ----------------------------------------------
 
 func _test_loopback() -> void:
@@ -397,11 +491,16 @@ func _test_loopback() -> void:
 
 	# Two broadcasts leave each phone: the head moving, then the body. Wait for
 	# the one that carries both.
-	await _wait(6.0, func(): return heard_a.size() >= 2 and heard_b.size() >= 2)
+	# N1 -- THE HEARTBEAT NOW CARRIES A BODY TOO, so `heard` fills with idle
+	# pulses as well as casts. Wait for the CAST head, not for a count.
+	var saw := func(list: Array, bits_want: int) -> bool:
+		return list.any(func(x): return int(x["bits"]) == bits_want)
+	await _wait(8.0, func(): return saw.call(heard_b, 0b101101) and saw.call(heard_a, 0b100101))
 	_check(not heard_b.is_empty(), "beta hears alpha figure")
 	_check(not heard_a.is_empty(), "alpha hears beta figure")
-	if not heard_b.is_empty():
-		var got: Dictionary = heard_b[heard_b.size() - 1]
+	var alpha_heard: Array = heard_b.filter(func(x): return int(x["bits"]) == 0b101101)
+	if not alpha_heard.is_empty():
+		var got: Dictionary = alpha_heard[alpha_heard.size() - 1]
 		_check(int(got["bits"]) == 0b101101 and int(got["moving"]) == 0b000100,
 			"byte 0 is alpha's HEAD, unchanged (got %d)" % int(got["bits"]))
 		_check(int(got["body"]) == 0b010010 and int(got["body_moving"]) == 0b000100,
