@@ -240,6 +240,47 @@ func estimate() -> Dictionary:
 		"sleep_h": sleep_h}
 
 
+## THE SEVEN NAMES A DAY GOES BY, as bands on the INTERNAL hour -- the hour
+## this file already slid off the sun, so a night owl's "morning" is their
+## own. Each row is [start_hour, name); the table wraps, so the last band
+## runs past midnight into the first. The boundaries are a choice, not a
+## measurement: they exist here, once, rather than scattered through the
+## glass that reads them.
+const PHASE_BANDS: Array = [
+	[0.0, "night"],
+	[5.0, "dawn"],
+	[7.0, "morning"],
+	[11.0, "midday"],
+	[14.0, "afternoon"],
+	[17.0, "dusk"],
+	[19.0, "evening"],
+	[22.0, "night"],
+]
+
+
+## WHICH BAND AN INTERNAL HOUR FALLS IN. Pass [method internal_hour]'s own
+## output, not a wall hour, or the name will be the sun's and not the user's.
+static func phase_name(internal_h: float) -> String:
+	var h: float = fposmod(internal_h, 24.0)
+	var name: String = String(PHASE_BANDS[0][1])
+	for row in PHASE_BANDS:
+		if h >= float(row[0]):
+			name = String(row[1])
+		else:
+			break
+	return name
+
+
+## THE ADVICE, AS ONE LOWERCASE CLAUSE a sentence can carry. "" when there is
+## nothing to say, which is every dim moment and every daylight hour.
+static func advice_clause(key: String) -> String:
+	if key == "light_advances":
+		return "light now shifts you earlier"
+	if key == "light_delays":
+		return "light now shifts you later"
+	return ""
+
+
 ## THE HOUR [FlyCircadianClock] SHOULD BELIEVE. A wall hour of 23:00 for a
 ## user whose offset is +4h (their morning starts four hours late) reads to
 ## the fly as 19:00 -- still their evening, not the fly's own midnight torpor.

@@ -118,6 +118,14 @@ static func _schema_rows() -> Array[Dictionary]:
 			"min": 0.0, "max": 365.0, "step": 0.5, "default": 14.0, "options": [],
 			"doc": "Days for an unfed mark to leak away by 1/e. 0 never forgets."},
 
+		# -- entrain: the ring of samples the user's own clock is guessed from -
+		{"key": "entrain.days", "group": "entrain", "type": "int",
+			"min": 1.0, "max": 30.0, "step": 1.0, "default": 7, "options": [],
+			"doc": "Days of zeitgeber samples kept. Older ones are trimmed off the ring before every estimate."},
+		{"key": "entrain.min_samples", "group": "entrain", "type": "int",
+			"min": 1.0, "max": 2048.0, "step": 1.0, "default": 48, "options": [],
+			"doc": "Samples below which the phase estimate is a guess and confidence stays near the floor."},
+
 		# -- qwen: the shape of an answer -------------------------------------
 		{"key": "qwen.max_sentences", "group": "qwen", "type": "int",
 			"min": 1.0, "max": 6.0, "step": 1.0, "default": 1, "options": [],

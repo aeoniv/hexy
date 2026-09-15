@@ -30,6 +30,7 @@ func _init() -> void:
 	_test_day_word()
 	_test_missing_keys()
 	_test_sweep()
+	_test_w7a_phase_and_advice()
 	print("\n=== SENTENCE RESULTS ===")
 	print("Passed: %d, Failed: %d" % [passes, failures])
 	if failures == 0:
@@ -158,3 +159,37 @@ func _test_sweep() -> void:
 			if s.length() > 48 or s != s.to_lower() or s.ends_with("."):
 				bad += 1
 	check(bad == 0, "%d/%d sweep sentences violated length/case/period (0 expected)" % [bad, checked])
+
+
+## W7a.4 -- THE DAY WORD IS NOT ALWAYS "day", AND THE LIGHT GETS A CLAUSE.
+func _test_w7a_phase_and_advice() -> void:
+	print("\n- the seven bands reach the sentence, and the advice clause fits")
+	## Every band Entrain names must survive into the sentence as its own word,
+	## which is the bug W7a found: the front never supplied phase_name at all,
+	## so every sentence this app ever composed ended in "day".
+	for band in ["dawn", "morning", "midday", "afternoon", "dusk", "evening", "night"]:
+		var s: String = SentenceScript.of(0b101010, {}, [], {"phase_name": band})
+		check(s.find(band) >= 0, "a %s day says %s in the sentence (got '%s')" % [band, band, s])
+		check(s.find(" day") < 0 or band == "midday",
+			"and does not fall back to the plain word day (got '%s')" % s)
+	check(SentenceScript.of(0b101010, {}, [], {}).ends_with("day"),
+		"a day dict with no phase_name still falls back to plain day")
+
+	## The advice is the newest thing the day has to say, so the ROOM is what
+	## goes when all four will not fit -- never the advice.
+	var peers: Array = [{"who": "a"}, {"who": "b"}, {"who": "c"}]
+	var clue: String = "light now shifts you earlier"
+	var withc: String = SentenceScript.of(0b101010, {}, peers, {"phase_name": "night"}, [], {}, clue)
+	check(withc.length() <= 48, "the sentence with advice still fits in 48 (%d: '%s')" % [withc.length(), withc])
+	check(withc.find(clue) >= 0, "and the advice clause survived (got '%s')" % withc)
+	check(withc.find("near") < 0, "the room clause is what was dropped to make room")
+	check(withc == withc.to_lower(), "and it is still lowercase")
+
+	var quiet: String = SentenceScript.of(0b101010, {}, peers, {"phase_name": "night"}, [], {}, "")
+	check(quiet.find("near") >= 0, "with no advice the room clause stands as it always did")
+	check(quiet.length() <= 48, "and that one fits too")
+
+	## Same inputs, same string -- the advice must not make it wobble.
+	check(SentenceScript.of(7, {}, peers, {"phase_name": "dusk"}, [], {}, clue)
+		== SentenceScript.of(7, {}, peers, {"phase_name": "dusk"}, [], {}, clue),
+		"the sentence with advice is still deterministic")

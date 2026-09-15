@@ -47,12 +47,22 @@ const TITLES: Dictionary = {
 	"tunables": "8 · TUNABLES",
 	"controls": "9 · CONTROLS",
 	"doors": "10 · DOORS",
+	"phase": "11 · PHASE — FOUR TIMESCALES",
 }
+
+## THE FOUR TIMESCALES, in the order they are stacked: the second the radar is
+## painting, the day the user's own clock is in, the weeks of pressure standing
+## on the six lines, and the life the journey says this figure is a chapter of.
+const PHASE_ROWS: Array[String] = ["seconds", "day", "weeks", "life"]
+
+## Five heights of block, so a signed mark's magnitude reads as a bar without
+## a single line of _draw.
+const MARK_BLOCKS: Array[String] = ["▁", "▃", "▅", "▇", "█"]
 
 ## The two panels that are WIDGETS, not paintings. A gauge shows you a number;
 ## these two let you MOVE one, which no _draw can do. They stand on the same
 ## column, under the seven, and are built out of real Controls.
-const WIDGET_PANELS: Array[String] = ["tunables", "controls", "doors"]
+const WIDGET_PANELS: Array[String] = ["tunables", "controls", "doors", "phase"]
 
 ## The twelve app controls that used to live on the earth dial, in the order a
 ## thumb should meet them. `kind` says what the button does with what it gets
@@ -186,6 +196,11 @@ var _addons: Node = null
 ## line or circuit id -> the Label that names the doors feeding it.
 var _door_labels: Dictionary = {}
 
+## The four timescale rows of panel 11, by key, and the last dictionary Front
+## pushed into them.
+var _phase_labels: Dictionary = {}
+var _phase_snapshot: Dictionary = {}
+
 
 # -- building ----------------------------------------------------------------
 
@@ -295,6 +310,10 @@ func _build_panel(kind: String) -> PanelContainer:
 		return panel
 	if kind == "doors":
 		_build_doors(box)
+		_panels[kind] = panel
+		return panel
+	if kind == "phase":
+		_build_phase(box)
 		_panels[kind] = panel
 		return panel
 
@@ -656,6 +675,97 @@ func control_text() -> String:
 ## attached add-on that answered with that line, and an em dash when nothing
 ## does -- which is what the whole column reads on a base app with no add-ons
 ## on disk, and is the picture "add-on off = base unchanged" should make.
+## THE PHASE PANEL: four rows of plain text, one per timescale.
+##
+## NOTHING HERE REACHES FOR A BRAIN. scripts/glass may not preload
+## scripts/brain, and the four numbers this panel wants -- calcium phase,
+## internal hour, marks, chapter -- live on four different objects on the far
+## side of that wall. So they arrive the only way they may: Front already
+## computes all four every beat and pushes them in through
+## [method set_phase_snapshot]. With nobody pushing, the rows read "—", which
+## is the honest thing for a panel nobody has told anything.
+func _build_phase(box: VBoxContainer) -> void:
+	for key in PHASE_ROWS:
+		var line := HBoxContainer.new()
+		line.name = "Phase:" + key
+		line.add_theme_constant_override("separation", 6)
+
+		var name_label := Label.new()
+		name_label.name = "Name"
+		name_label.text = key.to_upper()
+		name_label.custom_minimum_size = Vector2(80.0, 0.0)
+		name_label.add_theme_font_size_override("font_size", 11)
+		name_label.add_theme_color_override("font_color", DIM)
+		line.add_child(name_label)
+
+		var read := Label.new()
+		read.name = "Read"
+		read.text = "—"
+		read.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		read.add_theme_font_size_override("font_size", 11)
+		read.add_theme_color_override("font_color", INK)
+		line.add_child(read)
+
+		_phase_labels[key] = read
+		box.add_child(line)
+
+
+## WHAT ONE OF THE FOUR ROWS CURRENTLY SAYS, for a caller that wants to read
+## the panel back without walking the tree.
+func phase_row_text(key: String) -> String:
+	var l: Label = _phase_labels.get(key, null) as Label
+	return l.text if l != null else ""
+
+
+## THE SIX MARKS AS SIX SMALL BARS. A mark is signed and in [-1, 1]; each is
+## drawn as one of five block characters so the whole body fits in six
+## glyphs, with the days-toward count after it.
+static func _mark_bars(marks: Array, days: Array) -> String:
+	var out: String = ""
+	for i in range(6):
+		var m: float = absf(float(marks[i])) if i < marks.size() else 0.0
+		out += MARK_BLOCKS[clampi(int(m * 4.999), 0, 4)]
+	var total: int = 0
+	for d in days:
+		total += int(d)
+	return "%s  days %d" % [out, total]
+
+
+## THE ONE DOOR DATA COMES IN THROUGH. Front calls this each beat while the
+## dashboard stands open; every key is optional and a missing one leaves its
+## row alone rather than blanking it.
+func set_phase_snapshot(d: Dictionary) -> void:
+	if d.has("seconds"):
+		_set_phase_row("seconds", String(d["seconds"]))
+	elif d.has("radar_phase"):
+		_set_phase_row("seconds", "calcium %.3f" % float(d["radar_phase"]))
+	if d.has("internal_hour"):
+		_set_phase_row("day", "%02d:%02d  offset %+.2fh  conf %.2f" % [
+			int(float(d["internal_hour"])),
+			int(fposmod(float(d["internal_hour"]), 1.0) * 60.0),
+			float(d.get("offset_h", 0.0)),
+			float(d.get("confidence", 0.0)),
+		])
+	if d.has("marks"):
+		_set_phase_row("weeks", _mark_bars(d["marks"] as Array,
+			(d.get("days_toward", []) as Array)))
+	if d.has("chapter_title"):
+		_set_phase_row("life", "%s · %s" % [
+			String(d["chapter_title"]), String(d.get("stage_name", ""))])
+	_phase_snapshot = d.duplicate(true)
+
+
+## The snapshot exactly as it last arrived, for a test or a tool.
+func phase_snapshot() -> Dictionary:
+	return _phase_snapshot.duplicate(true)
+
+
+func _set_phase_row(key: String, text: String) -> void:
+	var l: Label = _phase_labels.get(key, null) as Label
+	if l != null:
+		l.text = text
+
+
 func _build_doors(box: VBoxContainer) -> void:
 	for i in range(HexyAddon.NEED_NAMES.size()):
 		box.add_child(_build_door_row(i, HexyAddon.NEED_NAMES[i]))

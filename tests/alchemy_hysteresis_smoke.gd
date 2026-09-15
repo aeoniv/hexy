@@ -43,6 +43,7 @@ func _initialize() -> void:
 	_test_a_broken_run_starts_again()
 	_test_flip_days_zero_is_the_old_body()
 	_test_state_exposes_the_pressure()
+	_test_marks_survive_a_fresh_instance()
 	_test_a_cast_spends_the_pressure()
 
 	HexyConfig.forget()
@@ -222,3 +223,45 @@ func _test_a_cast_spends_the_pressure() -> void:
 	near(al.marks()[1], 0.25, 1e-5, "casting the same figure again banks evidence for keeping it")
 	check(al.days_toward()[1] == 1, "one day of it")
 	al.unbind()
+
+
+## W7a.3 -- THE MARKS OUTLIVE THE PROCESS.
+##
+## Two days of evidence banked on a line used to die with the Alchemy that
+## banked them, which made `alchemy.flip_days` a promise the app could not
+## keep across a restart. The pressure is published into the store, the store
+## dumps it, and a FRESH Alchemy bound to a FRESH store loaded from that dump
+## stands on the same marks with the same days behind them.
+func _test_marks_survive_a_fresh_instance() -> void:
+	print("\n[ marks and days survive a fresh Alchemy ]")
+	var al: Alchemy = _rig(3)
+	var t: int = 900 * DAY
+	al.nudge(2, true, 1.0, t)
+	al.nudge(2, true, 1.0, t + DAY)
+	var want_mark: float = al.marks()[2]
+	var want_days: int = al.days_toward()[2]
+	check(want_days == 2, "two days of evidence are standing on line 2")
+	check(absf(want_mark) > 0.0, "and the mark is leaning")
+
+	var dump: Dictionary = al._store.dump()
+	check((dump.get("alchemy", {}) as Dictionary).has("mark"),
+		"the store's dump carries an alchemy section")
+	al.unbind()
+
+	var fresh_store: HexyStore = HexyStoreScript.new()
+	var fresh: Alchemy = Alchemy.new()
+	fresh.flip_days = 3
+	fresh.mark_threshold = 0.6
+	fresh.mark_decay_days = 14.0
+	fresh.bind(fresh_store, Senses.new())
+	check(fresh.marks()[2] == 0.0, "a fresh alchemy starts unmarked")
+	fresh_store.load_dump(dump)
+	near(fresh.marks()[2], want_mark, 1e-5, "and the restored one stands on the same mark")
+	check(fresh.days_toward()[2] == want_days,
+		"with the same days_toward behind it (got %d, want %d)" % [fresh.days_toward()[2], want_days])
+
+	## The third day still turns the line, which is the whole reason the days
+	## had to survive: the evidence was real and the restart did not spend it.
+	check(fresh.nudge(2, true, 1.0, t + 2 * DAY),
+		"the third day of evidence turns the line even though it crossed a restart")
+	fresh.unbind()

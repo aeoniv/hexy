@@ -4,6 +4,8 @@
 		"alchemy.mark_decay_days": 14.0,
 		"alchemy.mark_threshold": 0.6,
 		"creature.breathe_with_dwell": true,
+		"entrain.days": 7,
+		"entrain.min_samples": 48,
 		"hud.bubble_ttl_s": 6.0,
 		"hud.dwell_ring": true,
 		"hud.earth_mode": "lines",
@@ -34,6 +36,7 @@
 		"pacing",
 		"prior",
 		"alchemy",
+		"entrain",
 		"qwen",
 		"senses",
 		"hud",
@@ -217,6 +220,28 @@
 			"options": [],
 			"step": 0.5,
 			"type": "float"
+		},
+		{
+			"default": 7,
+			"doc": "Days of zeitgeber samples kept. Older ones are trimmed off the ring before every estimate.",
+			"group": "entrain",
+			"key": "entrain.days",
+			"max": 30.0,
+			"min": 1.0,
+			"options": [],
+			"step": 1.0,
+			"type": "int"
+		},
+		{
+			"default": 48,
+			"doc": "Samples below which the phase estimate is a guess and confidence stays near the floor.",
+			"group": "entrain",
+			"key": "entrain.min_samples",
+			"max": 2048.0,
+			"min": 1.0,
+			"options": [],
+			"step": 1.0,
+			"type": "int"
 		},
 		{
 			"default": 1,

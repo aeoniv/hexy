@@ -1233,7 +1233,7 @@ func _frame_creature() -> void:
 	var z: float = SOLID_DIAMETER * box.y / (2.0 * half * want_px)
 	var drop_px: float = _band_middle().y - box.y * 0.5
 	var world_per_px: float = 2.0 * half * z / box.y
-	cam.position = Vector3(0.0, drop_px * world_per_px, z)
+	cam.position = Vector3(0.0, -drop_px * world_per_px, z)
 
 
 ## The middle of the body band, in the glass's own coordinates.

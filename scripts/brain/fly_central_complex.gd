@@ -99,15 +99,52 @@ func coherence() -> float:
 ## --- FAN-SHAPED BODY (FB) 2D GOAL VECTOR NAVIGATION ---
 var target_heading: float = 0.0
 
+## WHETHER ANYBODY EVER ASKED FOR A GOAL. target_heading's rest value of 0.0
+## is also a perfectly good bearing (due Earth/Kun), so a flag is the only
+## honest way to tell "steer north" from "nobody said". Until this is true the
+## ring attractor is left entirely alone and the fly drifts as it always did.
+var has_target: bool = false
+
+## How much of the remaining steering error is paid off per second of tick
+## when a goal IS set. Small on purpose: the fan-shaped body biases the bump,
+## it does not teleport it, so a turn takes a visible second or two.
+const GOAL_GAIN: float = 1.5
+
+## Sets the allocentric goal heading directly, in radians. The name the glass
+## reaches for -- Hud3.steer_head calls this when it exists.
+func set_target_heading(angle_rad: float) -> void:
+	target_heading = fposmod(angle_rad, TAU)
+	has_target = true
+
+## Forget the goal; the bump goes back to drifting on its own.
+func clear_target() -> void:
+	has_target = false
+
 ## Sets the allocentric goal heading using an intended hexagram (1..64)
 func set_target_hexagram(hex_id: int) -> void:
 	var h_clamped: int = clampi(hex_id, 1, 64)
 	target_heading = fposmod(float(h_clamped - 1) * (TAU / 64.0), TAU)
+	has_target = true
 
 ## Sets the allocentric goal heading using an intended trigram (0..7)
 func set_target_trigram(trigram_idx: int) -> void:
 	var t_clamped: int = clampi(trigram_idx, 0, 7)
 	target_heading = fposmod(float(t_clamped) * TAU_SLICE, TAU)
+	has_target = true
+
+## THE GOAL ACTUALLY REACHING THE HEADING. compute_steering_vector already
+## said which way and how hard to turn; this is the one place that number is
+## spent on current_heading. A no-op with no goal set.
+func steer_toward_target(dt_sec: float, gain: float = GOAL_GAIN) -> void:
+	if not has_target:
+		return
+	var turn: float = compute_steering_vector().y
+	var step_rad: float = turn * gain * maxf(dt_sec, 0.0)
+	var err: float = steering_error()
+	## Never overshoot: a large dt must land ON the goal, not past it.
+	if absf(step_rad) > absf(err):
+		step_rad = err
+	current_heading = fposmod(current_heading + step_rad, TAU)
 
 ## Returns the signed egocentric steering error in radians [-PI, PI].
 ## Positive = target is to the left; Negative = target is to the right.

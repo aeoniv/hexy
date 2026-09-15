@@ -30,6 +30,7 @@ func _initialize() -> void:
 	await _run_widget_panels()
 	await _run()
 	await _run_borrowed_radar()
+	await _run_phase_panel()
 	if failures == 0:
 		print("--- ALL DASHBOARD TESTS PASSED PERFECTLY ---\n")
 		quit(0)
@@ -462,3 +463,67 @@ func _run_widget_panels() -> void:
 	dash.queue_free()
 	await process_frame
 
+
+
+## W7a.7 -- THE FOUR TIMESCALES STAND ON THE COLUMN.
+func _run_phase_panel() -> void:
+	print("\n[ panel 11: four timescales ]")
+	var packed: PackedScene = load(SCENE)
+	if packed == null:
+		return
+	var app: Node = packed.instantiate()
+	root.add_child(app)
+	await process_frame
+	await process_frame
+	var front: Node = app.get_node_or_null("Hud")
+	if front == null:
+		app.queue_free()
+		return
+	var dash: Node = front.open_dashboard()
+	await process_frame
+	await process_frame
+	check(dash != null, "the gear opens")
+	if dash == null:
+		app.queue_free()
+		return
+
+	check(dash.panel("phase") != null, "the phase panel stands on the column")
+	check(dash.panel("phase") != null and dash.panel("phase").get_parent() == dash.column,
+		"as a child of the one scrolling column")
+	check(HexyDashboard.PHASE_ROWS.size() == 4, "and it has exactly four timescales")
+	check(dash.has_method("set_phase_snapshot"), "data comes in through set_phase_snapshot")
+
+	## The panel is glass and reaches for no brain: everything it shows arrives
+	## in one flat dictionary, which is the only way a glass file may learn
+	## what a calcium phase or a chapter is.
+	dash.set_phase_snapshot({
+		"seconds": "calcium 0.250  morning",
+		"internal_hour": 8.5,
+		"offset_h": 1.25,
+		"confidence": 0.75,
+		"marks": [0.0, 0.25, 0.5, 0.75, 1.0, -0.5],
+		"days_toward": [0, 1, 2, 3, 0, 1],
+		"chapter_title": "Trials · Difficulty",
+		"stage_name": "Trials",
+	})
+	check(dash.phase_row_text("seconds").find("calcium") >= 0, "the seconds row shows the calcium phase")
+	check(dash.phase_row_text("day").find("08:30") >= 0,
+		"the day row shows the internal hour (got '%s')" % dash.phase_row_text("day"))
+	check(dash.phase_row_text("day").find("+1.25") >= 0, "with the offset beside it")
+	check(dash.phase_row_text("day").find("0.75") >= 0, "and the confidence")
+	var weeks: String = dash.phase_row_text("weeks")
+	check(weeks.length() >= 6, "the weeks row draws the six marks as six bars (got '%s')" % weeks)
+	check(weeks.find("days 7") >= 0, "and counts the days toward a turn")
+	check(dash.phase_row_text("life").find("Trials") >= 0, "the life row names the chapter and the stage")
+	check(not dash.phase_snapshot().is_empty(), "the snapshot is readable back")
+
+	## And the front really pushes one every beat while the panel is open.
+	dash.set_phase_snapshot({"seconds": "wiped"})
+	front.beat()
+	check(dash.phase_row_text("seconds") != "wiped",
+		"the front pushes a fresh snapshot on every beat the dashboard is open")
+	check(not (dash.phase_snapshot().get("marks", null) == null),
+		"and the snapshot it pushes carries the six marks")
+
+	app.queue_free()
+	await process_frame

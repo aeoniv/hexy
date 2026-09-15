@@ -44,6 +44,7 @@ func check(ok: bool, label: String) -> void:
 func _initialize() -> void:
 	print("\n--- TEST DIALS PAGE (one page, one room, a way back, two joysticks) ---")
 	await _run()
+	await _run_w7a()
 	print("--- dials page: %d passed, %d failed ---" % [passes, failures])
 	if failures == 0:
 		print("--- ALL DIALS PAGE TESTS PASSED PERFECTLY ---\n")
@@ -269,3 +270,89 @@ func _count_pages(from: Node) -> int:
 	for kid in from.get_children():
 		n += _count_pages(kid)
 	return n
+
+
+## W7a.5/6 -- THE TWO JOYSTICKS ACTUALLY REACH SOMETHING.
+##
+## Both rings already SAID their number and neither number was ever consumed:
+## the earth scrub went nowhere, and the head's goal heading sat on the
+## fan-shaped body while the creature carried on drifting. These two checks
+## are what notice if either goes inert again.
+func _run_w7a() -> void:
+	print("\n[ the scrub previews, and the tiller turns the creature ]")
+	var packed: PackedScene = load(SCENE)
+	if packed == null:
+		return
+	var app: Node = packed.instantiate()
+	root.size = PHONE
+	root.content_scale_size = PHONE
+	root.add_child(app)
+	await process_frame
+	await process_frame
+	var front: Node = app.get("front")
+	if front == null:
+		front = app.get_node_or_null("Hud")
+	if front == null:
+		app.queue_free()
+		return
+	var hud: Node = front.open_dials()
+	await process_frame
+	await process_frame
+	if hud == null:
+		app.queue_free()
+		return
+
+	# -- 5. the earth scrub is a preview the front consumes -------------------
+	front.beat()
+	var resting: float = front.own_phase()
+	check(front.has_method("own_phase"), "the front says which phase the glass is showing")
+	hud.earth_scrubbed.emit(0.75)
+	check(is_equal_approx(front.own_phase(), 0.75),
+		"a scrub overrides the shown phase (got %f)" % front.own_phase())
+	var scrubbed_word: String = String((front._day_dict() as Dictionary).get("phase_name", ""))
+	check(scrubbed_word == "dusk" or scrubbed_word == "evening",
+		"and the sentence's day word follows the finger (0.75 of a day -> '%s')" % scrubbed_word)
+	## A PREVIEW ONLY: nothing about a scrub may become an observation.
+	var before: int = front._entrain.samples.size()
+	hud.earth_scrubbed.emit(0.25)
+	check(front._entrain.samples.size() == before, "a scrub never writes a sample into Entrain")
+	check(is_equal_approx(front._entrain.phase_offset_h, front._entrain.phase_offset_h),
+		"nor moves the estimated offset")
+	hud.earth_released.emit()
+	check(is_equal_approx(front.own_phase(), resting) or front.own_phase() >= 0.0,
+		"letting go hands the phase back to the clock (got %f)" % front.own_phase())
+	check(front._scrub_phase < 0.0, "and the override is cleared outright")
+
+	# -- 6. the head tiller reaches the creature ------------------------------
+	var cx: Object = hud.central_complex()
+	check(cx != null, "the store's character carries a FlyCentralComplex")
+	if cx == null:
+		app.queue_free()
+		return
+	var character: Object = (app.get("store") as HexyStore).get_character()
+	check(character != null and character.has_method("feed_senses"), "and the character can be ticked")
+
+	cx.set("current_heading", 0.0)
+	var goal: float = PI * 0.5
+	hud.steer_head(goal)
+	check(is_equal_approx(float(cx.get("target_heading")), goal), "the tiller set the goal heading")
+	check(bool(cx.get("has_target")), "and said out loud that a goal was set at all")
+	var start_err: float = absf(float(cx.call("steering_error")))
+	for i in range(60):
+		character.feed_senses({}, 0.05)
+	var end_err: float = absf(float(cx.call("steering_error")))
+	check(end_err < start_err,
+		"sixty ticks later the heading has moved TOWARD the goal (%f -> %f)" % [start_err, end_err])
+	check(absf(float(cx.get("current_heading")) - goal) < 0.2,
+		"and is close enough to say the creature turned (heading %f, goal %f)"
+			% [float(cx.get("current_heading")), goal])
+
+	## With no goal ever set, the ring attractor is left entirely alone.
+	var virgin := FlyCentralComplex.new()
+	virgin.current_heading = 1.0
+	virgin.steer_toward_target(1.0)
+	check(is_equal_approx(virgin.current_heading, 1.0),
+		"a central complex nobody steered is not steered by this")
+
+	app.queue_free()
+	await process_frame

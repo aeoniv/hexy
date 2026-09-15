@@ -104,6 +104,25 @@ var answer: String = ""
 ## room of one, which is also what it reads with no mesh at all.
 var swarm_yaw: float = 0.0
 
+## WHERE THE BODY HAS BEEN, newest last, as plain six-bit figures. Journey's
+## ROAD_BACK rule needs more than one step of memory to fire at all, and the
+## store is the only thing here that outlives a run, so the path is kept with
+## the figure rather than in whatever glass happens to be watching.
+var _path: Array[int] = ([] as Array[int])
+## How many steps of the path are kept. Journey looks back eight; a little
+## more than that is enough for it and small enough to carry in a dump.
+const PATH_MAX: int = 32
+
+## THE USER'S OWN CLOCK, as [Entrain.to_dict] left it. Publish only, like the
+## pacing cube: Front owns the Entrain instance and hands the dictionary here
+## so a dump carries it. The store never estimates anything.
+var _entrain_state: Dictionary = {}
+
+## ALCHEMY'S STANDING PRESSURE, as [method Alchemy.pressure_dict] left it.
+## Publish only, and the same bargain: Alchemy is the one writer, the store is
+## the one thing that persists.
+var _alchemy_state: Dictionary = {}
+
 ## Biological Fruit Fly Character Homeostat
 var character: RefCounted = null
 
@@ -240,9 +259,43 @@ func set_body(b: Dictionary) -> bool:
 	if _same(next, body):
 		return false
 	body = next
+	_note_path(int(body.get("bits", 0)) & 63)
 	body_changed.emit(body)
 	hexagram_changed.emit(body)
 	return true
+
+
+## ONE STEP OF THE WALK, remembered. A body set to where it already stands is
+## not a step and is not recorded, so the path is figures actually visited.
+func _note_path(bits: int) -> void:
+	if not _path.is_empty() and _path[_path.size() - 1] == bits:
+		return
+	_path.append(bits)
+	while _path.size() > PATH_MAX:
+		_path.remove_at(0)
+
+
+## THE WALK SO FAR, newest last, for [method Journey.stage_of_path].
+func body_path() -> Array[int]:
+	return _path.duplicate() as Array[int]
+
+
+## PUBLISH ONLY, from Front: the entrain state a dump should carry.
+func set_entrain_state(d: Dictionary) -> void:
+	_entrain_state = d.duplicate(true)
+
+
+func entrain_state() -> Dictionary:
+	return _entrain_state.duplicate(true)
+
+
+## PUBLISH ONLY, from Alchemy: the six marks and their runs of days.
+func set_alchemy_state(d: Dictionary) -> void:
+	_alchemy_state = d.duplicate(true)
+
+
+func alchemy_state() -> Dictionary:
+	return _alchemy_state.duplicate(true)
 
 
 ## The old name. It always meant the body; it still does -- and like every
@@ -432,6 +485,9 @@ func dump() -> Dictionary:
 		"answer": answer,
 		"pacing_bits": _pacing_bits,
 		"journal_tail": _journal_tail.duplicate(true),
+		"path": _path.duplicate(),
+		"entrain": _entrain_state.duplicate(true),
+		"alchemy": _alchemy_state.duplicate(true),
 	}
 
 
@@ -463,6 +519,20 @@ func load_dump(d: Dictionary) -> void:
 		set_room(d["room"] as Dictionary)
 	if d.has("answer"):
 		set_answer(String(d["answer"]))
+	## THE THREE CARRIED SECTIONS ARE PUT BACK BEFORE `restored` FIRES, because
+	## Alchemy re-reads its own marks off this store the moment it hears that
+	## signal -- a section loaded after it would arrive one restore too late.
+	if d.has("path") and d["path"] is Array:
+		var walked: Array[int] = ([] as Array[int])
+		for b in (d["path"] as Array):
+			walked.append(int(b) & 63)
+		while walked.size() > PATH_MAX:
+			walked.remove_at(0)
+		_path = walked
+	if d.has("entrain") and d["entrain"] is Dictionary:
+		_entrain_state = (d["entrain"] as Dictionary).duplicate(true)
+	if d.has("alchemy") and d["alchemy"] is Dictionary:
+		_alchemy_state = (d["alchemy"] as Dictionary).duplicate(true)
 	restored.emit()
 
 
@@ -477,6 +547,9 @@ func reset() -> void:
 	set_answer("")
 	_pacing_bits = 0
 	_journal_tail = {}
+	_path = ([] as Array[int])
+	_entrain_state = {}
+	_alchemy_state = {}
 	restored.emit()
 
 

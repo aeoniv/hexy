@@ -40,6 +40,16 @@ const DIALS := preload("res://scripts/glass/hud3.gd")
 ## swipe asks for it.
 const DASHBOARD := preload("res://scripts/glass/dashboard.gd")
 
+## How often [method Entrain.estimate] is actually run, in milliseconds. The
+## beat is four times a second and the estimate walks a week of samples; the
+## number it produces moves in hours.
+const ESTIMATE_EVERY_MS: int = 60_000
+
+## The two entrain knobs, by the names [method Entrain.default_config] gives
+## them and [HexyConfig] registers.
+const CFG_ENTRAIN_DAYS: String = "entrain.days"
+const CFG_ENTRAIN_MIN_SAMPLES: String = "entrain.min_samples"
+
 ## THE TWO THIN SHEETS, preloaded and never built until a finger asks for one
 ## -- the same bargain the dials strike above.
 const PEER_SHEET := preload("res://scripts/glass/peer_sheet.gd")
@@ -165,6 +175,8 @@ var _mic_listening: bool = false
 var _entrain: Entrain = null
 ## Whether a question left the composer since the last beat.
 var _spoke: bool = false
+## The last light reading anybody handed in. -1 is "no light sensor here".
+var _lux: float = -1.0
 
 ## The journey, tracked from the store's body changes: where the figure came
 ## from, and how many days it has been sitting where it is.
@@ -173,6 +185,18 @@ var _cur_body: int = -1
 var _still_since_day: int = -1
 var _stage: int = -1
 var _phase: float = -1.0
+## The last [method Entrain.estimate] result, refreshed at most once a minute
+## -- the estimate walks the whole ring buffer and a beat is four times a
+## second, which would be a week of arithmetic for a number that moves in
+## hours.
+var _phase_est: Dictionary = {}
+## Wall-clock ms the estimate was last taken, so the throttle needs no timer.
+var _est_at_ms: int = 0
+## A FINGER ON THE EARTH RING, as a share of the day, or -1 for no finger.
+## A PREVIEW ONLY: it colours the sentence's day word and the radar's own
+## phase while it is held and is forgotten on release. Nothing here ever
+## reaches [Entrain] -- a scrub is a question, not an observation.
+var _scrub_phase: float = -1.0
 
 var _sentence_script: Script = null
 var _beat_timer: Timer = null
@@ -479,6 +503,10 @@ func bind(store: Node, mnn: Node, wmn: Node, senses: Node, alchemy: Node, qwen: 
 		_cur_body = _body_bits()
 		_prev_body = _cur_body
 		_still_since_day = _today()
+		## THE CLOCK THIS PHONE WENT TO SLEEP WITH. Loaded before the first
+		## beat, so the very first sentence is already on the user's own hour.
+		_load_entrain()
+		_join(_store, "restored", _load_entrain)
 	_join(_mnn, "token", _on_token)
 	## A PEER THAT STOPS SHOUTING LEAVES THE DISC. The fabric's own timeout is
 	## the authority; the front only forwards the word.
@@ -574,7 +602,33 @@ func beat() -> void:
 	_feed_clock()
 	_refresh_sentence()
 	_refresh_glyph()
+	_feed_dashboard()
 	_spoke = false
+
+
+## THE FOUR TIMESCALES, PUSHED. The dashboard is glass and may not preload a
+## brain; the front already holds every one of these numbers, so it hands them
+## over as one flat dictionary while the panel is standing open.
+func _feed_dashboard() -> void:
+	if dashboard == null or not dashboard.has_method("set_phase_snapshot"):
+		return
+	var bits: int = _body_bits()
+	var ch: Dictionary = Journey.chapter(bits, maxi(_stage, 0))
+	var est: Dictionary = phase_estimate()
+	var days: Array = []
+	if _alchemy != null and _alchemy.has_method("days_toward"):
+		days = _alchemy.days_toward() as Array
+	dashboard.set_phase_snapshot({
+		"radar_phase": own_phase(),
+		"seconds": "calcium %.3f  %s" % [own_phase(), String(est.get("phase_name", ""))],
+		"internal_hour": float(est.get("internal_hour", 0.0)),
+		"offset_h": float(est.get("offset_h", 0.0)),
+		"confidence": float(est.get("confidence", 0.0)),
+		"marks": _marks(),
+		"days_toward": days,
+		"chapter_title": String(ch.get("title", "")),
+		"stage_name": String(ch.get("stage_name", "")),
+	})
 
 
 ## EVERYTHING THE ROOM KNOWS, PUSHED. The radar reaches for nothing: the fly
@@ -621,18 +675,98 @@ func _feed_clock() -> void:
 	var day: int = _today()
 	var wall: float = _wall_hour()
 	_entrain.sample(day, wall, -1.0, _motion(), _screen_on(), _spoke)
-	_entrain.trim(day, 7)
+	_entrain.trim(day, _entrain_days())
+	## THE ESTIMATE, ONCE A MINUTE. It is the only thing that moves
+	## `phase_offset_h`, so without this call `internal_hour` is the sun's hour
+	## wearing the user's name -- which is what the audit found.
+	var now_ms: int = Clock.now_ms()
+	if _est_at_ms <= 0 or now_ms - _est_at_ms >= ESTIMATE_EVERY_MS:
+		_est_at_ms = now_ms
+		_phase_est = _entrain.estimate()
+		_save_entrain()
 	_phase = fposmod(_entrain.internal_hour(wall), 24.0) / 24.0
 	var days_still: int = maxi(0, day - _still_since_day)
 	var now_bits: int = _body_bits()
 	if _cur_body < 0:
 		_cur_body = now_bits
 		_prev_body = now_bits
-	_stage = Journey.stage_of(_prev_body, now_bits, days_still)
+	## THE WHOLE WALK, NOT ONE STEP. `stage_of` can never return ROAD_BACK --
+	## it has no memory to recognise old ground with -- so the store's own path
+	## is handed over when there is enough of it, and the single step stays as
+	## the fallback for a store that has only just started walking.
+	var walked: Array[int] = _body_path()
+	if walked.size() >= 3:
+		_stage = Journey.stage_of_path(walked, days_still)
+	else:
+		_stage = Journey.stage_of(_prev_body, now_bits, days_still)
+	var shown: float = own_phase()
 	if _wmn != null and _wmn.has_method("set_own_phase"):
-		_wmn.set_own_phase(_phase, _stage)
+		_wmn.set_own_phase(shown, _stage)
 	if radar != null and radar.has_method("set_own_phase"):
-		radar.set_own_phase(_phase, _stage)
+		radar.set_own_phase(shown, _stage)
+
+
+## THE PHASE THE GLASS IS SHOWING: the scrub's, while a finger holds the earth
+## ring, and the clock's own otherwise.
+func own_phase() -> float:
+	return _scrub_phase if _scrub_phase >= 0.0 else _phase
+
+
+## THE LAST ESTIMATE, as a dictionary a dashboard or a test can read: offset_h,
+## confidence, wake_h, sleep_h, plus the internal hour and its band name.
+func phase_estimate() -> Dictionary:
+	var out: Dictionary = _phase_est.duplicate(true)
+	var ih: float = _entrain.internal_hour(_wall_hour())
+	out["internal_hour"] = ih
+	out["phase_name"] = Entrain.phase_name(ih)
+	out["phase"] = own_phase()
+	out["confidence"] = _entrain.confidence
+	out["offset_h"] = _entrain.phase_offset_h
+	return out
+
+
+## How many days of samples the ring keeps, from HexyConfig when there is one.
+func _entrain_days() -> int:
+	var cfg: HexyConfig = HexyConfig.peek()
+	if cfg != null and cfg.keys().has(CFG_ENTRAIN_DAYS):
+		return maxi(1, int(cfg.get_value(CFG_ENTRAIN_DAYS)))
+	return int(Entrain.default_config()[CFG_ENTRAIN_DAYS])
+
+
+## THE ENTRAIN STATE, HANDED TO THE STORE so a dump carries it. Publish only.
+func _save_entrain() -> void:
+	if _store != null and _store.has_method("set_entrain_state"):
+		_store.set_entrain_state(_entrain.to_dict())
+
+
+## THE INVERSE, at bind: a store that came back with an entrain section gives
+## this front the clock it went to sleep with instead of a cold one.
+func _load_entrain() -> void:
+	if _store == null or not _store.has_method("entrain_state"):
+		return
+	var d: Dictionary = _store.entrain_state() as Dictionary
+	if d.is_empty():
+		return
+	_entrain = Entrain.from_dict(d)
+	_phase_est = _entrain.estimate()
+
+
+## A FINGER SCRUBBED THE EARTH RING. Preview only; released below.
+func _on_earth_scrubbed(day_phase: float) -> void:
+	_scrub_phase = clampf(day_phase, 0.0, 1.0)
+	_refresh_sentence()
+
+
+func _on_earth_released() -> void:
+	_scrub_phase = -1.0
+	_refresh_sentence()
+
+
+## The walk the store remembers, or nothing when the store is too old to know.
+func _body_path() -> Array[int]:
+	if _store != null and _store.has_method("body_path"):
+		return _store.body_path() as Array[int]
+	return ([] as Array[int])
 
 
 ## THE ONE LINE. Composed by the core when the core is there, and by the figure
@@ -653,7 +787,8 @@ func _compose_sentence() -> String:
 	var bits: int = _body_bits()
 	if _sentence_script != null:
 		var out: Variant = _sentence_script.call("of", bits, _cast_dict(), _peer_rows(),
-			_day_dict(), _marks(), Journey.chapter(bits, maxi(_stage, 0)))
+			_day_dict(), _marks(), Journey.chapter(bits, maxi(_stage, 0)),
+			_advice_clause())
 		if out != null:
 			return String(out)
 	return "#%d %s" % [KingWen.number(bits), KingWen.name(bits)]
@@ -682,11 +817,35 @@ func _day_dict() -> Dictionary:
 		"day": _today(),
 		"hour": _wall_hour(),
 		"internal_hour": _entrain.internal_hour(_wall_hour()),
-		"phase": _phase,
+		## THE BAND, NAMED. Sentence._day_word reads this and nothing else, so
+		## without it every sentence this front ever composed said "day".
+		## Derived from the INTERNAL hour, so a night owl's "morning" is theirs
+		## -- and from the scrub's hour instead while a finger is holding the
+		## earth ring, which is the whole point of a preview.
+		"phase_name": Entrain.phase_name(
+			own_phase() * 24.0 if _scrub_phase >= 0.0
+			else _entrain.internal_hour(_wall_hour())),
+		"phase": own_phase(),
 		"stage": _stage,
 		"confidence": _entrain.confidence,
 		"days_still": maxi(0, _today() - _still_since_day),
 	}
+
+
+## WHAT THE LIGHT IS DOING TO THE CLOCK, as one lowercase clause or "". The
+## front has no lux of its own, so this is only ever non-empty when something
+## upstream pushed one in through [method set_lux].
+func _advice_clause() -> String:
+	if _lux < Entrain.BRIGHT_LUX:
+		return ""
+	var a: Dictionary = _entrain.advice(_wall_hour(), _lux)
+	return Entrain.advice_clause(String(a.get("key", "none")))
+
+
+## THE ONE LIGHT READING, pushed in by whoever has a light sensor. -1 is
+## "unknown", which is what a phone with nothing attached honestly reports.
+func set_lux(lux: float) -> void:
+	_lux = lux
 
 
 ## The six standing marks, when there is an alchemy to ask.
@@ -924,10 +1083,17 @@ func open_dials() -> Node:
 		## THE PAGE MAY LEARN TO CLOSE ITSELF LATER. When it has a `closed`
 		## signal the front listens to it; until then the front puts its own
 		## back bar over the page, because a page with no way out is a trap.
+		## THE EARTH SCRUB, PREVIEWED. The ring says a share of the day; the
+		## sentence and the radar borrow it while the finger is down and give
+		## it back on release. It never becomes a sample.
+		_join(dials, "earth_scrubbed", _on_earth_scrubbed)
+		_join(dials, "earth_released", _on_earth_released)
 		if dials.has_signal("closed"):
 			_join(dials, "closed", close_dials)
 		else:
 			_build_back_bar()
+	if _creature != null and dials.has_method("set_creature"):
+		dials.set_creature(_creature)
 	_show_page(true)
 	return dials
 
@@ -946,6 +1112,8 @@ func dials_open() -> bool:
 func close_dials() -> bool:
 	if not dials_open():
 		return false
+	if _creature != null:
+		set_creature(_creature)
 	_show_page(false)
 	return true
 
@@ -1238,7 +1406,9 @@ func _layout_room() -> void:
 ## distance is solved from the eye's own field of view and the offset from how
 ## far the hub's middle is from the glass's.
 func _frame_creature() -> void:
-	if _creature == null or _creature.camera == null or root == null:
+	if dials_open():
+		return
+	if _creature == null or _creature.camera == null or root == null or _creature.get_parent() != view:
 		return
 	var box: Vector2 = root.size
 	var want_px: float = creature_field.size.x * CREATURE_FILL
@@ -1335,3 +1505,4 @@ static func _join(who_node: Object, what: String, to: Callable) -> void:
 		return
 	if not who_node.is_connected(what, to):
 		who_node.connect(what, to)
+

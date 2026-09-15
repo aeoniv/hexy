@@ -223,6 +223,7 @@ func tick(now_ms: int) -> Dictionary:
 	if prior_follows_stillness:
 		Q6Core.set_prior_weight(_prior_weight(_senses.stillness(), _tension()))
 	_decay_marks(now_ms)
+	_publish_pressure()
 	if out.is_empty():
 		return out
 	var line: int = int(out["line"])
@@ -291,6 +292,7 @@ func nudge(line: int, to_yang: bool, weight: float = 1.0, now_ms: int = -1) -> b
 	_mark[line] = clampf(
 		_mark[line] + float(sign_now) * MARK_STEP * absf(weight), -1.0, 1.0)
 	if absf(_mark[line]) + 1e-6 < mark_threshold or _days[line] < flip_days:
+		_publish_pressure()
 		mark_moved.emit(line, _mark[line])
 		return false
 	## THE LINE TURNS, and the pressure that turned it is SPENT: a flipped line
@@ -305,6 +307,7 @@ func nudge(line: int, to_yang: bool, weight: float = 1.0, now_ms: int = -1) -> b
 		"reason": "hysteresis",
 		"kind": "hysteresis",
 	})
+	_publish_pressure()
 	mark_moved.emit(line, _mark[line])
 	return true
 
@@ -512,10 +515,19 @@ func _on_restored() -> void:
 	var now: int = _last_now_ms if _last_now_ms > 0 else Clock.now_ms()
 	pacing.reset(_store.body_bits(), now)
 	## A FIGURE PUT BACK IS NOT A FIGURE THAT WAS ARGUED FOR. The marks belonged
-	## to the body that was here a moment ago; they say nothing about this one.
-	for i in range(6):
-		_clear_mark(i)
-	_decayed_at_ms = now
+	## to the body that was here a moment ago; they say nothing about this one
+	## -- UNLESS the dump that put it back carried the marks too, in which case
+	## they are the same body's own pressure coming home and clearing them
+	## would throw away days of evidence the person actually lived.
+	var carried: Dictionary = {}
+	if _store.has_method("alchemy_state"):
+		carried = _store.alchemy_state() as Dictionary
+	if carried.is_empty():
+		for i in range(6):
+			_clear_mark(i)
+		_decayed_at_ms = now
+	else:
+		restore(carried)
 	if not pacing.journal.is_empty():
 		pacing.journal[pacing.journal.size() - 1]["source"] = "restore"
 	_publish_pacing_state()
@@ -577,6 +589,63 @@ func state() -> Dictionary:
 		"flip_days": flip_days,
 		"mark_threshold": mark_threshold,
 	}
+
+
+## THE PRESSURE, AS A DICTIONARY THAT SURVIVES A COLD START.
+##
+## [method state] is a readout for a glass and carries device facts and pacing
+## alongside the marks; this is the narrower thing a store persists -- the six
+## accumulators, the direction and day-count of each run, and when the leak was
+## last paid -- and nothing that can be recomputed.
+func pressure_dict() -> Dictionary:
+	return {
+		"mark": marks(),
+		"dir": _int_array(_dir),
+		"days": _int_array(_days),
+		"last_day": _int_array(_last_day),
+		"decayed_at_ms": _decayed_at_ms,
+	}
+
+
+static func _int_array(p: PackedInt32Array) -> Array[int]:
+	var out: Array[int] = []
+	for v in p:
+		out.append(int(v))
+	return out
+
+
+## THE INVERSE. A fresh Alchemy handed the dictionary its predecessor left
+## stands on the same six marks, with the same runs of days behind them, so
+## three days of evidence banked before a restart are still three days after
+## it. An empty or short dictionary leaves the marks where they are rather
+## than zeroing them, so a caller with nothing saved loses nothing.
+func restore(state: Dictionary) -> void:
+	if state.is_empty():
+		return
+	var mark: Array = state.get("mark", [])
+	var dir: Array = state.get("dir", [])
+	var days: Array = state.get("days", [])
+	var last_day: Array = state.get("last_day", [])
+	for i in range(6):
+		if i < mark.size():
+			_mark[i] = clampf(float(mark[i]), -1.0, 1.0)
+		if i < dir.size():
+			_dir[i] = clampi(int(dir[i]), -1, 1)
+		if i < days.size():
+			_days[i] = maxi(0, int(days[i]))
+		if i < last_day.size():
+			_last_day[i] = int(last_day[i])
+	_decayed_at_ms = int(state.get("decayed_at_ms", _decayed_at_ms))
+	for i in range(6):
+		mark_moved.emit(i, _mark[i])
+
+
+## THE MARKS, HANDED TO THE ONE THING THAT OUTLIVES THE RUN. Publish only: the
+## store keeps the dictionary and dumps it; it never reads a mark back on its
+## own.
+func _publish_pressure() -> void:
+	if _store != null and _store.has_method("set_alchemy_state"):
+		_store.set_alchemy_state(pressure_dict())
 
 
 ## The six standing marks, copied, signed, + for yang.

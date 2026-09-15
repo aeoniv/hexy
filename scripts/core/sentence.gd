@@ -109,6 +109,12 @@ static func _day_word(day: Dictionary) -> String:
 		return "night"
 	if phase.find("siesta") >= 0:
 		return "siesta"
+	## The seven bands [Entrain.phase_name] hands out, matched whole so a
+	## host that spells its own phase differently still falls through to
+	## "day" rather than being guessed at.
+	for w in ["morning", "midday", "afternoon", "evening"]:
+		if phase.find(w) >= 0:
+			return w
 	return "day"
 
 
@@ -133,7 +139,7 @@ static func _dominant_line(marks: Array) -> int:
 ## may throw -- a sentence with nothing to say about the room or the day
 ## still says something about the body.
 static func of(body_bits: int, cast: Dictionary, peers: Array, day: Dictionary,
-		marks: Array = [], chapter: Dictionary = {}) -> String:
+		marks: Array = [], chapter: Dictionary = {}, advice: String = "") -> String:
 	var bits: int = body_bits & 63
 	## `cast` carries only `bits`/`source` today; a cast with its own bits
 	## does not override the body -- the body is what the glass shows -- but
@@ -153,6 +159,16 @@ static func of(body_bits: int, cast: Dictionary, peers: Array, day: Dictionary,
 	var stage_name: String = String(raw_stage) if raw_stage != null else ""
 	if stage_name != "" and stage_name != "Ordinary World":
 		day_word += " " + stage_name.to_lower()
+
+	## THE LIGHT ADVISORY, WHEN THERE IS ONE. It is the newest thing the day
+	## has to say, so it outranks the room: if all four will not fit, the room
+	## clause is the one that goes, not the advice.
+	var clue: String = advice.strip_edges().to_lower()
+	if clue != "":
+		var full: String = _compose([body_word, room_word, day_word, clue])
+		if full.length() <= MAX_LEN and full.find(clue) >= 0:
+			return full
+		return _compose([body_word, day_word, clue])
 
 	return _compose([body_word, room_word, day_word])
 

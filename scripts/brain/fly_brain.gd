@@ -105,6 +105,11 @@ func feed(sample: Dictionary, dt_sec: float) -> void:
 		central_complex.current_heading = fposmod(
 			central_complex.current_heading + diff * clampf(dt * 0.5, 0.0, 1.0), TAU)
 
+	#    And the fan-shaped body's goal, when a hand on the head dial set one:
+	#    the steering error the central complex already computes is finally
+	#    spent on the heading, which is what makes the creature actually turn.
+	central_complex.steer_toward_target(dt)
+
 	# 3. Circadian clock.
 	if sample.has("solar_hour"):
 		circadian_clock.update(float(sample["solar_hour"]))

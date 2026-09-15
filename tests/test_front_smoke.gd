@@ -35,6 +35,7 @@ func check(ok: bool, label: String) -> void:
 func _initialize() -> void:
 	print("\n--- TEST FRONT SMOKE (one sentence, one room, one composer) ---")
 	await _run()
+	await _run_phase_spine()
 	print("--- front smoke: %d passed, %d failed ---" % [passes, failures])
 	if failures == 0:
 		print("--- ALL FRONT SMOKE TESTS PASSED PERFECTLY ---\n")
@@ -239,3 +240,79 @@ func _count_children_of_type(parent: Node, type_name: String) -> int:
 		if kid.get_class() == type_name or (type_name == "Hud3" and kid is Hud3):
 			n += 1
 	return n
+
+
+## W7a.1/2/4/7 -- THE PHASE SPINE IS LIVE.
+##
+## The audit found every part of this already written and none of it wired:
+## the estimate was never run, the entrain state was never saved, the sentence
+## never got a phase_name, and the journey only ever saw one step. This is the
+## file that notices if any of them goes inert again.
+func _run_phase_spine() -> void:
+	print("\n[ the phase spine ]")
+	var packed: PackedScene = load(SCENE)
+	if packed == null:
+		return
+	var app: Node = packed.instantiate()
+	root.add_child(app)
+	await process_frame
+	await process_frame
+
+	var front: Node = app.get_node_or_null("Hud")
+	check(front != null, "the front is under the app")
+	if front == null:
+		app.queue_free()
+		return
+	var store: HexyStore = app.get("store") as HexyStore
+
+	# -- 1. the estimate actually runs, and is exposed ------------------------
+	front.beat()
+	check(front.has_method("phase_estimate"), "the front exposes phase_estimate()")
+	var est: Dictionary = front.phase_estimate() as Dictionary
+	for key in ["offset_h", "confidence", "internal_hour", "phase_name", "phase"]:
+		check(est.has(key), "phase_estimate names %s" % key)
+	check(est.has("wake_h"), "and carries the estimate's own wake hour, so estimate() was really run")
+	var ph: String = String(est.get("phase_name", ""))
+	check(["night", "dawn", "morning", "midday", "afternoon", "dusk", "evening"].has(ph),
+		"the internal hour names one of the seven bands (got '%s')" % ph)
+
+	# -- 2. entrain reaches the store, and comes back off it ------------------
+	check(store != null and store.has_method("entrain_state"), "the store keeps an entrain section")
+	var saved: Dictionary = store.entrain_state() as Dictionary
+	check(not saved.is_empty(), "and the front wrote this run's clock into it")
+	check((saved.get("samples", []) as Array).size() > 0, "with the samples it has taken so far")
+	var dumped: Dictionary = store.dump()
+	check((dumped.get("entrain", {}) as Dictionary).has("samples"),
+		"a dump of the whole store carries the entrain section")
+
+	var cold: HexyStore = HexyStore.new()
+	cold.load_dump(dumped)
+	check((cold.entrain_state().get("samples", []) as Array).size()
+		== (saved.get("samples", []) as Array).size(),
+		"and a fresh store loaded from it has the same clock back")
+
+	# -- 4. the sentence says a real day word --------------------------------
+	var day: Dictionary = front._day_dict() as Dictionary
+	check(day.has("phase_name"), "the day dict the sentence is handed names a phase")
+	check(String(day["phase_name"]) != "", "and it is not empty")
+	var line: String = String(front.sentence_text())
+	check(line.length() <= SENTENCE_MAX, "the bar still fits in %d (%d)" % [SENTENCE_MAX, line.length()])
+	check(line == line.to_lower(), "and is still lowercase")
+
+	# -- 7. the journey reads the whole path ---------------------------------
+	check(store.has_method("body_path"), "the store remembers where the body has been")
+	## Walk the body somewhere, somewhere else, then back to the first: only a
+	## path-aware rule can call that THE ROAD BACK, and stage_of never could.
+	store.set_body({"bits": 0b000111, "moving": 0})
+	store.set_body({"bits": 0b001111, "moving": 0})
+	store.set_body({"bits": 0b000111, "moving": 0})
+	check(store.body_path().size() >= 3, "three steps of walk are remembered")
+	front.beat()
+	var walked: Array[int] = store.body_path()
+	check(Journey.stage_of_path(walked, 0) == front._stage,
+		"the front's stage is the path's stage, not the single step's")
+	check(front._stage == Journey.Stage.ROAD_BACK,
+		"and returning to old ground fires ROAD_BACK (got %d)" % front._stage)
+
+	app.queue_free()
+	await process_frame

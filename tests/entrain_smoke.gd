@@ -30,6 +30,7 @@ func _initialize() -> void:
 	_decay()
 	_trim()
 	_config()
+	_phase_bands()
 
 	print("checks: ", _checks)
 	if _fails == 0:
@@ -196,3 +197,30 @@ func _config() -> void:
 	_check(cfg.has("entrain.days") and int(cfg["entrain.days"]) == 7, "entrain.days defaults to 7")
 	_check(cfg.has("entrain.min_samples") and int(cfg["entrain.min_samples"]) == 48,
 		"entrain.min_samples defaults to 48")
+
+
+## W7a.4 -- THE SEVEN BANDS, and the clause the light advisory turns into.
+func _phase_bands() -> void:
+	print("\n- phase_name and advice_clause")
+	var want := {
+		1.0: "night", 5.5: "dawn", 8.0: "morning", 12.0: "midday",
+		15.0: "afternoon", 18.0: "dusk", 20.0: "evening", 23.0: "night",
+	}
+	for h in want.keys():
+		_check(Entrain.phase_name(float(h)) == String(want[h]),
+			"internal hour %.1f is %s (got %s)" % [h, String(want[h]), Entrain.phase_name(float(h))])
+	_check(Entrain.phase_name(25.0) == "night", "the hour wraps rather than falling off the table")
+	_check(Entrain.phase_name(-1.0) == "night", "and wraps backwards too")
+	## Every band name is one the sentence knows, so no hour ever reads "day".
+	var known := ["night", "dawn", "morning", "midday", "afternoon", "dusk", "evening"]
+	var all_known := true
+	for i in range(240):
+		if not known.has(Entrain.phase_name(float(i) * 0.1)):
+			all_known = false
+	_check(all_known, "every hour of the day names a band the sentence knows")
+
+	_check(Entrain.advice_clause("light_advances") == "light now shifts you earlier",
+		"an advancing PRC reads as a short lowercase clause")
+	_check(Entrain.advice_clause("light_delays") == "light now shifts you later",
+		"a delaying one says the other direction")
+	_check(Entrain.advice_clause("none") == "", "and silence when the light says nothing")
