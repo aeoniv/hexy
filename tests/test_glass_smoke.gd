@@ -153,6 +153,11 @@ func _run() -> void:
 	# -- stillness walks the BODY one line at a time -------------------------
 	check(app.alchemy != null, "the app built an Alchemy and bound it")
 	if app.alchemy != null:
+		## This walk is 2.6 SECONDS long, so it asks for the immediate body:
+		## the epigenetic gate wants days, and is checked in its own file.
+		var cfg: HexyConfig = HexyConfig.instance()
+		cfg.autosave = false
+		cfg.set_value("alchemy.flip_days", 0)
 		app.senses.period_ms = 100
 		app.senses.reset()
 		var t0: int = 5_000_000

@@ -261,6 +261,30 @@ func peer_proximity_by_src() -> Dictionary:
 	return out
 
 
+## fabric src id -> where in their own day that peer is, 0..1. A peer whose last
+## pulse said -1 -- no estimator on that phone yet -- is simply absent, the same
+## bargain `peer_proximity_by_src` strikes for an unplaced link: a radar draws
+## nobody it was told nothing about.
+func peer_phase_by_src() -> Dictionary:
+	var out := {}
+	for src in peer_bio:
+		var p := float((peer_bio[src] as Dictionary).get("phase", -1.0))
+		if p >= 0.0:
+			out[String(src)] = p
+	return out
+
+
+## fabric src id -> which chapter of the journey that peer is in. Absent for a
+## peer who has not said, for the same reason as above.
+func peer_stage_by_src() -> Dictionary:
+	var out := {}
+	for src in peer_bio:
+		var s := int((peer_bio[src] as Dictionary).get("stage", -1))
+		if s >= 0:
+			out[String(src)] = s
+	return out
+
+
 func _on_transport_proximity(peer_id: String, cls: String) -> void:
 	_peer_cls[peer_id] = cls
 	if _peer_src.has(peer_id):
@@ -322,16 +346,26 @@ func seen_count() -> int:
 ## law, which also strips `head` from anything a relay touches).
 ## Returns the envelope so a caller (and a test) can read what went out.
 func broadcast_bio_state(heading_rad: float, oa: float, habit_bias: Array = [],
-		q6: PackedFloat32Array = PackedFloat32Array(), q6_topk: int = 0) -> Dictionary:
+		q6: PackedFloat32Array = PackedFloat32Array(), q6_topk: int = 0,
+		phase: float = -1.0, stage: int = -1) -> Dictionary:
 	return emit_event("fly_bio_pulse",
-		bio_payload(heading_rad, oa, habit_bias, q6, q6_topk), 1)
+		bio_payload(heading_rad, oa, habit_bias, q6, q6_topk, phase, stage), 1)
 
 
 ## The payload builder, pure and testable on its own. Floats are rounded to
 ## three decimals because nothing downstream draws finer than that and a phone
 ## should not pay for digits nobody reads.
+##
+## WHERE IN THE DAY, AND WHERE IN THE STORY. `phase` is the fraction of the
+## internal day, 0..1, snapped to a hundredth -- about a quarter hour, which is
+## finer than any glass draws a circadian arc and two bytes on the wire rather
+## than five. `stage` is the journey chapter as a plain int. Both default to -1,
+## the ONE word for "unknown": the estimator that computes a phase and the map
+## that names a stage live elsewhere, and a pulse from a body that has neither
+## must say so rather than claim midnight and chapter zero.
 static func bio_payload(heading_rad: float, oa: float, habit_bias: Array = [],
-		q6: PackedFloat32Array = PackedFloat32Array(), q6_topk: int = 0) -> Dictionary:
+		q6: PackedFloat32Array = PackedFloat32Array(), q6_topk: int = 0,
+		phase: float = -1.0, stage: int = -1) -> Dictionary:
 	var habit := PackedFloat32Array()
 	for h in habit_bias:
 		habit.append(snappedf(float(h), 0.001))
@@ -340,6 +374,8 @@ static func bio_payload(heading_rad: float, oa: float, habit_bias: Array = [],
 		"oa": snappedf(oa, 0.001),
 		"habit_bias": habit,
 		"t": Clock.now_ms(),
+		"phase": _wire_phase(phase),
+		"stage": stage if stage >= 0 else -1,
 	}
 	if q6.size() > 0:
 		if q6_topk > 0:
@@ -350,6 +386,17 @@ static func bio_payload(heading_rad: float, oa: float, habit_bias: Array = [],
 				mass.append(snappedf(float(v), 0.001))
 			body["q6"] = mass
 	return body
+
+
+## A phase as the wire carries it: -1.0 for unknown, otherwise a hundredth of a
+## day in [0, 1). The day is a circle, so a phase that snapped up to a full turn
+## comes back round to 0 rather than becoming a second midnight nothing else
+## would compare equal to.
+static func _wire_phase(phase: float) -> float:
+	if not is_finite(phase) or phase < 0.0:
+		return -1.0
+	var p := snappedf(fposmod(phase, 1.0), 0.01)
+	return 0.0 if p >= 1.0 else p
 
 
 ## THE CUBE, THINNED FOR THE WIRE. A 64-float mass is 256 bytes in a pulse that

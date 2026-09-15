@@ -15,6 +15,11 @@ extends Node
 ## Announced on every turned line, for a host that wants to buzz or speak.
 signal line_flipped(f: Dictionary)
 
+## A LINE'S STANDING PRESSURE MOVED, and no line turned. The dials page draws
+## this as a needle leaning; `mark` is the line's whole signed accumulator in
+## [-1, 1], not the delta that moved it.
+signal mark_moved(line: int, mark: float)
+
 ## THE CUBE SPEAKS TO QWEN AS LOUDLY AS THE BODY HOLDS STILL. Off by default:
 ## the prior weight stays whatever a human last set it to, and nothing here
 ## touches it. Switched on, every beat writes it from the senses.
@@ -23,16 +28,71 @@ const PRIOR_FOLLOWS_STILLNESS_DEFAULT: bool = false
 ## body gets. Above this the answer is the cube's and not the model's.
 const PRIOR_MAX: float = 0.35
 
+## EPIGENETIC HYSTERESIS. A body that turned a line the moment a sense said so
+## was a body made of the last thing that happened. These three numbers make it
+## the thing that KEEPS happening: evidence for a line lands as a signed mark,
+## the mark leaks away over a fortnight, and the line only turns once the mark
+## has crossed its threshold AND the pressure has come back on enough separate
+## DAYS. One loud afternoon is not a body.
+##
+## Distinct days of same-direction evidence a line needs before it may turn.
+##
+## ZERO IS THE OLD BODY: no marks, no days, a line turns the beat it is asked
+## to -- which is what everything written before this file expects, and what a
+## suite that wants it says out loud by putting `alchemy.flip_days` to zero.
+const FLIP_DAYS_DEFAULT: int = 3
+## How far a mark must lean, in [0, 1], before the days gate is even consulted.
+const MARK_THRESHOLD_DEFAULT: float = 0.6
+## The leak. A mark left alone falls by 1/e in this many days, so evidence that
+## stops being repeated stops counting without ever being deleted.
+const MARK_DECAY_DAYS_DEFAULT: float = 14.0
+
+## What one piece of unweighted evidence is worth. Four of them saturate a mark;
+## three of them clear MARK_THRESHOLD_DEFAULT, which is the shape the tests
+## lean on and the reason the default is not a round half.
+const MARK_STEP: float = 0.25
+
+## A cast is a whole figure stated on purpose, so it is worth more than a beat
+## of sense -- but it is still only evidence.
+const INJECT_WEIGHT: float = 1.0
+
+const MS_PER_DAY: int = 86_400_000
+## Under this, a mark is nothing and its run of days is forgotten.
+const MARK_EPSILON: float = 0.001
+
 ## The keys this node will take from HexyConfig when there is one.
 const CFG_FOLLOWS: String = "prior.follows_stillness"
 const CFG_MAX: String = "prior.max"
+const CFG_FLIP_DAYS: String = "alchemy.flip_days"
+const CFG_MARK_THRESHOLD: String = "alchemy.mark_threshold"
+const CFG_MARK_DECAY: String = "alchemy.mark_decay_days"
 
 var pacing: Pacing = null
 var prior_follows_stillness: bool = PRIOR_FOLLOWS_STILLNESS_DEFAULT
 ## The live ceiling. Starts at the const and follows HexyConfig when one exists.
 var prior_max: float = PRIOR_MAX
 
+## The live hysteresis dials, following HexyConfig when one exists.
+var flip_days: int = FLIP_DAYS_DEFAULT
+var mark_threshold: float = MARK_THRESHOLD_DEFAULT
+var mark_decay_days: float = MARK_DECAY_DAYS_DEFAULT
+
 var _config: Object = null
+
+## THE SIX ACCUMULATORS, one per line, signed: + leans yang, - leans yin. Held
+## in memory only -- the store persists figures and cube state, not pressure,
+## so a cold start begins with an unmarked body.
+var _mark: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+## Which way each mark's current run leans: +1, -1, or 0 for no run at all.
+var _dir: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
+## How many DISTINCT days that run has been fed on.
+var _days: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0])
+## The day index each run was last fed on, so two beats in one afternoon count
+## once. -1 is "never fed".
+var _last_day: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1, -1, -1])
+## When the marks were last leaked, so decay is paid per elapsed day and not
+## per beat.
+var _decayed_at_ms: int = 0
 
 var _store: HexyStore = null
 var _senses: Senses = null
@@ -127,10 +187,21 @@ func _read_config() -> void:
 	var ceiling: Variant = _config.get_value(CFG_MAX)
 	if ceiling != null:
 		prior_max = clampf(float(ceiling), 0.0, 1.0)
+	var days: Variant = _config.get_value(CFG_FLIP_DAYS)
+	if days != null:
+		flip_days = maxi(int(days), 0)
+	var thresh: Variant = _config.get_value(CFG_MARK_THRESHOLD)
+	if thresh != null:
+		mark_threshold = clampf(float(thresh), 0.0, 1.0)
+	var decay: Variant = _config.get_value(CFG_MARK_DECAY)
+	if decay != null:
+		mark_decay_days = maxf(float(decay), 0.0)
 
 
 func _on_config_changed(key: String, _value: Variant) -> void:
 	if key == CFG_FOLLOWS or key == CFG_MAX:
+		_read_config()
+	elif key == CFG_FLIP_DAYS or key == CFG_MARK_THRESHOLD or key == CFG_MARK_DECAY:
 		_read_config()
 
 
@@ -151,10 +222,142 @@ func tick(now_ms: int) -> Dictionary:
 	_publish_pacing_state()
 	if prior_follows_stillness:
 		Q6Core.set_prior_weight(_prior_weight(_senses.stillness(), _tension()))
+	_decay_marks(now_ms)
 	if out.is_empty():
 		return out
-	var bits: int = int(out["bits"]) & 63
 	var line: int = int(out["line"])
+	## THE HYSTERESIS GATE. With flip_days at zero this is the body that has
+	## always been here: Pacing says turn and the line turns. Above zero the
+	## verdict is only evidence, and `nudge` decides whether today is the day.
+	if flip_days > 0:
+		## `nudge` owns the write and the announcement on this path, so a turned
+		## line is reported once and a leaning one is reported as no line at all.
+		if not nudge(line, bool(out["to_yang"]), 1.0, now_ms):
+			return {}
+		out = out.duplicate(true)
+		out["bits"] = _store.body_bits()
+		out["reason"] = "hysteresis"
+		return out
+	_commit_flip(
+		int(out["bits"]) & 63,
+		line,
+		bool(out["to_yang"]),
+		String(out["reason"]),
+		now_ms)
+	line_flipped.emit(out)
+	return out
+
+
+## EVIDENCE FOR ONE LINE, and the only door marks come in through.
+##
+## `weight` scales the mark this lands, so a whole cast may lean harder than a
+## beat of sense. Returns true when the evidence actually TURNED the line --
+## which needs the mark past `mark_threshold` and the run fed on at least
+## `flip_days` distinct days -- and false when it only leaned it.
+func nudge(line: int, to_yang: bool, weight: float = 1.0, now_ms: int = -1) -> bool:
+	if line < 0 or line > 5 or _store == null:
+		return false
+	var when: int = Clock.ms_or_ticks(now_ms)
+	_last_now_ms = maxi(_last_now_ms, when)
+	if flip_days <= 0:
+		_commit_flip(_body_after(line, to_yang), line, to_yang, "nudge", when)
+		line_flipped.emit({
+			"bits": _store.body_bits(),
+			"line": line,
+			"to_yang": to_yang,
+			"reason": "nudge",
+			"kind": "nudge",
+		})
+		return true
+	## The leak is paid from the first mark ever banked, not from the first
+	## beat: a mark laid down by a cast between two ticks must still age.
+	if _decayed_at_ms <= 0:
+		_decayed_at_ms = when
+	var sign_now: int = 1 if to_yang else -1
+	var day: int = int(floor(float(when) / float(MS_PER_DAY)))
+	if _dir[line] != sign_now:
+		## THE RUN BROKE. Evidence the other way does not merely subtract from
+		## the mark, it starts a new run: a day of yin pressure is not half a
+		## day of yang pressure.
+		_dir[line] = sign_now
+		_days[line] = 1
+		_last_day[line] = day
+	elif day != _last_day[line]:
+		_days[line] += 1
+		_last_day[line] = day
+	elif _days[line] <= 0:
+		_days[line] = 1
+		_last_day[line] = day
+	_mark[line] = clampf(
+		_mark[line] + float(sign_now) * MARK_STEP * absf(weight), -1.0, 1.0)
+	if absf(_mark[line]) + 1e-6 < mark_threshold or _days[line] < flip_days:
+		mark_moved.emit(line, _mark[line])
+		return false
+	## THE LINE TURNS, and the pressure that turned it is SPENT: a flipped line
+	## starts again from nothing, so a body cannot ratchet twice on one week of
+	## evidence.
+	_clear_mark(line)
+	_commit_flip(_body_after(line, to_yang), line, to_yang, "hysteresis", when)
+	line_flipped.emit({
+		"bits": _store.body_bits(),
+		"line": line,
+		"to_yang": to_yang,
+		"reason": "hysteresis",
+		"kind": "hysteresis",
+	})
+	mark_moved.emit(line, _mark[line])
+	return true
+
+
+## The body with one line forced the way the evidence points.
+func _body_after(line: int, to_yang: bool) -> int:
+	var bits: int = _store.body_bits() if _store != null else 0
+	if to_yang:
+		return (bits | (1 << line)) & 63
+	return (bits & ~(1 << line)) & 63
+
+
+## Forget one line's standing pressure entirely.
+func _clear_mark(line: int) -> void:
+	_mark[line] = 0.0
+	_dir[line] = 0
+	_days[line] = 0
+	_last_day[line] = -1
+
+
+## THE LEAK. Every mark falls toward zero with a time constant in DAYS, paid
+## against the wall the host hands us rather than per beat, so a phone that was
+## asleep for a week wakes with a week of forgetting already done.
+func _decay_marks(now_ms: int) -> void:
+	if _decayed_at_ms <= 0:
+		_decayed_at_ms = now_ms
+		return
+	var elapsed_ms: int = now_ms - _decayed_at_ms
+	if elapsed_ms <= 0:
+		return
+	_decayed_at_ms = now_ms
+	if mark_decay_days <= 0.0:
+		return
+	var days: float = float(elapsed_ms) / float(MS_PER_DAY)
+	var keep: float = exp(-days / mark_decay_days)
+	for i in range(6):
+		if is_zero_approx(_mark[i]):
+			continue
+		_mark[i] *= keep
+		if absf(_mark[i]) < MARK_EPSILON:
+			## A mark that has leaked away takes its run of days with it.
+			## Otherwise a body could bank three days in March and spend them
+			## in June, which is the exact thing this whole file refuses.
+			_clear_mark(i)
+		mark_moved.emit(i, _mark[i])
+
+
+## THE ONE WRITE. Whatever turned a line -- pacing on the old path, a mark that
+## crossed on the new one -- the body and the flip record are written here and
+## nowhere else.
+func _commit_flip(bits: int, line: int, to_yang: bool, reason: String, now_ms: int) -> void:
+	if _store == null:
+		return
 	_store.set_body({
 		"bits": bits,
 		"moving": 1 << line,
@@ -165,12 +368,10 @@ func tick(now_ms: int) -> Dictionary:
 	})
 	_store.set_last_flip({
 		"line": line,
-		"to_yang": bool(out["to_yang"]),
-		"reason": String(out["reason"]),
+		"to_yang": to_yang,
+		"reason": reason,
 		"when": now_ms,
 	})
-	line_flipped.emit(out)
-	return out
 
 
 ## An explicit cast lands in the body whole, re-anchoring pacing and locking out both fires.
@@ -182,6 +383,7 @@ func inject(bits: int, when: int, source: String = "tap", who: String = "",
 		return
 	_injecting = true
 	var b: int = bits & 63
+	var before: int = _store.body_bits()
 	var w: int = maxi(when, _last_now_ms)
 	pacing.inject(b, w)
 	## WHY the body moved is ours to say, not Pacing's: `inject` writes the
@@ -198,8 +400,41 @@ func inject(bits: int, when: int, source: String = "tap", who: String = "",
 		"source": source,
 		"seq_index": seq_index if seq_index >= 0 else HexyStore.seq_index_of(b, false),
 	})
+	_mark_cast(b, before, w)
 	_publish_pacing_state()
 	_injecting = false
+
+
+## WHAT A CAST DOES TO THE PRESSURE. The figure itself lands whole -- a cast has
+## always been a statement, not an argument -- but it is also the loudest
+## evidence this body ever gets, so it is written into the marks too:
+##
+##   a line the cast MOVED has its pressure spent, exactly as a flip does;
+##   a line the cast merely AGREED with banks a day of evidence for staying,
+##   so a figure a person keeps casting becomes a figure that resists a beat
+##   of sense the other way.
+func _mark_cast(bits: int, before: int, when: int) -> void:
+	if flip_days <= 0:
+		return
+	if _decayed_at_ms <= 0:
+		_decayed_at_ms = when
+	for line in range(6):
+		var to_yang: bool = (bits >> line) & 1 == 1
+		if ((before >> line) & 1) != int(to_yang):
+			_clear_mark(line)
+			continue
+		var sign_now: int = 1 if to_yang else -1
+		var day: int = int(floor(float(when) / float(MS_PER_DAY)))
+		if _dir[line] != sign_now:
+			_dir[line] = sign_now
+			_days[line] = 1
+			_last_day[line] = day
+		elif day != _last_day[line]:
+			_days[line] += 1
+			_last_day[line] = day
+		_mark[line] = clampf(
+			_mark[line] + float(sign_now) * MARK_STEP * INJECT_WEIGHT, -1.0, 1.0)
+		mark_moved.emit(line, _mark[line])
 
 
 ## HOW LOUDLY THE CUBE MAY SPEAK, given a body and the cube's own spread.
@@ -276,6 +511,11 @@ func _on_restored() -> void:
 		return
 	var now: int = _last_now_ms if _last_now_ms > 0 else Clock.now_ms()
 	pacing.reset(_store.body_bits(), now)
+	## A FIGURE PUT BACK IS NOT A FIGURE THAT WAS ARGUED FOR. The marks belonged
+	## to the body that was here a moment ago; they say nothing about this one.
+	for i in range(6):
+		_clear_mark(i)
+	_decayed_at_ms = now
 	if not pacing.journal.is_empty():
 		pacing.journal[pacing.journal.size() - 1]["source"] = "restore"
 	_publish_pacing_state()
@@ -329,4 +569,28 @@ func state() -> Dictionary:
 		"last_line": int(flip.get("line", 0)),
 		"flex": flex,
 		"bits": int(pacing.bits) if pacing != null else 0,
+		## THE PRESSURE, BEFORE IT IS A FLIP. Six signed marks in [-1, 1] and the
+		## six runs of days feeding them, so the dials page can draw a line
+		## leaning long before it turns.
+		"marks": marks(),
+		"days_toward": days_toward(),
+		"flip_days": flip_days,
+		"mark_threshold": mark_threshold,
 	}
+
+
+## The six standing marks, copied, signed, + for yang.
+func marks() -> Array[float]:
+	var out: Array[float] = []
+	for i in range(6):
+		out.append(float(_mark[i]))
+	return out
+
+
+## How many distinct days each line's current run has been fed on. Zero where
+## there is no run.
+func days_toward() -> Array[int]:
+	var out: Array[int] = []
+	for i in range(6):
+		out.append(int(_days[i]))
+	return out

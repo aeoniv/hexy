@@ -32,6 +32,7 @@ func _process(_delta: float) -> bool:
 	_test_tap_and_guide()
 	_test_caption()
 	_test_glass_wiring()
+	_test_phase_and_mentor()
 	
 	print("\n=== CIRCADIAN & RADAR RESULTS ===")
 	print("Passed: %d, Failed: %d" % [passes, failures])
@@ -347,3 +348,73 @@ func _test_glass_wiring() -> void:
 	check(not r.blip_positions().has("a"), "including their hit-test seat")
 	check(r.guide_id == "", "and their guidance")
 	r.free()
+
+## SAME DAY, ONE CHAPTER AHEAD. The two facts a peer now carries beside its
+## heading, and the two flags a glass draws off them. Read through peer_plots,
+## never off pixels.
+func _test_phase_and_mentor() -> void:
+	print("
+- who is awake with you, and who is one chapter ahead")
+	var r: Control = _radar()
+	r.set_peer_headings({"a": 0.0, "b": 1.0, "c": 2.0})
+	var plots: Dictionary = r.peer_plots()
+	check(float(plots["a"]["phase"]) == -1.0, "a peer who never said has no phase")
+	check(int(plots["a"]["stage"]) == -1, "nor a stage")
+	check(not bool(plots["a"]["in_phase"]), "and is nobody's company")
+	check(not bool(plots["a"]["mentor"]), "nor anybody's mentor")
+
+	# Their side known, ours not: still nothing is claimed.
+	r.set_peer_phase({"a": 0.50, "b": 0.65, "c": 0.99})
+	r.set_peer_stage({"a": 2, "b": 3, "c": 5})
+	plots = r.peer_plots()
+	check(is_equal_approx(float(plots["a"]["phase"]), 0.50), "the phase rides on the row")
+	check(int(plots["b"]["stage"]) == 3, "and the stage beside it")
+	check(not bool(plots["a"]["in_phase"]) and not bool(plots["b"]["mentor"]),
+		"a body that has not placed itself recognises nobody")
+
+	# Now we stand somewhere.
+	r.set_own_phase(0.52, 2)
+	check(is_equal_approx(r.own_phase(), 0.52) and r.own_stage() == 2, "and now it has")
+	plots = r.peer_plots()
+	check(bool(plots["a"]["in_phase"]), "0.50 against 0.52 is the same two hours of the day")
+	check(not bool(plots["b"]["in_phase"]), "0.65 is a long way off it")
+	check(bool(plots["b"]["mentor"]), "stage 3 against our 2 is one chapter ahead")
+	check(not bool(plots["a"]["mentor"]), "the same chapter is a companion, not a mentor")
+	check(not bool(plots["c"]["mentor"]), "three chapters ahead is a stranger again")
+
+	# THE DAY IS A CIRCLE. Just before midnight and just after it are neighbours.
+	r.set_own_phase(0.02, 2)
+	plots = r.peer_plots()
+	check(bool(plots["c"]["in_phase"]), "0.99 and 0.02 are three hundredths apart, not ninety-seven")
+	check(is_equal_approx(FlyCalciumRadar2DScript.phase_gap(0.99, 0.02), 0.03),
+		"and phase_gap says so in one number")
+	check(is_equal_approx(FlyCalciumRadar2DScript.phase_gap(0.0, 0.5), 0.5),
+		"half a day is the furthest two bodies can be")
+	check(FlyCalciumRadar2DScript.IN_PHASE_FRAC < 0.125,
+		"the window is under three hours of the day")
+
+	# A peer known ONLY by a phase is still a person on the dial.
+	var r2: Control = _radar()
+	r2.set_peer_phase({"z": 0.10})
+	check(r2.peer_plots().has("z"), "a peer who only ever said what time it is still gets a blip")
+	r2.free()
+
+	# Rubbish in, nothing out.
+	r.set_peer_phase({"a": 1.7, "b": 0.2})
+	r.set_peer_stage({"a": -1, "b": 4})
+	plots = r.peer_plots()
+	check(float(plots["a"]["phase"]) == -1.0, "a phase outside the day is a wrong field, not a time")
+	check(int(plots["a"]["stage"]) == -1, "and a negative stage is the wire's word for unknown")
+	check(is_equal_approx(float(plots["b"]["phase"]), 0.2), "the good row beside it is untouched")
+	r.set_own_phase(-1.0, -1)
+	check(not bool(r.peer_plots()["b"]["in_phase"]), "forgetting where you stand un-flags everybody")
+
+	# And they leave with the peer.
+	r.set_own_phase(0.2, 3)
+	check(bool(r.peer_plots()["b"]["in_phase"]), "b is company again")
+	r.drop_peer("b")
+	check(not r.peer_plots().has("b"), "a dropped peer leaves the phase map")
+	r.set_peer_phase({"b": 0.2})
+	check(r.peer_plots().has("b"), "and can walk back in")
+	r.free()
+

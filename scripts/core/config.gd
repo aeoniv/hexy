@@ -107,6 +107,17 @@ static func _schema_rows() -> Array[Dictionary]:
 			"min": 0.0, "max": 1.0, "step": 0.01, "default": 0.0, "options": [],
 			"doc": "Manual prior weight, used when prior.follows_stillness is off. Clamped to prior.max."},
 
+		# -- alchemy: how many days of pressure a line needs to turn -----------
+		{"key": "alchemy.flip_days", "group": "alchemy", "type": "int",
+			"min": 0.0, "max": 30.0, "step": 1.0, "default": 3, "options": [],
+			"doc": "Distinct days of same-direction evidence before a line turns. 0 turns a line the beat it is asked to."},
+		{"key": "alchemy.mark_threshold", "group": "alchemy", "type": "float",
+			"min": 0.0, "max": 1.0, "step": 0.01, "default": 0.6, "options": [],
+			"doc": "How far a line's signed mark must lean before the days gate is consulted."},
+		{"key": "alchemy.mark_decay_days", "group": "alchemy", "type": "float",
+			"min": 0.0, "max": 365.0, "step": 0.5, "default": 14.0, "options": [],
+			"doc": "Days for an unfed mark to leak away by 1/e. 0 never forgets."},
+
 		# -- qwen: the shape of an answer -------------------------------------
 		{"key": "qwen.max_sentences", "group": "qwen", "type": "int",
 			"min": 1.0, "max": 6.0, "step": 1.0, "default": 1, "options": [],

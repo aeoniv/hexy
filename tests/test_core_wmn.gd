@@ -15,7 +15,7 @@ var _fails := 0
 ## EVERY CHECK IS COUNTED. A compile error in a depended script makes a whole
 ## section skip silently, and a suite that prints ALL PASS because it ran
 ## nothing is worse than a red one. Raise this floor when checks are added.
-const MIN_CHECKS := 30
+const MIN_CHECKS := 38
 var _checks := 0
 
 
@@ -371,6 +371,33 @@ func _test_loopback() -> void:
 		"cls is empty (unplaced) or one of touch/room/far (got %s)" % String(row[0]["cls"]))
 	_check(row[0]["heading_rad"] == null or row[0]["heading_rad"] is float,
 		"heading_rad is null (no bio pulse yet) or a float, never a guess")
+	_check(row.size() == 1 and row[0].has("phase") and row[0].has("stage"),
+		"a peer row carries where they are in the day and in the story")
+	_check(row[0]["phase"] == null or row[0]["phase"] is float,
+		"phase is null (nobody said) or a float, never a guessed midnight")
+	_check(row[0]["stage"] == null or row[0]["stage"] is int,
+		"stage is null or an int, same bargain")
+	_check(a.own_phase() == -1.0 and a.own_stage() == -1,
+		"a node that was never told its own phase says so")
+
+	# WMN COMPUTES NEITHER OF THESE. It only carries what a caller set, and the
+	# proof is that setting it here reaches beta's reader without anything in
+	# this folder having estimated a phase.
+	a.set_own_phase(0.42, 2)
+	_check(is_equal_approx(a.own_phase(), 0.42) and a.own_stage() == 2,
+		"set_own_phase is the one door for both facts")
+	a.fabric.broadcast_bio_state(0.0, 0.5, [], PackedFloat32Array(), 0,
+		a.own_phase(), a.own_stage())
+	await _wait(4.0, func(): return b.peer_phase().has(a.fabric_id()))
+	_check(b.peer_phase().has(a.fabric_id()), "beta hears alpha's phase")
+	_check(is_equal_approx(float(b.peer_phase().get(a.fabric_id(), -1.0)), 0.42),
+		"and it is the number alpha set, snapped to a hundredth of a day")
+	_check(int(b.peer_stage().get(a.fabric_id(), -1)) == 2, "and the stage beside it")
+	var brow: Array = b.peers().filter(func(r): return String(r["who"]) == a.fabric_id())
+	_check(brow.size() == 1 and brow[0]["phase"] != null and is_equal_approx(float(brow[0]["phase"]), 0.42),
+		"which is what peers() hands a glass, on the same row as the heading")
+	_check(brow.size() == 1 and int(brow[0]["stage"]) == 2, "with the stage on it too")
+
 	_check(a.ledger.size() >= 2, "the ledger kept our cast and the one we heard")
 
 	# The chirps have been flying at 2 Hz since start(); by now the clock has

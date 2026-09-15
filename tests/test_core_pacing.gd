@@ -229,6 +229,13 @@ func _test_alchemy() -> void:
 	var store: HexyStore = HexyStoreScript.new() as HexyStore
 	var rig: Senses = Senses.new()
 	rig.bind(store)
+	## THE OLD BODY, ASKED FOR OUT LOUD. Alchemy now holds a line back until the
+	## same pressure has come back on `alchemy.flip_days` separate days; this
+	## file drives sixty SECONDS, so it says plainly that it wants the immediate
+	## body. tests/alchemy_hysteresis_smoke.gd is where the days are checked.
+	var cfg: HexyConfig = HexyConfig.instance()
+	cfg.autosave = false
+	cfg.set_value("alchemy.flip_days", 0)
 	var al: Alchemy = Alchemy.new()
 	al.bind(store, rig)
 

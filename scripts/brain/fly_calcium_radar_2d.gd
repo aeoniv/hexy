@@ -114,6 +114,18 @@ const BAND_HALF_FRAC := 0.045
 const BAND_COLOR := Color(0.55, 0.78, 0.72, 0.30)
 const GUIDE_COLOR := Color(0.98, 0.78, 0.32)
 const DIM_COLOR := Color(0.62, 0.70, 0.68)
+## HOW CLOSE TWO BODIES MUST BE IN THE DAY TO BE CALLED SAME-PHASE. 0.08 of a
+## day is a shade under two hours, measured the short way round the circle --
+## close enough that two people are awake, or tired, together, and loose enough
+## that a clock nobody set to the minute still finds its company.
+const IN_PHASE_FRAC := 0.08
+## The second ring an in-phase blip wears, as a multiple of the blip radius.
+const PHASE_RING_MUL := 1.45
+const PHASE_RING_COLOR := Color(0.62, 0.88, 0.95, 0.75)
+## The tick a mentor wears, pointing up: one chapter ahead is up the page.
+const MENTOR_TICK_MUL := 2.2
+const MENTOR_COLOR := Color(0.98, 0.86, 0.45, 0.9)
+
 ## Tap radius as a fraction of the field. A blip with a reach twice its own
 ## radius is a touch target a thumb can actually hit.
 const BLIP_HIT_FRAC := 0.16
@@ -127,6 +139,18 @@ var _distances: Dictionary = {}
 ## degrees. Also the nav door's gift (Geo.bearing_spread_deg). Without one the
 ## radar falls back to the honest default in `peer_plots`.
 var _spreads: Dictionary = {}
+
+## fabric peer id -> where in their own day they are, 0..1, exactly as
+## MeshFabric.peer_phase_by_src keeps it. Empty in base: this dial estimates no
+## circadian phase of its own and a peer who never said stays unsaid.
+var _phases: Dictionary = {}
+## fabric peer id -> which chapter of the journey they are in.
+var _stages: Dictionary = {}
+## This body's own place in the day and the story. -1 for either means the
+## comparison cannot be made at all, and every flag below stays false rather
+## than defaulting to "everybody matches".
+var _own_phase: float = -1.0
+var _own_stage: int = -1
 
 ## The compass, exactly as `Heading` publishes it. Defaults are the headless
 ## truth: nothing is live, nothing has been seen, and the dial is the
@@ -224,8 +248,69 @@ func set_peer_bearings(bearings: Dictionary) -> void:
 	_bearings = bearings.duplicate()
 
 
+## fabric peer id -> 0..1 of their internal day. A value outside [0, 1) or not
+## finite is dropped rather than wrapped: an out-of-range phase is a field that
+## was filled in wrong, not a time of day.
+func set_peer_phase(d: Dictionary) -> void:
+	_phases = {}
+	for id in d:
+		var v: float = float(d[id])
+		if is_finite(v) and v >= 0.0 and v < 1.0:
+			_phases[id] = v
+
+
+## fabric peer id -> journey chapter. Negative is the wire's "unknown" and is
+## dropped, so `peer_plots` never compares against a stage nobody claimed.
+func set_peer_stage(d: Dictionary) -> void:
+	_stages = {}
+	for id in d:
+		var v: int = int(d[id])
+		if v >= 0:
+			_stages[id] = v
+
+
+## WHERE YOU STAND, which is the other half of every comparison on this dial.
+## Pass -1 for either to say you do not know; nothing is then flagged.
+func set_own_phase(phase: float = -1.0, stage: int = -1) -> void:
+	_own_phase = phase if (is_finite(phase) and phase >= 0.0 and phase < 1.0) else -1.0
+	_own_stage = stage if stage >= 0 else -1
+
+
+func own_phase() -> float:
+	return _own_phase
+
+
+func own_stage() -> int:
+	return _own_stage
+
+
+## THE SHORT WAY ROUND THE DAY. Midnight-minus-a-bit and midnight-plus-a-bit are
+## neighbours, not a day apart, so 0.99 and 0.02 are three hundredths away.
+static func phase_gap(a: float, b: float) -> float:
+	var d: float = absf(fposmod(a - b, 1.0))
+	return minf(d, 1.0 - d)
+
+
+## Awake together: both sides known, and less than IN_PHASE_FRAC of a day apart
+## the short way round.
+func _in_phase(id: Variant) -> bool:
+	if _own_phase < 0.0 or not _phases.has(id):
+		return false
+	return phase_gap(float(_phases[id]), _own_phase) < IN_PHASE_FRAC
+
+
+## One chapter ahead, and exactly one: the person who has just walked the bit of
+## road you are on now. Two chapters ahead is a stranger again.
+func _is_mentor(id: Variant) -> bool:
+	if _own_stage < 0 or not _stages.has(id):
+		return false
+	return int(_stages[id]) == _own_stage + 1
+
+
 func drop_peer(id: String) -> void:
 	_peers.erase(id)
+	_phases.erase(id)
+	_stages.erase(id)
 	_proximity.erase(id)
 	_bearings.erase(id)
 	_distances.erase(id)
@@ -387,6 +472,10 @@ func peer_plots() -> Dictionary:
 		ids[id] = true
 	for id in _proximity:
 		ids[id] = true
+	for id in _phases:
+		ids[id] = true
+	for id in _stages:
+		ids[id] = true
 	var off: float = frame_offset()
 	for id in ids:
 		var cls: String = String(_proximity.get(id, DEFAULT_CLASS))
@@ -420,6 +509,13 @@ func peer_plots() -> Dictionary:
 			"log": by_metres,
 			"spread": spread,
 			"ring": spread >= Geo.SPREAD_RING_DEG,
+			# WHERE THEY ARE IN THE DAY AND THE STORY, and the two readings a
+			# glass actually draws off them. Both flags need BOTH sides known:
+			# a body that has not placed itself recognises nobody.
+			"phase": float(_phases.get(id, -1.0)),
+			"stage": int(_stages.get(id, -1)),
+			"in_phase": _in_phase(id),
+			"mentor": _is_mentor(id),
 		}
 	return out
 
@@ -564,6 +660,15 @@ func _draw() -> void:
 		# fly heading does not, so the glass never claims a position it lacks.
 		if bool(p["bearing"]):
 			draw_line(at, at + dir * (blip_r * 1.8), Identity.edge_color(hue), 1.5, true)
+		# SOMEBODY ELSE IS AWAKE WITH YOU: a thin second ring, drawn nowhere
+		# near the guidance ring's weight so the two never read as one mark.
+		if bool(p.get("in_phase", false)):
+			draw_arc(at, blip_r * PHASE_RING_MUL, 0.0, TAU, 20, PHASE_RING_COLOR, 1.0, true)
+		# ONE CHAPTER AHEAD: a small tick above the blip. Up the page, not up
+		# the dial -- a mentor is not a direction in the room.
+		if bool(p.get("mentor", false)):
+			draw_line(at + Vector2(0.0, -blip_r * 1.2),
+				at + Vector2(0.0, -blip_r * MENTOR_TICK_MUL), MENTOR_COLOR, 1.5, true)
 		if String(pid) == guide_id:
 			draw_arc(at, blip_r * 1.9, 0.0, TAU, 24, GUIDE_COLOR, 2.0, true)
 	# 3d. NORTH, WHEN THERE IS A NORTH. Four small ticks that swing with the

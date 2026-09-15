@@ -1,5 +1,8 @@
 {
 	"defaults": {
+		"alchemy.flip_days": 3,
+		"alchemy.mark_decay_days": 14.0,
+		"alchemy.mark_threshold": 0.6,
 		"creature.breathe_with_dwell": true,
 		"hud.bubble_ttl_s": 6.0,
 		"hud.dwell_ring": true,
@@ -30,6 +33,7 @@
 	"groups": [
 		"pacing",
 		"prior",
+		"alchemy",
 		"qwen",
 		"senses",
 		"hud",
@@ -179,6 +183,39 @@
 			"min": 0.0,
 			"options": [],
 			"step": 0.01,
+			"type": "float"
+		},
+		{
+			"default": 3,
+			"doc": "Distinct days of same-direction evidence before a line turns. 0 turns a line the beat it is asked to.",
+			"group": "alchemy",
+			"key": "alchemy.flip_days",
+			"max": 30.0,
+			"min": 0.0,
+			"options": [],
+			"step": 1.0,
+			"type": "int"
+		},
+		{
+			"default": 0.6,
+			"doc": "How far a line's signed mark must lean before the days gate is consulted.",
+			"group": "alchemy",
+			"key": "alchemy.mark_threshold",
+			"max": 1.0,
+			"min": 0.0,
+			"options": [],
+			"step": 0.01,
+			"type": "float"
+		},
+		{
+			"default": 14.0,
+			"doc": "Days for an unfed mark to leak away by 1/e. 0 never forgets.",
+			"group": "alchemy",
+			"key": "alchemy.mark_decay_days",
+			"max": 365.0,
+			"min": 0.0,
+			"options": [],
+			"step": 0.5,
 			"type": "float"
 		},
 		{

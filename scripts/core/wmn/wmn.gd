@@ -76,6 +76,28 @@ var _binding := false
 ## wire turns it off; the app leaves it on.
 var bio_pulse := true
 var _bio_next_ms := 0
+## WHERE THIS BODY IS IN ITS OWN DAY AND ITS OWN STORY, as somebody else worked
+## it out. Wmn computes neither: the phase comes from the entrainment estimator
+## and the stage from the journey map, and this node's whole job is to put what
+## they say on the wire beside the heading. -1/-1 until a caller speaks, which
+## is the wire's word for "this phone does not know".
+var _own_phase := -1.0
+var _own_stage := -1
+
+
+## The one door for the two facts above. A caller that knows only the phase
+## passes the stage it already set, so nothing is blanked by half an answer.
+func set_own_phase(phase: float = -1.0, stage: int = -1) -> void:
+	_own_phase = phase
+	_own_stage = stage
+
+
+func own_phase() -> float:
+	return _own_phase
+
+
+func own_stage() -> int:
+	return _own_stage
 
 
 func fabric_id() -> String:
@@ -291,6 +313,8 @@ func peers() -> Array:
 	var now := now_ms()
 	var cls_by_who: Dictionary = peer_proximity()
 	var headings: Dictionary = peer_headings()
+	var phases: Dictionary = peer_phase()
+	var stages: Dictionary = peer_stage()
 	var out: Array = []
 	for who in room.names():
 		var p: Dictionary = room.peers[who]
@@ -310,6 +334,11 @@ func peers() -> Array:
 			"cls": String(cls_by_who.get(who, "")),
 			# radians, or null when no bio pulse has been heard from them.
 			"heading_rad": headings.get(who, null),
+			# 0..1 of their internal day, or null when that phone runs no
+			# estimator yet -- never a guessed midnight.
+			"phase": phases.get(who, null),
+			# Which chapter of the journey they are in, or null when unsaid.
+			"stage": stages.get(who, null),
 		})
 	return out
 
@@ -430,7 +459,7 @@ func _bio_beat(now: int) -> void:
 		heading,
 		float(fly.get("octopamine", 0.5)),
 		(fly.get("habit_bias", []) as Array),
-		mass, topk)
+		mass, topk, _own_phase, _own_stage)
 	if _store.has_method("set_swarm_yaw"):
 		_store.set_swarm_yaw(fabric.compute_kuramoto_coupling(heading))
 
@@ -469,6 +498,16 @@ func peer_headings() -> Dictionary:
 
 func peer_bio() -> Dictionary:
 	return fabric.peer_bio if fabric != null else {}
+
+
+## peer id -> 0..1 of their own day, and peer id -> their journey chapter. Only
+## peers who actually said; see MeshFabric.peer_phase_by_src.
+func peer_phase() -> Dictionary:
+	return fabric.peer_phase_by_src() if fabric != null else {}
+
+
+func peer_stage() -> Dictionary:
+	return fabric.peer_stage_by_src() if fabric != null else {}
 
 
 ## peer id -> "touch" / "room" / "far", the radar's ring for each blip.
