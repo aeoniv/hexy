@@ -186,11 +186,12 @@ func chat(prompt: String, cast_version: int = -1) -> String:
 		if not _chat_ready:
 			chat_start()
 		var formatted := _format_prompt(prompt)
-		var res: String = ""
-		if _android.has_method("chat_at"):
-			res = str(_android.call("chat_at", formatted, cast_version))
-		else:
-			res = str(_android.call("chat", formatted))
+		# NO has_method HERE. A JNISingleton answers has_method FALSE for every
+		# @UsedByGodot method it owns, so the guard that used to stand here took
+		# the else branch on every real phone and silently dropped the Q6
+		# cast-version cache guard. The handshake at `_init` is the only gate:
+		# past it, `chat_at` exists because ixmnn/2 owns it.
+		var res: String = str(_android.call("chat_at", formatted, cast_version))
 		if res != "":
 			return res
 	return "The ancient Book of Changes whispers: Change is constant. When the rigid yields to the flexible, harmony and progress endure."
@@ -203,9 +204,8 @@ func chat_stream(prompt: String, cast_version: int = -1) -> bool:
 		return true
 	_streaming = true
 	var formatted := _format_prompt(prompt)
-	if _android.has_method("chat_stream_at"):
-		return bool(_android.call("chat_stream_at", formatted, cast_version))
-	return bool(_android.call("chat_stream", formatted))
+	# Handshake-gated, not has_method-gated — see `chat()` above.
+	return bool(_android.call("chat_stream_at", formatted, cast_version))
 
 static func cosine(a: PackedFloat32Array, b: PackedFloat32Array) -> float:
 	if a.size() != b.size() or a.is_empty():
@@ -224,9 +224,13 @@ static func cosine(a: PackedFloat32Array, b: PackedFloat32Array) -> float:
 # ── MNN ENGINE EXTENSIONS: TOKENIZER, SAMPLING, PERF & CONTEXT ──────────────
 #
 # Every one of these calls a method the ixmnn/2 aar owns. `REQUIRES` above is
-# the real gate; the `has_method` guard below is the second fence, so an aar
-# that got past the handshake and is still missing a method degrades to the
-# desktop mock with ONE LOUD LINE rather than an engine error nobody reads.
+# THE ONLY GATE. There is no second has_method fence, and there must not be: a
+# JNISingleton answers `has_method` FALSE for every @UsedByGodot method it
+# owns, so that fence fired on every real phone and sent the whole extension
+# surface to the desktop mock while blaming a stale aar that was fine. If the
+# handshake at `_init` passed at REQUIRES, every /2 method is called bare; if
+# the singleton is absent (desktop, headless), `available()` is false and the
+# mock below answers. Those are the two states, and there is no third.
 
 ## Desktop truth for the sampling knobs: the plugin does not own a getter, so
 ## the last values set are kept here and handed back by [get_sampling].
@@ -250,15 +254,30 @@ var _last_perf := {
 }
 
 
-## True when the plugin is here AND owns `name`. False is never silent: a stale
-## aar under a fresh script is exactly the failure worth shouting about.
-func _plugin_has(method: String) -> bool:
-	if not available():
+## THE ONLY GATE, kept as a name so every extension below reads the same way.
+## True means: a singleton is here and it passed the REQUIRES handshake, so the
+## whole ixmnn/2 method surface may be called bare. False means desktop/headless
+## and the mock answers. `method` is documentation for the reader, not a probe.
+func _plugin_owns(method: String) -> bool:
+	return available()
+
+
+## TEST SEAM. Attaches `node` exactly the way `_init` attaches a real
+## singleton — version handshake first, signals after — so a headless test can
+## pin the on-device branch without an aar. Returns whether the handshake passed.
+func _attach_plugin_for_test(node: Object) -> bool:
+	_android = null
+	_can_stream = false
+	if node == null:
 		return false
-	if _android.has_method(method):
-		return true
-	push_warning("mnn: the aar has no `%s` — falling back to the mock for this call. Re-export ixmnn (%s)." % [method, REQUIRES])
-	return false
+	if not Seam.check(node, REQUIRES, REQUIRES_TAG):
+		return false
+	_android = node
+	_can_stream = node.has_signal("chat_token") and node.has_signal("chat_done")
+	if _can_stream:
+		node.connect("chat_token", _on_plugin_token)
+		node.connect("chat_done", _on_plugin_done)
+	return true
 
 
 ## True between `chat_stream()` and its `chat_done`.
@@ -321,7 +340,7 @@ static func stream_chunks(text: String) -> Array:
 ## Encodes a prompt into model token ids. The mock keeps a growing word->id
 ## vocabulary, so the same word is the same id for the life of the runtime.
 func tokenize(text: String) -> PackedInt32Array:
-	if _plugin_has("tokenize"):
+	if _plugin_owns("tokenize"):
 		# The engine marshals a Kotlin IntArray as PackedInt32Array, but an older
 		# aar may hand back a plain Array; both are accepted rather than assumed.
 		var raw: Variant = _android.call("tokenize", text)
@@ -349,7 +368,7 @@ func tokenize(text: String) -> PackedInt32Array:
 
 ## Decodes one token id back into text. Round-trips whatever [tokenize] made.
 func detokenize(token_id: int) -> String:
-	if _plugin_has("detokenize"):
+	if _plugin_owns("detokenize"):
 		return String(_android.call("detokenize", token_id))
 	if _mock_inv_vocab.has(token_id):
 		return String(_mock_inv_vocab[token_id]) + " "
@@ -359,7 +378,7 @@ func detokenize(token_id: int) -> String:
 ## Native execution telemetry: prefill/decode latency, tokens per second and the
 ## three sequence lengths. Milliseconds out, microseconds in.
 func get_perf() -> Dictionary:
-	if _plugin_has("get_perf"):
+	if _plugin_owns("get_perf"):
 		var parsed: Variant = JSON.parse_string(String(_android.call("get_perf")))
 		if parsed is Dictionary:
 			var d: Dictionary = parsed
@@ -387,7 +406,7 @@ func set_sampling(temperature: float, top_p: float = 0.9, repetition_penalty: fl
 	_sampling_params["temperature"] = clampf(temperature, 0.05, 2.0)
 	_sampling_params["top_p"] = clampf(top_p, 0.1, 1.0)
 	_sampling_params["repetition_penalty"] = clampf(repetition_penalty, 1.0, 2.0)
-	if _plugin_has("set_sampling"):
+	if _plugin_owns("set_sampling"):
 		return bool(_android.call("set_sampling",
 			_sampling_params["temperature"],
 			_sampling_params["top_p"],
@@ -401,7 +420,7 @@ func get_sampling() -> Dictionary:
 
 ## How many tokens of context history the session is carrying.
 func get_history_count() -> int:
-	if _plugin_has("get_history_count"):
+	if _plugin_owns("get_history_count"):
 		return int(_android.call("get_history_count"))
 	return _mock_history_count
 
@@ -409,7 +428,7 @@ func get_history_count() -> int:
 ## Trims the sliding window [begin, end) out of the kv-cache, so a long turn on
 ## a phone does not grow until the OS takes the process away.
 func trim_history(begin: int, end: int) -> bool:
-	if _plugin_has("trim_history"):
+	if _plugin_owns("trim_history"):
 		return bool(_android.call("trim_history", begin, end))
 	_mock_history_count = maxi(0, _mock_history_count - maxi(0, end - begin))
 	return true
@@ -418,7 +437,7 @@ func trim_history(begin: int, end: int) -> bool:
 ## Formats a prompt with the model's own ChatML template. The mock writes the
 ## Qwen shape by hand so a caller can be tested against a real-looking string.
 func apply_template(prompt: String) -> String:
-	if _plugin_has("apply_template"):
+	if _plugin_owns("apply_template"):
 		return String(_android.call("apply_template", prompt))
 	return "<|im_start|>user\n" + prompt.strip_edges() + "<|im_end|>\n<|im_start|>assistant\n"
 

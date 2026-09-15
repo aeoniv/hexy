@@ -1,67 +1,39 @@
-class_name EarthLinesDial
+﻿class_name EarthLinesDial
 extends Control
 
-## THE EARTH BAND AS SIX LINES, not twelve buttons.
+## THE EARTH DIAL: Six Yin/Yang lines arranged in divisions around the central Hypergram.
 ##
-## The twelve stations were the app's own chrome wearing a dial's clothes: a
-## person looking at them learned what the app could do, never what their own
-## day was doing. This dial draws the ONE thing the earth band is actually for
-## -- the six lines of the body, and for each of them whether the head is
-## asking it to OPEN, to CLOSE, or to stay where it is.
-##
-## LINE 1 IS AT THE BOTTOM AND LINE 6 IS AT THE TOP, the way a hexagram is read
-## and the way a body is built: "Body" under the feet, "Connection" over the
-## head. The six climb the right of the ring in five even steps, so the stack a
-## person knows from the hub of every other dial here is simply lifted onto a
-## rim where a finger can reach one line at a time.
-##
-## THE DIAL DECIDES NOTHING. A tap says which line was touched and the glass
-## announces it on the seat bus; the hub says a cast was asked for. Nothing here
-## writes a figure, and nothing here reads a store.
+## Surrounds the central 4096-state Hypergram with a circle divided into six
+## equal sectors (divisions), each displaying that line's Yin/Yang state
+## (solid arc for Yang, broken arc for Yin), its change status (opens/closes/same),
+## and responsive touch targets for line flipping.
 
-## A line of the ring was touched, 0..5 with 0 the bottom line.
-signal line_tapped(i: int)
-## The middle was touched: throw the coins.
+signal line_tapped(line: int)
 signal hub_tapped()
 
-## The six names, in Pacing's own spelling. Carried rather than imported so the
-## dial draws the same words headless as it does on a phone.
 const LINE_NAMES: Array[String] = ["Body", "Food", "Breath", "Rest", "Focus", "Connection"]
 
-## The three things a line can be doing, as words, so a test may read them.
 const SAME: String = "same"
 const OPENS: String = "opens"
 const CLOSES: String = "closes"
 
-## Where the six sit: line 0 at the bottom of the ring, line 5 at the top, five
-## even steps up the right-hand side. Screen angles, so +y is down.
-const ANGLE_BOTTOM: float = PI * 0.5
-const ANGLE_STEP: float = PI / 5.0
+## Division geometry: 6 sectors spanning TAU (60 degrees each).
+## Line 0 sits at the bottom (PI * 0.5), lines 1..5 rise up the right and descend the left.
+const SECTOR_SPAN: float = TAU / 6.0
+const ANGLE_BASE: float = PI * 0.5
 
-## How near a finger has to land, in pixels, to have touched a line.
-const LINE_REACH: float = 44.0
+const RING: float = 0.84
+const HUB: float = 0.48
 
-## The rim, the glyph and the hub, as shares of the dial's own radius.
-const RING: float = 0.86
-const HUB: float = 0.52
-const GLYPH_W: float = 44.0
-const GLYPH_H: float = 4.0
-const CAPTION_PT: int = 9
+const COL_RIM: Color = Color(1.0, 0.55, 0.15, 0.40)
+const COL_DIVIDER: Color = Color(0.28, 0.65, 0.85, 0.35)
+const COL_DIM_YANG: Color = Color(1.0, 0.82, 0.35, 0.70)
+const COL_DIM_YIN: Color = Color(0.35, 0.75, 0.95, 0.65)
+const COL_OPENS: Color = Color(1.0, 0.85, 0.30, 0.98)
+const COL_CLOSES: Color = Color(0.35, 0.85, 1.0, 0.98)
 
-const COL_RIM: Color = Color(1.0, 0.55, 0.15, 0.45)
-const COL_INNER: Color = Color(0.25, 0.75, 0.95, 0.3)
-const COL_DIM: Color = Color(0.32, 0.45, 0.58, 0.55)
-const COL_OPENS: Color = Color(1.0, 0.82, 0.30, 0.98)
-const COL_CLOSES: Color = Color(0.35, 0.80, 1.0, 0.98)
-const COL_TEXT: Color = Color(0.72, 0.82, 0.92, 0.85)
-const COL_TEXT_LIT: Color = Color(0.94, 0.97, 1.0, 0.98)
-
-## The two figures this dial compares. The body is what stands; the head is what
-## is being asked for.
 var body_bits: int = 0
 var head_bits: int = 0
-
-## The line the finger last chose, or -1. Drawn a little larger, nothing more.
 var active_line: int = -1
 
 var dial_center: Vector2 = Vector2.ZERO
@@ -72,8 +44,6 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 
-## The pair, set together, because a line's state is only ever the difference
-## between them.
 func set_figures(body_in: int, head_in: int) -> void:
 	var b: int = body_in & 63
 	var h: int = head_in & 63
@@ -84,7 +54,6 @@ func set_figures(body_in: int, head_in: int) -> void:
 	queue_redraw()
 
 
-## What line `i` is doing, as one of SAME, OPENS or CLOSES.
 func line_state(i: int) -> String:
 	var b: int = (body_bits >> clampi(i, 0, 5)) & 1
 	var h: int = (head_bits >> clampi(i, 0, 5)) & 1
@@ -93,7 +62,6 @@ func line_state(i: int) -> String:
 	return OPENS if h == 1 else CLOSES
 
 
-## The figure a tap on line `i` would land: the body with that one line turned.
 func bits_if_tapped(i: int) -> int:
 	return (body_bits ^ (1 << clampi(i, 0, 5))) & 63
 
@@ -107,112 +75,129 @@ func _measure() -> void:
 	dial_radius = minf(size.x, size.y) * 0.46
 
 
-## Where line `i` sits on the rim, in this dial's own pixels.
-func line_position(i: int) -> Vector2:
-	_measure()
-	var ang: float = ANGLE_BOTTOM - float(clampi(i, 0, 5)) * ANGLE_STEP
-	return dial_center + Vector2(cos(ang), sin(ang)) * (dial_radius * RING)
-
-
 func hub_radius() -> float:
 	_measure()
 	return dial_radius * HUB
 
 
-## The line nearest a point, or -1 when the finger was nowhere near one.
+## Center angle of division `i` (0 at bottom, 1..5 wrapping around).
+func line_angle(i: int) -> float:
+	return ANGLE_BASE - float(clampi(i, 0, 5)) * SECTOR_SPAN
+
+
+## Where line `i` sits on the rim, in this dial's own pixels.
+func line_position(i: int) -> Vector2:
+	_measure()
+	var ang: float = line_angle(i)
+	return dial_center + Vector2(cos(ang), sin(ang)) * (dial_radius * RING)
+
+
+## The line division nearest a point, or -1 when inside the hub or outside the dial.
 func line_at(point: Vector2) -> int:
 	_measure()
-	var best: int = -1
-	var best_d: float = LINE_REACH
-	for i in range(6):
-		var d: float = (point - line_position(i)).length()
-		if d < best_d:
-			best_d = d
-			best = i
-	return best
+	var offset: Vector2 = point - dial_center
+	var dist: float = offset.length()
+	if dist < hub_radius() or dist > dial_radius * 1.18:
+		return -1
+	# Map angle to division index 0..5
+	var raw_ang: float = offset.angle()
+	# Relative to bottom (PI * 0.5), rotated counter-clockwise:
+	var diff: float = fposmod(ANGLE_BASE + (SECTOR_SPAN * 0.5) - raw_ang, TAU)
+	var idx: int = int(diff / SECTOR_SPAN) % 6
+	return clampi(idx, 0, 5)
 
 
 func _draw() -> void:
 	_measure()
-	draw_arc(dial_center, dial_radius, 0.0, TAU, 96, COL_RIM, 3.0, true)
-	draw_arc(dial_center, dial_radius - 18.0, 0.0, TAU, 96, COL_INNER, 1.5, true)
+	var hub_r: float = hub_radius()
+	var arc_r: float = dial_radius * RING
 
-	var font: Font = get_theme_default_font()
+	# Outer decorative rim
+	draw_arc(dial_center, dial_radius, 0.0, TAU, 96, COL_RIM, 2.5, true)
+	draw_arc(dial_center, dial_radius - 6.0, 0.0, TAU, 96, Color(0.20, 0.60, 0.85, 0.25), 1.0, true)
+
+	# Radial division tick marks between the 6 sectors
+	for s in range(6):
+		var div_ang: float = ANGLE_BASE + (SECTOR_SPAN * 0.5) - float(s) * SECTOR_SPAN
+		var dir := Vector2(cos(div_ang), sin(div_ang))
+		draw_line(dial_center + dir * (hub_r + 4.0), dial_center + dir * (dial_radius - 2.0), COL_DIVIDER, 1.5)
+
+	# Draw the 6 Yin/Yang Lines in their respective divisions around the circle
+	var sector_arc_span: float = SECTOR_SPAN * 0.76
+	var half_span: float = sector_arc_span * 0.5
+	var gap_span: float = sector_arc_span * 0.24
+
 	for i in range(6):
-		var at: Vector2 = line_position(i)
+		var ang: float = line_angle(i)
 		var state: String = line_state(i)
-		var lit: bool = state != SAME
-		var col: Color = COL_DIM
+		var lit: bool = (state != SAME) or (i == active_line)
+		var b_bit: int = (body_bits >> i) & 1
+		var h_bit: int = (head_bits >> i) & 1
+		var whole: bool = state == OPENS or (state == SAME and b_bit == 1)
+
+		var col: Color = COL_DIM_YIN
 		if state == OPENS:
 			col = COL_OPENS
 		elif state == CLOSES:
 			col = COL_CLOSES
-		var w: float = GLYPH_W * (1.15 if i == active_line else 1.0)
-		var h: float = GLYPH_H * (1.4 if lit else 1.0)
-		## THE GLYPH IS THE ANSWER: a line that opens is drawn whole, a line
-		## that closes is drawn broken, and a line with nothing to say is drawn
-		## as it already stands in the body.
-		var whole: bool = state == OPENS or (state == SAME and ((body_bits >> i) & 1) == 1)
-		if whole:
-			draw_line(at - Vector2(w * 0.5, 0.0), at + Vector2(w * 0.5, 0.0), col, h)
-		else:
-			var gap: float = w * 0.24
-			draw_line(at - Vector2(w * 0.5, 0.0), at - Vector2(gap * 0.5, 0.0), col, h)
-			draw_line(at + Vector2(gap * 0.5, 0.0), at + Vector2(w * 0.5, 0.0), col, h)
-		if font == null:
-			continue
-		var text: String = "%d %s" % [i + 1, LINE_NAMES[i]]
-		var tw: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, CAPTION_PT).x
-		var inward: Vector2 = (dial_center - at).normalized()
-		draw_string(font, at + inward * 16.0 + Vector2(-tw * 0.5, 4.0), text,
-			HORIZONTAL_ALIGNMENT_LEFT, -1.0, CAPTION_PT,
-			COL_TEXT_LIT if lit else COL_TEXT)
+		elif whole:
+			col = COL_DIM_YANG
 
-	var hub_r: float = hub_radius()
+		var stroke_w: float = 6.0 if not lit else 8.0
+
+		if whole:
+			# Yang: Solid curved arc across division
+			if lit:
+				draw_arc(dial_center, arc_r, ang - half_span, ang + half_span, 20, Color(col.r, col.g, col.b, 0.30), stroke_w + 5.0, true)
+			draw_arc(dial_center, arc_r, ang - half_span, ang + half_span, 20, col, stroke_w, true)
+		else:
+			# Yin: Broken curved arc with central angular gap in the division
+			var seg_half_gap: float = gap_span * 0.5
+			if lit:
+				draw_arc(dial_center, arc_r, ang - half_span, ang - seg_half_gap, 10, Color(col.r, col.g, col.b, 0.30), stroke_w + 5.0, true)
+				draw_arc(dial_center, arc_r, ang + seg_half_gap, ang + half_span, 10, Color(col.r, col.g, col.b, 0.30), stroke_w + 5.0, true)
+			draw_arc(dial_center, arc_r, ang - half_span, ang - seg_half_gap, 10, col, stroke_w, true)
+			draw_arc(dial_center, arc_r, ang + seg_half_gap, ang + half_span, 10, col, stroke_w, true)
+
+		# Moving Line Radiant Center Indicator
+		if b_bit != h_bit:
+			var pip_pos: Vector2 = dial_center + Vector2(cos(ang), sin(ang)) * arc_r
+			var pip_col: Color = Color(1.0, 0.95, 0.45, 1.0) if b_bit == 1 else Color(0.35, 0.95, 1.0, 1.0)
+			draw_circle(pip_pos, 4.0, pip_col)
+			draw_circle(pip_pos, 7.0, Color(pip_col.r, pip_col.g, pip_col.b, 0.35))
+
+	# Center Hub: MAXIMIZED HYPERGRAM SYMBOL ONLY (No small unreadable titles)
 	draw_circle(dial_center, hub_r, Color(0.05, 0.08, 0.13, 0.96))
 	draw_arc(dial_center, hub_r, 0.0, TAU, 48, Color(1.0, 0.65, 0.18, 0.95), 2.5, true)
-	draw_arc(dial_center, hub_r - 3.0, 0.0, TAU, 48, Color(0.25, 0.75, 0.95, 0.35), 1.0, true)
+	draw_arc(dial_center, hub_r - 3.5, 0.0, TAU, 48, Color(0.25, 0.75, 0.95, 0.35), 1.0, true)
 
-	# 4096 HYPERGRAM (64 HEAD x 64 BODY)
-	var hypergram_idx: int = ((head_bits & 63) << 6) | (body_bits & 63)
-
-	if font != null:
-		var hyp_hdr: String = "HYPERGRAM #%d / 4096" % (hypergram_idx + 1)
-		var hw: float = font.get_string_size(hyp_hdr, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8).x
-		draw_string(font, dial_center + Vector2(-hw * 0.5, -hub_r * 0.54), hyp_hdr,
-			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8, Color(1.0, 0.78, 0.35, 0.95))
-
-	# Draw the 6 Hypergram Lines in the Center Hub (line 0 at bottom to line 5 at top)
-	var hlw: float = 38.0
+	# 6 Hypergram Lines in Hub (Maximized, line 0 bottom to line 5 top)
+	var hlw: float = hub_r * 1.30
+	var line_thickness: float = 4.2
+	var line_spacing: float = 8.0
 	for i in range(6):
-		var ly: float = dial_center.y + float(2.5 - float(i)) * 8.0 - 2.0
+		var ly: float = dial_center.y + float(2.5 - float(i)) * line_spacing
 		var b_bit: int = (body_bits >> i) & 1
 		var h_bit: int = (head_bits >> i) & 1
-		
+
 		if b_bit == 1 and h_bit == 1:
 			# Young Yang (Firm Steady Yang)
-			draw_line(Vector2(dial_center.x - hlw * 0.5, ly), Vector2(dial_center.x + hlw * 0.5, ly), Color(1.0, 0.85, 0.35, 0.92), 2.2)
+			draw_line(Vector2(dial_center.x - hlw * 0.5, ly), Vector2(dial_center.x + hlw * 0.5, ly), Color(1.0, 0.85, 0.35, 0.95), line_thickness)
 		elif b_bit == 0 and h_bit == 0:
 			# Young Yin (Firm Steady Yin)
-			var half: float = (hlw - 7.0) * 0.5
-			draw_line(Vector2(dial_center.x - hlw * 0.5, ly), Vector2(dial_center.x - hlw * 0.5 + half, ly), Color(0.28, 0.68, 0.88, 0.82), 2.2)
-			draw_line(Vector2(dial_center.x + hlw * 0.5 - half, ly), Vector2(dial_center.x + hlw * 0.5, ly), Color(0.28, 0.68, 0.88, 0.82), 2.2)
+			var half: float = (hlw - 9.0) * 0.5
+			draw_line(Vector2(dial_center.x - hlw * 0.5, ly), Vector2(dial_center.x - hlw * 0.5 + half, ly), Color(0.30, 0.75, 0.95, 0.88), line_thickness)
+			draw_line(Vector2(dial_center.x + hlw * 0.5 - half, ly), Vector2(dial_center.x + hlw * 0.5, ly), Color(0.30, 0.75, 0.95, 0.88), line_thickness)
 		elif b_bit == 1 and h_bit == 0:
 			# Old Yang (Moving Yang -> Yin)
-			draw_line(Vector2(dial_center.x - hlw * 0.5, ly), Vector2(dial_center.x + hlw * 0.5, ly), Color(1.0, 0.52, 0.18, 0.98), 2.4)
-			draw_circle(Vector2(dial_center.x, ly), 2.8, Color(1.0, 0.92, 0.45, 0.98))
+			draw_line(Vector2(dial_center.x - hlw * 0.5, ly), Vector2(dial_center.x + hlw * 0.5, ly), Color(1.0, 0.55, 0.20, 0.98), line_thickness)
+			draw_circle(Vector2(dial_center.x, ly), 3.2, Color(1.0, 0.92, 0.45, 0.98))
 		else:
 			# Old Yin (Moving Yin -> Yang)
-			var half: float = (hlw - 7.0) * 0.5
-			draw_line(Vector2(dial_center.x - hlw * 0.5, ly), Vector2(dial_center.x - hlw * 0.5 + half, ly), Color(0.35, 0.92, 1.0, 0.98), 2.4)
-			draw_line(Vector2(dial_center.x + hlw * 0.5 - half, ly), Vector2(dial_center.x + hlw * 0.5, ly), Color(0.35, 0.92, 1.0, 0.98), 2.4)
-			draw_circle(Vector2(dial_center.x, ly), 2.5, Color(1.0, 0.85, 0.25, 0.98))
-
-	if font != null:
-		var cast_txt: String = "[ CAST ]"
-		var cw: float = font.get_string_size(cast_txt, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9).x
-		draw_string(font, dial_center + Vector2(-cw * 0.5, hub_r * 0.65), cast_txt,
-			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9, Color(1.0, 0.82, 0.32, 0.95))
+			var half: float = (hlw - 9.0) * 0.5
+			draw_line(Vector2(dial_center.x - hlw * 0.5, ly), Vector2(dial_center.x - hlw * 0.5 + half, ly), Color(0.35, 0.92, 1.0, 0.98), line_thickness)
+			draw_line(Vector2(dial_center.x + hlw * 0.5 - half, ly), Vector2(dial_center.x + hlw * 0.5, ly), Color(0.35, 0.92, 1.0, 0.98), line_thickness)
+			draw_circle(Vector2(dial_center.x, ly), 3.0, Color(1.0, 0.85, 0.25, 0.98))
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -230,8 +215,6 @@ func _gui_input(event: InputEvent) -> void:
 	accept_event()
 
 
-## The tap, separated from the event so a headless test may reach it without
-## building an InputEvent for a Control that is never in a viewport.
 func tap_at(at: Vector2) -> void:
 	_measure()
 	if (at - dial_center).length() < hub_radius():

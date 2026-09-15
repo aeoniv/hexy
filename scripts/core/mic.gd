@@ -37,6 +37,8 @@ const MOCK_STEP_S: float = 0.05
 ## scale onRmsChanged uses.
 const MOCK_RMS: float = 4.0
 
+const Seam := preload("res://scripts/seam.gd")
+
 var _plugin: Object = null
 var _listening: bool = false
 var _step: int = 0
@@ -44,10 +46,12 @@ var _timer: Timer = null
 
 
 func _init() -> void:
-	if not Engine.has_singleton("IxMnn"):
-		return
-	var p: Object = Engine.get_singleton("IxMnn")
-	if p == null or not p.has_method("mic_available"):
+	# ONE HANDSHAKE, NOT A PROBE. A `has_method` probe for the availability
+	# call used to stand here, and a JNISingleton answers false for every
+	# @UsedByGodot method it owns, so the mic ran its desktop mock on every
+	# phone. `seam.gd` has already checked this aar, once, for everyone.
+	var p: Object = Seam.ixmnn()
+	if p == null:
 		return
 	_plugin = p
 	_connect_plugin()
@@ -99,8 +103,6 @@ func listening() -> bool:
 func permission() -> String:
 	if _plugin == null:
 		return "granted"
-	if not _plugin.has_method("mic_permission"):
-		return "unknown"
 	return String(_plugin.call("mic_permission"))
 
 
@@ -139,8 +141,7 @@ func stop() -> void:
 
 func cancel() -> void:
 	if _plugin != null:
-		if _plugin.has_method("mic_cancel"):
-			_plugin.call("mic_cancel")
+		_plugin.call("mic_cancel")
 		return
 	if not _listening:
 		return

@@ -174,17 +174,17 @@ func _draw() -> void:
 		draw_string(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, CAPTION_PT,
 			Color(0.92, 0.96, 1.0, 0.98) if lit else Color(0.6, 0.72, 0.84, 0.78))
 
-	# 4. Central Hub: EXCLUSIVE HOME OF THE HEXAGRAM
+	# 4. Central Hub: EXCLUSIVE HOME OF THE HEXAGRAM (MAXIMIZED SYMBOL ONLY)
 	var hub_r: float = hub_radius()
 	draw_circle(dial_center, hub_r, Color(0.05, 0.08, 0.13, 0.96))
 	draw_arc(dial_center, hub_r, 0.0, TAU, 48, Color(1.0, 0.65, 0.18, 0.95), 2.5, true)
 	draw_arc(dial_center, hub_r - 4.0, 0.0, TAU, 48, Color(1.0, 0.82, 0.3, 0.35), 1.0, true)
 
-	# 6 Hexagram Lines
-	var line_w: float = hub_r * 1.05
-	var line_h: float = 3.5
-	var line_gap: float = 4.8
-	var start_y: float = dial_center.y - 4.0 + (line_gap * 2.5)
+	# 6 Hexagram Lines Maximized
+	var line_w: float = hub_r * 1.30
+	var line_h: float = 4.5
+	var line_gap: float = 6.5
+	var start_y: float = dial_center.y + (2.5 * (line_h + line_gap))
 
 	for line_idx in range(6):
 		var y: float = start_y - float(line_idx) * (line_h + line_gap)
@@ -204,19 +204,6 @@ func _draw() -> void:
 				Vector2(dial_center.x - gap * 0.5, y), col, line_h)
 			draw_line(Vector2(dial_center.x + gap * 0.5, y),
 				Vector2(dial_center.x + half, y), col, line_h)
-
-	# Hexagram Title & Peer Status
-	if font != null:
-		var hex_title: String = "#%d %s %s" % [hex_num, hex_zh, hex_name]
-		var tw: float = font.get_string_size(hex_title, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9).x
-		draw_string(font, dial_center + Vector2(-tw * 0.5, hub_r * 0.64), hex_title,
-			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9, Color(0.9, 0.94, 0.98, 0.95))
-
-		var alt_txt: String = "CAST ALTAR · %dp" % peers
-		var cw: float = font.get_string_size(alt_txt, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8).x
-		draw_string(font, dial_center + Vector2(-cw * 0.5, hub_r * 0.84), alt_txt,
-			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8, Color(1.0, 0.78, 0.3, 0.85))
-
 
 func _gui_input(event: InputEvent) -> void:
 	_measure()

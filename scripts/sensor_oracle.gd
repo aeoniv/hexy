@@ -8,6 +8,8 @@ extends Node
 ## Upper Trigram (Outer / Action)    = 8 Human Activity & Habit Disciplines
 ## Combined: 8 x 8 = 64 King Wen Hexagrams
 
+const Seam := preload("res://scripts/seam.gd")
+
 signal shake_started()
 signal shake_progress(progress: float)
 signal shake_cast_completed(wen: int, moving_line: int, bits: int)
@@ -402,21 +404,21 @@ func _update_habit_line_strains(delta: float) -> void:
 
 
 func _sample_hardware_extensions() -> void:
-	if Engine.has_singleton("IxMnn"):
-		var mnn = Engine.get_singleton("IxMnn")
-		if mnn:
-			if mnn.has_method("get_ambient_lux"):
-				var lux_val: float = mnn.get_ambient_lux()
-				if lux_val >= 0.0:
-					current_lux = lerp(current_lux, lux_val, 0.15)
-			if mnn.has_method("get_proximity"):
-				var prox: float = mnn.get_proximity()
-				if prox >= 0.0:
-					current_proximity = prox
-			if mnn.has_method("get_battery_level"):
-				var bat: float = mnn.get_battery_level()
-				if bat >= 0.0:
-					current_battery = bat
+	# THE HANDSHAKE IS THE GATE. Each of these three was fenced by a
+	# `has_method`, which a JNISingleton answers false for, so lux, proximity
+	# and battery never moved off their defaults on any device. Past
+	# `Seam.ixmnn()` the aar is ixmnn/2 and owns all three.
+	var mnn: Object = Seam.ixmnn()
+	if mnn != null:
+		var lux_val := float(mnn.call("get_ambient_lux"))
+		if lux_val >= 0.0:
+			current_lux = lerp(current_lux, lux_val, 0.15)
+		var prox := float(mnn.call("get_proximity"))
+		if prox >= 0.0:
+			current_proximity = prox
+		var bat := float(mnn.call("get_battery_level"))
+		if bat >= 0.0:
+			current_battery = bat
 
 
 func _execute_coin_toss_cast() -> void:

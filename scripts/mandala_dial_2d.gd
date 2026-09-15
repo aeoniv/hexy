@@ -70,7 +70,7 @@ func _draw() -> void:
 		draw_circle(st_pos, node_r, node_col)
 	
 	# Center Hub (Circle): Human Consciousness & Breathing Vitality
-	var hub_r := dial_radius * 0.48
+	var hub_r := dial_radius * 0.52
 	draw_circle(dial_center, hub_r, Color(0.05, 0.08, 0.13, 0.94))
 	draw_arc(dial_center, hub_r, 0, TAU, 32, Color(0.2, 0.7, 0.9, 0.75), 2.0, true)
 	draw_arc(dial_center, hub_r - 4.0, 0, TAU, 32, Color(0.15, 0.45, 0.7, 0.35), 1.0, true)
@@ -82,42 +82,25 @@ func _draw() -> void:
 	draw_circle(dial_center, aura_r, Color(0.2, 0.65, 0.9, 0.12 + 0.1 * breath))
 	draw_arc(dial_center, aura_r, 0, TAU, 32, Color(0.3, 0.8, 1.0, 0.3 + 0.35 * breath), 1.5, true)
 
-	# Central Trigram Display (Human Mind & Intent Trigram + Selected Hexagram)
+	# Central Trigram Display: MAXIMIZED TRIGRAM SYMBOL ONLY (No small titles)
 	var cur_hex: Dictionary = HuohoutuData.get_head_hex(current_hex_index)
 	var hex_bits: int = int(cur_hex.get("bits", 0))
-	var hex_num: int = int(cur_hex.get("id", 1))
-	var hex_name: String = String(cur_hex.get("name", ""))
 	var active_tri: int = active_human_trigram if active_human_trigram in HUMAN_STATION_TRIGRAMS else (hex_bits & 7)
-	var tri_name: String = KingWen.trigram_name(active_tri)
 
-	# Draw the 3 Trigram Lines (line 0 bottom, line 1 middle, line 2 top)
-	var lw: float = 38.0
+	# Draw the 3 Maximized Trigram Lines (line 0 bottom, line 1 middle, line 2 top)
+	var lw: float = hub_r * 1.42
+	var line_thickness: float = 6.0
+	var line_spacing: float = 20.0
 	for i in range(3):
-		var ly: float = dial_center.y + float(1 - i) * 10.0 - 2.0
+		var ly: float = dial_center.y + float(1 - i) * line_spacing
 		var is_yang: bool = ((active_tri >> i) & 1) == 1
 		if is_yang:
-			draw_line(Vector2(dial_center.x - lw * 0.5, ly), Vector2(dial_center.x + lw * 0.5, ly), Color(1.0, 0.84, 0.32, 0.98), 2.5)
+			draw_line(Vector2(dial_center.x - lw * 0.5, ly), Vector2(dial_center.x + lw * 0.5, ly), Color(1.0, 0.85, 0.30, 0.98), line_thickness)
 		else:
-			var half: float = (lw - 8.0) * 0.5
-			draw_line(Vector2(dial_center.x - lw * 0.5, ly), Vector2(dial_center.x - lw * 0.5 + half, ly), Color(0.35, 0.85, 1.0, 0.95), 2.5)
-			draw_line(Vector2(dial_center.x + lw * 0.5 - half, ly), Vector2(dial_center.x + lw * 0.5, ly), Color(0.35, 0.85, 1.0, 0.95), 2.5)
-
-	var font: Font = get_theme_default_font()
-	if font != null:
-		var header: String = "TRIGRAM · %s" % tri_name.to_upper()
-		var hw: float = font.get_string_size(header, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8).x
-		draw_string(font, dial_center + Vector2(-hw * 0.5, -hub_r * 0.44), header,
-			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8, Color(0.7, 0.9, 1.0, 0.95))
-		
-		var sub: String = "HEAD #%d %s" % [hex_num, hex_name]
-		var sw: float = font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9).x
-		draw_string(font, dial_center + Vector2(-sw * 0.5, hub_r * 0.42), sub,
-			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 9, Color(1.0, 0.85, 0.35, 0.98))
-		
-		var inq: String = "[ TAP TO INQUIRE ]"
-		var iw: float = font.get_string_size(inq, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 7).x
-		draw_string(font, dial_center + Vector2(-iw * 0.5, hub_r * 0.68), inq,
-			HORIZONTAL_ALIGNMENT_LEFT, -1.0, 7, Color(0.5, 0.72, 0.9, 0.75))
+			var gap: float = 16.0
+			var seg: float = (lw - gap) * 0.5
+			draw_line(Vector2(dial_center.x - lw * 0.5, ly), Vector2(dial_center.x - lw * 0.5 + seg, ly), Color(0.35, 0.85, 1.0, 0.98), line_thickness)
+			draw_line(Vector2(dial_center.x + lw * 0.5 - seg, ly), Vector2(dial_center.x + lw * 0.5, ly), Color(0.35, 0.85, 1.0, 0.98), line_thickness)
 
 func _gui_input(event: InputEvent) -> void:
 	var is_press: bool = false

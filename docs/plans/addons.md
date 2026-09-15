@@ -42,10 +42,11 @@ Dashboard panel 10: six lines × which door feeds each.
 
 ## 5. Milestones
 
-| M | move | proof |
-|---|---|---|
-| M1 | base plumbing + REQUIRES | suites + plugin_version_smoke |
-| M2 | HexyAddon contract | test_addon_bus |
+| M | move | proof | state |
+|---|---|---|---|
+| M1 | base plumbing + REQUIRES | suites + plugin_version_smoke | done (5e2fb7a) |
+| M2 | HexyAddon contract | test_addon_bus | done (5e2fb7a) |
+| M2b | the one radar: north-up compass, presence rows, geo math | test_circadian_radar_smoke, geo_smoke, heading_smoke | radar complete (44f8c9e) |
 | M3 | hexy_connection: peer_minds, presence, identity → line 5 | mesh_live, fabric_smoke |
 | M4 | hexy_voice: voice_sense, stage_voice → line 2 | voice_smoke |
 | M5 | hexy_body: pose_sense, kp_live → line 0 | body_smoke, one APK |

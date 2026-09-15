@@ -2,6 +2,9 @@
 
 An on-device mobile experiment combining **Alibaba MNN**, **Qwen LLM**, and the **I-Ching** in Godot 4.7 Forward Mobile for Android.
 
+> **Base v1.0.0** — what one APK contains (surfaces, plugins and their versions,
+> autoloads, tests) is one page: [`docs/BASE_V1.md`](docs/BASE_V1.md).
+
 ## Overview
 
 This repository is strictly scoped to three core pillars:

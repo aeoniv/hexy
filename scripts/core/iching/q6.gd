@@ -29,6 +29,7 @@ extends RefCounted
 ## answer the same numbers, so nothing upstream has to branch.
 
 const Lattice := preload("res://scripts/core/iching/q6_lattice.gd")
+const Seam := preload("res://scripts/seam.gd")
 
 const LINES: int = 6
 const STATES: int = 64
@@ -68,15 +69,20 @@ func _init(want_native: bool = true) -> void:
 			_send_figure_words()
 
 
-## The IxMnn singleton, but only when it actually carries the cube. A plugin
-## built before this file existed answers nothing, and that is not an error.
+## Hands the native lease back, so a test can walk the take twice in one
+## process. For tests only: on a phone the lease is taken once, by Pacing.
+static func release_lease_for_test() -> void:
+	_lease_taken = false
+
+
+## The IxMnn singleton, or null. THE VERSION HANDSHAKE IS THE WHOLE GATE:
+## `seam.gd` checked this aar once against `mnn_runtime.gd`'s REQUIRES, and a
+## plugin too old to carry the cube is a plugin that failed that check. What
+## used to stand here was a `has_method` probe for the cube call, which a
+## JNISingleton answers FALSE for every method it owns — so the lease was never
+## taken on any real phone and the cube quietly ran the desktop arithmetic.
 static func _singleton() -> Object:
-	if not Engine.has_singleton("IxMnn"):
-		return null
-	var p: Object = Engine.get_singleton("IxMnn")
-	if p == null or not p.has_method("q6_state"):
-		return null
-	return p
+	return Seam.ixmnn()
 
 
 ## True when this object's arithmetic is happening in C++ inside ixmnn.
@@ -103,7 +109,7 @@ static func bump_cast_version() -> int:
 ## 0 on desktop, where there is no decode loop to be wrong.
 static func prior_mismatches() -> int:
 	var p: Object = _singleton()
-	if p == null or not p.has_method("q6_prior_mismatches"):
+	if p == null:
 		return 0
 	return int(p.call("q6_prior_mismatches"))
 
@@ -113,7 +119,7 @@ static func prior_mismatches() -> int:
 ## is the honest signal that a push did not land.
 static func native_figure_version() -> int:
 	var p: Object = _singleton()
-	if p == null or not p.has_method("q6_figure_version"):
+	if p == null:
 		return -1
 	return int(p.call("q6_figure_version"))
 

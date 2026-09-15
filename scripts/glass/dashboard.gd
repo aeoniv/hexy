@@ -138,6 +138,10 @@ var _wmn: Node = null
 var _senses: Node = null
 var _alchemy: Node = null
 var _qwen: Node = null
+
+## The compass the glass hands down, so the dashboard's radar turns north-up
+## and can speak a guide line. Null is a legal state: headless has none.
+var _heading: Node = null
 ## The glass that owns this panel, read only for the words it already holds
 ## (the node name, the token stream). Never written to.
 var _host: Node = null
@@ -292,11 +296,17 @@ func _build_panel(kind: String) -> PanelContainer:
 		box.add_child(row)
 		radar = FlyCalciumRadar2D.new()
 		radar.name = "DashRadar"
-		radar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		radar.radar_radius = 72.0
-		radar.ring_thickness = 16.0
+		## THE ONE RADAR A SLAB PHONE CAN REACH. On a fold the glass keeps a
+		## column of its own for the dial; on a slab that pane is not drawn at
+		## all, so THIS is the radar a person opens -- panel 6, on the one
+		## scrolling column -- and it must answer a finger exactly as the
+		## fold's does. STOP, not IGNORE: the tap is the whole point.
+		radar.mouse_filter = Control.MOUSE_FILTER_STOP
+		radar.gui_input.connect(_on_radar_input)
+		radar.radar_radius = 88.0
+		radar.ring_thickness = 18.0
 		radar.show_neuromodulators = false
-		radar.custom_minimum_size = Vector2(180.0, float(HEIGHTS["fly"]))
+		radar.custom_minimum_size = Vector2(210.0, float(HEIGHTS["fly"]))
 		row.add_child(radar)
 		row.add_child(geom)
 	else:
@@ -728,6 +738,46 @@ func set_senses(senses: Node) -> void:
 	_senses = senses
 
 
+## THE COMPASS, handed down from the glass, duck-typed and optional exactly as
+## it is up there. No compass is not an error: the dial falls back to the
+## allocentric disc it drew before there was one.
+func set_heading(h: Node) -> void:
+	_heading = h
+
+
+## A PEER THE FABRIC DROPPED LEAVES THIS DIAL TOO. The glass forwards Wmn's
+## `peer_gone` to both radars, because a heading map that keeps a dead entry
+## keeps drawing a blip for somebody who walked out.
+func drop_peer(who: String) -> void:
+	if radar != null:
+		radar.drop_peer(who)
+
+
+## A TAP ON A BLIP PICKS SOMEBODY TO WALK TOWARD; a second tap lets them go.
+## One gesture in, the same gesture out -- the radar's own rule, and this file
+## only routes it, byte for byte as `hud3.gd` does.
+func _on_radar_input(event: InputEvent) -> void:
+	if radar == null:
+		return
+	var at: Vector2 = Vector2.ZERO
+	if event is InputEventMouseButton:
+		var mb: InputEventMouseButton = event
+		if not (mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT):
+			return
+		at = mb.position
+	elif event is InputEventScreenTouch:
+		var st: InputEventScreenTouch = event
+		if not st.pressed:
+			return
+		at = st.position
+	else:
+		return
+	if at.distance_to(radar.disc_center()) > radar.field_radius():
+		return
+	radar.tap(at)
+	radar.accept_event()
+
+
 func set_alchemy(alchemy: Node) -> void:
 	_alchemy = alchemy
 
@@ -863,6 +913,21 @@ func _refresh() -> void:
 			radar.set_state(fs)
 		if _wmn != null and _wmn.has_method("peer_headings"):
 			radar.set_peer_headings(_wmn.peer_headings() as Dictionary)
+		if _wmn != null and _wmn.has_method("peer_proximity"):
+			radar.set_peer_proximity(_wmn.peer_proximity() as Dictionary)
+		## AND THE COMPASS, the same seven facts the glass pushes into its own
+		## dial. Without them this radar is allocentric and tap-to-guide has
+		## nothing to turn against, which is not a radar a person can walk by.
+		if _heading != null and _heading.has_method("heading_rad"):
+			radar.set_compass({
+				"heading_rad": _heading.heading_rad(),
+				"accuracy": _heading.accuracy(),
+				"pose": _heading.pose(),
+				"live": _heading.live(),
+				"seen": _heading.seen(),
+				"true_north": _heading.true_north(),
+				"declination": _heading.declination(),
+			})
 
 	for kind in PANELS:
 		var g: Control = _geoms.get(kind, null) as Control

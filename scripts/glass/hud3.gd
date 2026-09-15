@@ -743,6 +743,11 @@ func bind(store: Node, qwen: Node, mnn: Node, wmn: Node) -> void:
 func _on_peer_gone(who: String) -> void:
 	if radar != null:
 		radar.drop_peer(who)
+	## THERE ARE TWO RADARS AND ONE FABRIC. The dashboard carries the dial a
+	## SLAB phone can actually open -- the pane above it is not drawn there --
+	## so the goodbye has to reach both or one of them keeps a ghost.
+	if dashboard != null and dashboard.has_method("drop_peer"):
+		dashboard.drop_peer(who)
 
 
 ## THE COMPASS NODE, HANDED IN BY THE APP. Duck-typed and optional: the app that
@@ -750,6 +755,11 @@ func _on_peer_gone(who: String) -> void:
 ## the allocentric dial it drew before this existed.
 func set_heading(h: Node) -> void:
 	_heading = h
+	## The dashboard's own radar is the one a slab phone can open, so the
+	## compass goes down with it. `_build_dashboard` re-sends it if it builds
+	## after this call.
+	if dashboard != null and dashboard.has_method("set_heading"):
+		dashboard.set_heading(h)
 
 
 func set_senses(senses: Node) -> void:
@@ -1668,6 +1678,8 @@ func _build_dashboard() -> void:
 	root.add_child(dashboard)
 	dashboard.set_host(self)
 	dashboard.bind(_store, _mnn, _wmn, _senses, _alchemy, _qwen)
+	if _heading != null:
+		dashboard.set_heading(_heading)
 	if _addons != null:
 		dashboard.set_addons(_addons)
 

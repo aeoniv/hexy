@@ -28,6 +28,16 @@ extends RefCounted
 ## THE GATE LIVES AT ATTACH, BESIDE THE has_signal GATING, and nowhere else. No
 ## call site anywhere in this app asks the version again; a seam that got past
 ## attach has already been told it may speak.
+##
+## AND IT IS THE ONLY GATE. A per-call `has_method` fence is not a safety net on
+## top of the handshake, it is the handshake's opposite: it answers false for
+## every method the plugin really owns, so it fires on the phone and never on
+## the desktop — the exact inversion of the behaviour anyone writing it wanted.
+## `scripts/brain/mnn_runtime.gd` carried such a fence over its whole ixmnn/2
+## extension surface (tokenize, get_perf, set_sampling, trim_history,
+## apply_template, and the versioned `chat_at`/`chat_stream_at`) and every
+## device silently ran the desktop mock while blaming a stale aar. Two states
+## only: handshake passed, call bare; no singleton, run the mock.
 
 ## The method every plugin answers. Named once, here.
 const CALL := "plugin_version"
@@ -64,3 +74,67 @@ static func check(node: Object, needs: String, tag: String) -> bool:
 		return true
 	print(mismatch_line(tag, needs, got))
 	return false
+
+
+# ── THE ONE IXMNN, HANDSHAKEN ONCE ─────────────────────────────────────────
+#
+# THREE FILES SHARE THIS SINGLETON and each of them used to reach for it alone
+# behind a `has_method` probe: `core/iching/q6.gd` (the cube's native lease),
+# `core/mic.gd` (the recogniser) and `sensor_oracle.gd` (lux, proximity,
+# battery). On a phone every one of those probes answers false, so the cube ran
+# in GDScript, the mic ran its mock and the three sensors stayed at their
+# defaults — silently, on the device the code was written for.
+#
+# The fix is NOT three more handshakes. `brain/mnn_runtime.gd` already carries
+# the one `REQUIRES` for this aar, so that constant is the single source and
+# this accessor is the single door. Checked once, cached, and after that every
+# ixmnn/2 method is called bare.
+
+## The handshake's verdict, cached: null means "no plugin, run your mock".
+## The extra flag is what separates "checked, and it is null" from "not asked
+## yet", which a plain null cannot say.
+static var _ixmnn: Object = null
+static var _ixmnn_asked: bool = false
+
+
+## THE SINGLETON, OR NULL. Never raises, never probes, never asks twice.
+## The require string is loaded, not preloaded, because `mnn_runtime.gd`
+## preloads this file and a preload back would be a cycle.
+static func ixmnn() -> Object:
+	if _ixmnn_asked:
+		return _ixmnn
+	_ixmnn_asked = true
+	_ixmnn = null
+	if not Engine.has_singleton("IxMnn"):
+		return null
+	var node: Object = Engine.get_singleton("IxMnn")
+	var runtime: Script = load("res://scripts/brain/mnn_runtime.gd")
+	var needs := String(runtime.get_script_constant_map()["REQUIRES"])
+	var tag := String(runtime.get_script_constant_map()["REQUIRES_TAG"])
+	if not check(node, needs, tag):
+		return null
+	_ixmnn = node
+	return _ixmnn
+
+
+## TEST SEAM. Stands `node` in for the singleton, handshake and all, so a
+## headless test can pin the on-device branch of every caller at once.
+## Returns whether the handshake passed.
+static func _attach_for_test(node: Object) -> bool:
+	_ixmnn_asked = true
+	_ixmnn = null
+	if node == null:
+		return false
+	var runtime: Script = load("res://scripts/brain/mnn_runtime.gd")
+	var needs := String(runtime.get_script_constant_map()["REQUIRES"])
+	var tag := String(runtime.get_script_constant_map()["REQUIRES_TAG"])
+	if not check(node, needs, tag):
+		return false
+	_ixmnn = node
+	return true
+
+
+## Forgets the verdict, so the next [ixmnn] asks again. For tests only.
+static func reset_for_test() -> void:
+	_ixmnn = null
+	_ixmnn_asked = false
