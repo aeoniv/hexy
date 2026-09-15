@@ -201,6 +201,24 @@ func _run() -> void:
 	check(is_equal_approx(Hud3.day_phase_of(0.0), 0.25),
 		"and runs the day clockwise round the ring")
 
+	# -- 5. opening the gear FROM the dials page still borrows one radar -----
+	front.open_dials()
+	await process_frame
+	check(_count_radars(app) == 1, "one radar with the dials page standing")
+	hud.toggle_dashboard()
+	await process_frame
+	check(hud.dashboard_open(), "toggle_dashboard opened the gear from the dials page")
+	check(_count_radars(app) == 1, "still exactly one radar with the gear open on top of the dials")
+	check(hud.dashboard.radar == front.radar, "and the panel drew the front's own instance, not a second one")
+	check(not bool(front.radar.get("quiet")), "borrowed for the gear, the one radar is loud")
+	hud.toggle_dashboard()
+	await process_frame
+	check(not hud.dashboard_open(), "and the gear closes again")
+	check(_count_radars(app) == 1, "with the radar count still exactly one")
+	check(bool(front.radar.get("quiet")), "and the radar quiet again, back in the front's room")
+	front.close_dials()
+	await process_frame
+
 	app.wmn.stop()
 	root.remove_child(app)
 	app.queue_free()

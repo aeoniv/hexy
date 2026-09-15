@@ -132,6 +132,17 @@ var close_button: Button = null
 var build_label: Label = null
 var radar: Control = null
 
+## THE ONE RADAR RULE. `radar` above is this panel's own -- built at _ready
+## exactly as before -- until somebody LENDS one with `borrow_radar()`, at
+## which point it is swapped for the lent instance and the built one is freed,
+## so the tree never carries two. `_fly_row` is the row `radar` (whichever one
+## it is) stands beside its bars in; `_lender` is who to hand it back to.
+var _fly_row: HBoxContainer = null
+var _lender: Control = null
+var _lent_from_parent: Node = null
+var _lent_from_index: int = -1
+var _using_borrowed: bool = false
+
 var _store: Node = null
 var _mnn: Node = null
 var _wmn: Node = null
@@ -309,6 +320,7 @@ func _build_panel(kind: String) -> PanelContainer:
 		radar.custom_minimum_size = Vector2(210.0, float(HEIGHTS["fly"]))
 		row.add_child(radar)
 		row.add_child(geom)
+		_fly_row = row
 	else:
 		box.add_child(geom)
 
@@ -745,6 +757,71 @@ func set_heading(h: Node) -> void:
 	_heading = h
 
 
+## LEND THIS PANEL THE ONE RADAR. Whoever owns it (the front) calls this
+## before or while panel 6·FLY is shown, so the panel draws the SAME creature
+## the front's own room shows rather than keeping a second one alive. Safe to
+## call more than once with the same instance, and safe to call before the
+## panel has ever been opened -- the swap happens right away either way, which
+## is the only way "exactly one radar in the tree" can hold while this panel
+## is merely built and not yet visible.
+func borrow_radar(r: Control) -> void:
+	if r == null:
+		return
+	_lender = r
+	if not _using_borrowed:
+		_swap_in_borrowed_radar()
+
+
+## THE SWAP: the panel's own built radar is freed, the lent one takes its
+## place in the row at the same slot, wired for a tap and shown loud.
+func _swap_in_borrowed_radar() -> void:
+	if _lender == null or _fly_row == null or radar == _lender:
+		return
+	_lent_from_parent = _lender.get_parent()
+	_lent_from_index = _lender.get_index() if _lent_from_parent != null else -1
+	var slot: int = 0
+	if radar != null and radar.get_parent() == _fly_row:
+		slot = radar.get_index()
+		if radar.gui_input.is_connected(_on_radar_input):
+			radar.gui_input.disconnect(_on_radar_input)
+		_fly_row.remove_child(radar)
+		radar.queue_free()
+	if _lender.get_parent() != null:
+		_lender.get_parent().remove_child(_lender)
+	_fly_row.add_child(_lender)
+	_fly_row.move_child(_lender, slot)
+	_lender.radar_radius = 88.0
+	_lender.ring_thickness = 18.0
+	_lender.show_neuromodulators = false
+	_lender.custom_minimum_size = Vector2(210.0, float(HEIGHTS["fly"]))
+	_lender.mouse_filter = Control.MOUSE_FILTER_STOP
+	if not _lender.gui_input.is_connected(_on_radar_input):
+		_lender.gui_input.connect(_on_radar_input)
+	_lender.set_quiet(false)
+	radar = _lender
+	_using_borrowed = true
+
+
+## THE RADAR GOES HOME. Whoever lent it gets it back at the same seat it left,
+## quiet again -- called when this panel stops showing it: the dashboard
+## closing, or (should a future caller add one) the panel itself hiding.
+func _return_borrowed_radar() -> void:
+	if not _using_borrowed or radar == null:
+		return
+	if radar.gui_input.is_connected(_on_radar_input):
+		radar.gui_input.disconnect(_on_radar_input)
+	var cur_parent: Node = radar.get_parent()
+	if cur_parent != null:
+		cur_parent.remove_child(radar)
+	radar.set_quiet(true)
+	if _lent_from_parent != null:
+		_lent_from_parent.add_child(radar)
+		var at: int = mini(maxi(_lent_from_index, 0), _lent_from_parent.get_child_count() - 1)
+		_lent_from_parent.move_child(radar, at)
+	radar = null
+	_using_borrowed = false
+
+
 ## A PEER THE FABRIC DROPPED LEAVES THIS DIAL TOO. The glass forwards Wmn's
 ## `peer_gone` to both radars, because a heading map that keeps a dead entry
 ## keeps drawing a blip for somebody who walked out.
@@ -807,6 +884,7 @@ func close() -> void:
 	visible = false
 	if _beat != null:
 		_beat.stop()
+	_return_borrowed_radar()
 
 
 func toggle() -> bool:
@@ -907,7 +985,11 @@ func _refresh() -> void:
 
 	_sync_doors()
 
-	if radar != null:
+	## THE BORROWED CASE FEEDS ITSELF. The front pushes the state, the peer
+	## headings, the proximity and the compass into this same instance every
+	## beat of its own; doing it again here would be a second, slower clock on
+	## one radar rather than a compass push this panel has any business making.
+	if radar != null and not _using_borrowed:
 		var fs: Dictionary = snap["fly"].get("state", {}) as Dictionary
 		if not fs.is_empty():
 			radar.set_state(fs)

@@ -142,6 +142,10 @@ func _run() -> void:
 	front.composer.gui_input.emit(_press(Vector2(200.0, 120.0)))
 	front.composer.gui_input.emit(_tap(Vector2(200.0, 10.0)))
 	check(dash.size() == 1, "a drag of more than eighty pixels up asks for the dashboard")
+	await process_frame
+	check(front.dashboard_open(), "and the front actually opened it")
+	check(front.close_dashboard(), "and it can be closed again")
+	check(not front.dashboard_open(), "leaving nothing standing for the rest of this smoke test")
 
 	# -- the composer still takes a question --------------------------------
 	check(not front.composer_send("   "), "the composer refuses an empty question")

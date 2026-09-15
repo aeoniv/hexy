@@ -231,6 +231,11 @@ var dashboard: HexyDashboard = null
 ## The add-on loader, held only to hand on to the doors panel.
 var _addons: Node = null
 
+## WHOEVER STANDS THE ONE RADAR. Set by the front when it builds this page, so
+## the gear opened from here borrows the front's own creature instead of
+## growing a second one underneath the dials.
+var _radar_lender: Object = null
+
 var _store: Node = null
 var _qwen: Node = null
 var _mnn: Node = null
@@ -840,6 +845,13 @@ func set_alchemy(alchemy: Node) -> void:
 
 func alchemy() -> Node:
 	return _alchemy
+
+
+## THE ONE RADAR'S OWNER, handed in by whoever mounted this page (the front).
+## Read only when the dashboard is built, so the gear's panel borrows that
+## instance instead of the copy this page used to carry.
+func set_radar_lender(lender: Object) -> void:
+	_radar_lender = lender
 
 
 # -- what the glass is asked for ---------------------------------------------
@@ -1497,6 +1509,13 @@ func _build_dashboard() -> void:
 	dashboard.bind(_store, _mnn, _wmn, _senses, _alchemy, _qwen)
 	if _addons != null:
 		dashboard.set_addons(_addons)
+	## BORROW THE ONE RADAR, if somebody is standing one. Without a lender
+	## (this page built on its own, as the standalone dashboard test still
+	## does) the panel keeps the radar it just built for itself.
+	if _radar_lender != null and _radar_lender.has_method("radar_dial"):
+		var lent: Control = _radar_lender.radar_dial() as Control
+		if lent != null and dashboard.has_method("borrow_radar"):
+			dashboard.borrow_radar(lent)
 
 
 ## What the model is, what the fruit fly connectome is living, and what it is allowed to be on this phone.

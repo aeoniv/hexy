@@ -1,4 +1,4 @@
-class_name CreatureBall3D
+﻿class_name CreatureBall3D
 extends Node3D
 
 signal machine_node_clicked(node_idx: int)
@@ -8,7 +8,7 @@ var touch_press_time: int = 0
 
 ## Tensegrity Cybernetics Visualizer:
 ## 1. Icosahedron: Exact canonical 6-strut 24-cord tensegrity from commit 3215119
-## 2. Rhombic Dodecahedron: 3 coordinate struts, 8 trigram hubs, 24 cords
+## 2. Rhombic Dodecahedron: 3 coordinate struts, 8 trigram hubs, 24 cords, 12 diamond facets
 ## 3. Rhombic Triacontahedron: 30 golden rhombus translucent facets, 32 vertices, 60 sexagenary cords
 
 enum GeometryMode {
@@ -30,6 +30,13 @@ var octopamine_level: float = 0.5
 var dopamine_level: float = 0.5
 var dfb_sleep_level: float = 0.2
 var startle_curl: float = 0.0
+var stillness_dwell: float = 0.0
+
+# Dynamic physical impulse & jiggle state
+var impulse_offset: Vector3 = Vector3.ZERO
+var impulse_vel: Vector3 = Vector3.ZERO
+var impulse_wobble: float = 0.0
+var impulse_phase: float = 0.0
 
 func set_fly_brain_state(heading_angle_rad: float, oa: float, da: float, dfb: float, curl: float = 0.0) -> void:
 	target_heading_yaw = heading_angle_rad
@@ -38,12 +45,23 @@ func set_fly_brain_state(heading_angle_rad: float, oa: float, da: float, dfb: fl
 	dfb_sleep_level = clampf(dfb, 0.0, 1.0)
 	startle_curl = clampf(curl, 0.0, 1.0)
 
+func set_breath_rate(r: float) -> void:
+	stillness_dwell = clampf(r, 0.0, 1.0)
+
+func apply_touch_impulse(dir: Vector3, strength: float = 1.0) -> void:
+	impulse_vel += dir.normalized() * (strength * 0.35)
+	impulse_wobble = minf(impulse_wobble + strength * 1.6, 3.2)
+
+func apply_impulse(_pos: Vector3, dir: Vector3) -> void:
+	apply_touch_impulse(dir, 1.0)
+
 func set_thinking(val: bool) -> void:
 	is_thinking = val
+
 var gravity_strain: Vector3 = Vector3.ZERO
 
 const PHI: float = 1.61803398875 # Golden Ratio
-# Scaled down from 0.85 to 0.58 so all geometries fit within the screen without touching UI
+# Scaled so all geometries fit within the screen without touching UI
 const SCALE: float = 0.44
 
 # --- 1. EXACT CANONICAL TENSEGRITY ICOSAHEDRON (Commit 3215119) ---
@@ -77,7 +95,9 @@ const RD_VERTICES: Array[Vector3] = [
 ]
 
 const RD_STRUTS: Array = [
-	[0, 1], [2, 3], [4, 5]
+	[0, 1], # Strut 0: X-axis (Lines 1 & 2 - Earth/Substrate)
+	[2, 3], # Strut 1: Y-axis (Lines 3 & 4 - Human/Posture)
+	[4, 5]  # Strut 2: Z-axis (Lines 5 & 6 - Heaven/Crown)
 ]
 
 const RD_CORDS: Array = [
@@ -89,8 +109,7 @@ const RD_CORDS: Array = [
 	[5, 10], [5, 11], [5, 12], [5, 13]
 ]
 
-# 12 congruent diamond rhombus facets forming the outer protective exoskeleton shell
-# Each rhombus quad alternates: axial vertex (0..5) -> cubic vertex (6..13) -> axial vertex -> cubic vertex
+# 12 congruent diamond rhombus facets forming the outer bioskin shell
 const RD_FACES: Array = [
 	[0, 6, 2, 10],  # (+X, +Y)
 	[0, 8, 3, 12],  # (+X, -Y)
@@ -150,66 +169,18 @@ const RT_STRUTS: Array = [
 	[5, 8]
 ]
 const RT_CORDS: Array = [
-	[0, 20],
-	[0, 12],
-	[0, 16],
-	[0, 26],
-	[0, 21],
-	[1, 21],
-	[1, 12],
-	[1, 13],
-	[1, 27],
-	[1, 22],
-	[2, 22],
-	[2, 12],
-	[2, 14],
-	[2, 25],
-	[2, 20],
-	[3, 23],
-	[3, 13],
-	[3, 17],
-	[3, 29],
-	[3, 21],
-	[4, 24],
-	[4, 14],
-	[4, 15],
-	[4, 30],
-	[4, 22],
-	[5, 25],
-	[5, 13],
-	[5, 15],
-	[5, 22],
-	[5, 23],
-	[6, 26],
-	[6, 14],
-	[6, 18],
-	[6, 20],
-	[6, 24],
-	[7, 27],
-	[7, 16],
-	[7, 17],
-	[7, 21],
-	[7, 28],
-	[8, 28],
-	[8, 16],
-	[8, 18],
-	[8, 31],
-	[8, 20],
-	[9, 29],
-	[9, 15],
-	[9, 19],
-	[9, 23],
-	[9, 24],
-	[10, 30],
-	[10, 18],
-	[10, 19],
-	[10, 24],
-	[10, 28],
-	[11, 31],
-	[11, 17],
-	[11, 19],
-	[11, 28],
-	[11, 23]
+	[0, 20], [0, 12], [0, 16], [0, 26], [0, 21],
+	[1, 21], [1, 12], [1, 13], [1, 27], [1, 22],
+	[2, 22], [2, 12], [2, 14], [2, 25], [2, 20],
+	[3, 23], [3, 13], [3, 17], [3, 29], [3, 21],
+	[4, 24], [4, 14], [4, 15], [4, 30], [4, 22],
+	[5, 25], [5, 13], [5, 15], [5, 22], [5, 23],
+	[6, 26], [6, 14], [6, 18], [6, 20], [6, 24],
+	[7, 27], [7, 16], [7, 17], [7, 21], [7, 28],
+	[8, 28], [8, 16], [8, 18], [8, 31], [8, 20],
+	[9, 29], [9, 15], [9, 19], [9, 23], [9, 24],
+	[10, 30], [10, 18], [10, 19], [10, 24], [10, 28],
+	[11, 31], [11, 17], [11, 19], [11, 28], [11, 23]
 ]
 const RT_FACES: Array = [
 	[0, 12, 1, 21],
@@ -281,7 +252,7 @@ func get_current_geometry_name() -> String:
 			return "Rhombic Dodeca"
 		GeometryMode.RHOMBIC_TRIACONTAHEDRON:
 			return "Triacontahedron"
-	return "Icosahedron"
+	return "Rhombic Dodeca"
 
 func set_hexagram(bits: int, moving: int = -1) -> void:
 	hexagram_bits = bits & 0x3F
@@ -373,13 +344,15 @@ func _rebuild_node_pool() -> void:
 		var mat: StandardMaterial3D = tip_nodes[i].material_override as StandardMaterial3D
 		if geometry_mode == GeometryMode.RHOMBIC_DODECAHEDRON:
 			if i < 6:
-				sp.radius = 0.044
-				sp.height = 0.088
-				mat.albedo_color = Color(0.2, 0.85, 1.0)
+				# 6 Axial poles: Cartesian coordinate struts
+				sp.radius = 0.038
+				sp.height = 0.076
+				mat.albedo_color = Color(0.2, 0.88, 1.0)
 			else:
+				# 8 Cubic Trigram Hubs
 				sp.radius = 0.028
 				sp.height = 0.056
-				mat.albedo_color = Color(0.95, 0.72, 0.2)
+				mat.albedo_color = Color(0.96, 0.76, 0.22)
 		elif geometry_mode == GeometryMode.RHOMBIC_TRIACONTAHEDRON:
 			if i < 12:
 				sp.radius = 0.028
@@ -408,7 +381,7 @@ func _rebuild_node_pool() -> void:
 			cyl.top_radius = 0.024
 			cyl.bottom_radius = 0.024
 
-func _compute_base_vertices(bits: int, ext: float, fold: float) -> Array[Vector3]:
+func _compute_base_vertices(bits: int, ext: float, fold: float, anim_time: float = 0.0) -> Array[Vector3]:
 	var tips: Array[Vector3] = []
 	
 	if geometry_mode == GeometryMode.ICOSAHEDRON:
@@ -442,6 +415,33 @@ func _compute_base_vertices(bits: int, ext: float, fold: float) -> Array[Vector3
 			
 	elif geometry_mode == GeometryMode.RHOMBIC_DODECAHEDRON:
 		tips.resize(14)
+		var base_scale: float = SCALE * 0.95 * lerpf(1.0, 0.80, dfb_sleep_level)
+		
+		# Coupled breathing: stillness dwell slows down, octopamine quickens
+		var breath_freq: float = lerpf(1.1, 4.8, octopamine_level * (1.0 - stillness_dwell * 0.55))
+		var breath_amp: float = lerpf(0.035, 0.075, octopamine_level)
+		var phase_axial: float = anim_time * breath_freq
+		var phase_cubic: float = phase_axial - 0.48 # 0.15s phase delay
+		
+		var breath_ax: float = sin(phase_axial) * breath_amp
+		var breath_cub: float = sin(phase_cubic) * (breath_amp * 1.5)
+		
+		# High frequency moving line harmonic flutter (14 Hz)
+		var flutter: float = sin(anim_time * 14.0 * TAU) * 0.032 if moving_line >= 0 else 0.0
+		
+		# Axial elongation and Poisson strain coupling
+		var axial_delta: Array[float] = [0.0, 0.0, 0.0]
+		for s in range(3):
+			var bit_a: int = (bits >> (s * 2)) & 1
+			var bit_b: int = (bits >> (s * 2 + 1)) & 1
+			var yang_count: int = bit_a + bit_b
+			var delta_len: float = (ext if yang_count > 1 else (-ext if yang_count == 0 else 0.0))
+			
+			if moving_line == (s * 2) or moving_line == (s * 2 + 1):
+				delta_len += flutter
+			axial_delta[s] = delta_len
+			
+		# Struts with negative Poisson lateral bulging
 		for s in range(3):
 			var idx1: int = RD_STRUTS[s][0]
 			var idx2: int = RD_STRUTS[s][1]
@@ -451,16 +451,41 @@ func _compute_base_vertices(bits: int, ext: float, fold: float) -> Array[Vector3
 			var dir: Vector3 = (v2 - v1).normalized()
 			var base_len: float = v1.distance_to(v2)
 			
-			var bit_a: int = (bits >> (s * 2)) & 1
-			var bit_b: int = (bits >> (s * 2 + 1)) & 1
-			var delta_len: float = (ext if (bit_a + bit_b > 1) else (-ext if (bit_a + bit_b == 0) else 0.0))
-			var final_len: float = (base_len + delta_len) * (SCALE * 0.95)
+			var orthogonal_strain: float = 0.0
+			for other_s in range(3):
+				if other_s != s:
+					orthogonal_strain += axial_delta[other_s] * 0.18
+					
+			var final_len: float = (base_len + axial_delta[s] + breath_ax + orthogonal_strain) * base_scale
 			
-			tips[idx1] = (center * SCALE) - dir * (final_len * 0.5)
-			tips[idx2] = (center * SCALE) + dir * (final_len * 0.5)
+			if startle_curl > 0.001:
+				if s == 1:
+					final_len *= (1.0 - startle_curl * 0.38)
+				elif s == 2:
+					final_len *= (1.0 - startle_curl * 0.22)
+					
+			tips[idx1] = (center * base_scale) - dir * (final_len * 0.5)
+			tips[idx2] = (center * base_scale) + dir * (final_len * 0.5)
 			
+		# 8 Cubic Trigram Hubs: dynamic radial breathing, torsional twist, and Poisson tension pull
+		var twist_angle: float = sin(phase_axial) * 0.045 * (1.0 - dfb_sleep_level * 0.7)
+		var cubic_radial_mult: float = 1.0 + breath_cub
+		
 		for c in range(8):
-			tips[6 + c] = RD_VERTICES[6 + c] * (SCALE * 0.95)
+			var base_hub: Vector3 = RD_VERTICES[6 + c]
+			var norm: Vector3 = base_hub.normalized()
+			var twisted: Vector3 = base_hub.rotated(norm, twist_angle)
+			
+			var poisson_offset := Vector3(
+				-signf(base_hub.x) * axial_delta[0] * 0.14,
+				-signf(base_hub.y) * axial_delta[1] * 0.14,
+				-signf(base_hub.z) * axial_delta[2] * 0.14
+			)
+			
+			var pt: Vector3 = (twisted * (base_scale * cubic_radial_mult)) + poisson_offset
+			if startle_curl > 0.001:
+				pt *= (1.0 - startle_curl * 0.28)
+			tips[6 + c] = pt
 			
 	elif geometry_mode == GeometryMode.RHOMBIC_TRIACONTAHEDRON:
 		tips.resize(32)
@@ -486,9 +511,19 @@ func _update_geometry(anim_time: float) -> void:
 	var current_ext: float = (extension + breath) * (1.0 - startle_curl * 0.45)
 	var current_fold: float = fold_factor + sin(anim_time * 1.5) * 0.02 + (startle_curl * 0.25)
 	
-	var tips: Array[Vector3] = _compute_base_vertices(hexagram_bits, current_ext, current_fold)
+	var tips: Array[Vector3] = _compute_base_vertices(hexagram_bits, current_ext, current_fold, anim_time)
 	
-	# Organic gravity strain deformation (symmetric elastic squash and bulge)
+	# Touch impulse elastic jiggle perturbation
+	if impulse_wobble > 0.001:
+		var wobble_wave: float = sin(impulse_phase) * impulse_wobble * 0.04
+		for i in range(tips.size()):
+			tips[i] += Vector3(
+				sin(impulse_phase + float(i) * 0.7) * wobble_wave * 0.3,
+				cos(impulse_phase + float(i) * 0.9) * wobble_wave * 0.3,
+				sin(impulse_phase + float(i) * 1.1) * wobble_wave * 0.4
+			)
+	
+	# Organic gravity strain deformation
 	if gravity_strain.length_squared() > 0.00001:
 		var g_dir := gravity_strain.normalized()
 		var g_mag := gravity_strain.length()
@@ -542,20 +577,36 @@ func _update_geometry(anim_time: float) -> void:
 			
 		# Colors & Moving Line Pulse
 		var line_idx: int = s if geometry_mode != GeometryMode.RHOMBIC_DODECAHEDRON else s * 2
-		var is_yang: bool = ((hexagram_bits >> line_idx) & 1) == 1
-		var is_moving: bool = (line_idx == moving_line or (geometry_mode == GeometryMode.RHOMBIC_DODECAHEDRON and line_idx + 1 == moving_line))
+		var is_moving: bool = false
+		var is_yang: bool = false
+		var is_mixed: bool = false
+		
+		if geometry_mode == GeometryMode.RHOMBIC_DODECAHEDRON:
+			var bit_a: int = (hexagram_bits >> (s * 2)) & 1
+			var bit_b: int = (hexagram_bits >> (s * 2 + 1)) & 1
+			is_moving = (line_idx == moving_line or line_idx + 1 == moving_line)
+			is_yang = (bit_a + bit_b > 1)
+			is_mixed = (bit_a != bit_b)
+		else:
+			is_yang = ((hexagram_bits >> line_idx) & 1) == 1
+			is_moving = (line_idx == moving_line)
+			
 		var pulse: float = (sin(anim_time * 8.0) * 0.5 + 0.5) if is_moving else 0.0
 		if is_thinking:
 			pulse = max(pulse, sin(anim_time * 5.0) * 0.5 + 0.5)
 		
 		var mat: StandardMaterial3D = node.material_override
 		if is_moving:
-			mat.albedo_color = Color(1.0, 0.9, 0.2).lerp(Color.WHITE, pulse * 0.6)
-			mat.emission = Color(1.0, 0.8, 0.1) * (1.8 + pulse * 2.5)
+			mat.albedo_color = Color(1.0, 0.95, 0.25).lerp(Color.WHITE, pulse * 0.7)
+			mat.emission = Color(1.0, 0.85, 0.15) * (2.2 + pulse * 3.0)
 		elif is_yang:
-			var base_gold := Color(0.95, 0.72, 0.2)
+			var base_gold := Color(0.96, 0.74, 0.22)
 			mat.albedo_color = base_gold
-			mat.emission = Color(0.8, 0.55, 0.1) * 1.2
+			mat.emission = Color(0.85, 0.58, 0.12) * lerpf(1.2, 1.8, octopamine_level)
+		elif is_mixed:
+			var base_teal := Color(0.30, 0.85, 0.85)
+			mat.albedo_color = base_teal
+			mat.emission = Color(0.18, 0.65, 0.75) * 1.2
 		else:
 			var base_blue := Color(0.2, 0.65, 0.95)
 			mat.albedo_color = base_blue
@@ -584,14 +635,18 @@ func _update_geometry(anim_time: float) -> void:
 		var dist: float = p1.distance_to(p2)
 		var strain: float = clamp((dist - rest_cord_len) / (0.25 * SCALE), -1.0, 1.0)
 		
-		var base_col: Color = Color(0.2, 0.85, 1.0, 0.7) if geometry_mode != GeometryMode.RHOMBIC_TRIACONTAHEDRON else Color(0.3, 0.75, 1.0, 0.4)
-		var cord_col: Color = base_col.lerp(Color(1.0, 0.2, 0.7, 0.95), clamp(strain, 0.0, 1.0))
+		var base_col: Color = Color(0.2, 0.85, 1.0, 0.75) if geometry_mode != GeometryMode.RHOMBIC_TRIACONTAHEDRON else Color(0.3, 0.75, 1.0, 0.4)
+		var cord_col: Color = base_col.lerp(Color(1.0, 0.25, 0.75, 0.95), clamp(strain, 0.0, 1.0))
 		
-		if moving_line >= 0 and geometry_mode == GeometryMode.ICOSAHEDRON:
-			var m_p1: int = STRUT_PAIRS[moving_line][0]
-			var m_p2: int = STRUT_PAIRS[moving_line][1]
-			if a == m_p1 or a == m_p2 or b == m_p1 or b == m_p2:
-				cord_col = cord_col.lerp(Color(1.0, 0.9, 0.3, 0.95), 0.5)
+		# Moving line vibration glow along connected cords
+		if moving_line >= 0:
+			var m_strut: int = moving_line / 2 if geometry_mode == GeometryMode.RHOMBIC_DODECAHEDRON else moving_line
+			if m_strut < active_struts.size():
+				var m_p1: int = active_struts[m_strut][0]
+				var m_p2: int = active_struts[m_strut][1]
+				if a == m_p1 or a == m_p2 or b == m_p1 or b == m_p2:
+					var cord_flutter: float = sin(anim_time * 16.0) * 0.5 + 0.5
+					cord_col = cord_col.lerp(Color(1.0, 0.95, 0.35, 0.98), 0.65 + cord_flutter * 0.35)
 		
 		cord_immediate_mesh.surface_set_color(cord_col)
 		cord_immediate_mesh.surface_add_vertex(p1)
@@ -600,58 +655,41 @@ func _update_geometry(anim_time: float) -> void:
 		
 	cord_immediate_mesh.surface_end()
 
-	# Render Translucent Rhombic Facets (for Rhombic Triacontahedron)
+	# Render Translucent Rhombic Facets
 	if face_immediate_mesh:
 		face_immediate_mesh.clear_surfaces()
 		if geometry_mode == GeometryMode.RHOMBIC_DODECAHEDRON and tips.size() >= 14:
 			face_immediate_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
 			var active_face_idx: int = (hexagram_bits % 12)
+			var active_f: Array = RD_FACES[active_face_idx]
+			var active_center: Vector3 = (tips[active_f[0]] + tips[active_f[1]] + tips[active_f[2]] + tips[active_f[3]]) * 0.25
+			var f_pulse: float = sin(anim_time * 6.0) * 0.5 + 0.5
+			
 			for f_idx in range(RD_FACES.size()):
 				var f: Array = RD_FACES[f_idx]
 				var p0: Vector3 = tips[f[0]]
 				var p1: Vector3 = tips[f[1]]
 				var p2: Vector3 = tips[f[2]]
 				var p3: Vector3 = tips[f[3]]
+				var fc: Vector3 = (p0 + p1 + p2 + p3) * 0.25
 				var is_active: bool = (f_idx == active_face_idx)
-				var face_col: Color
-				if is_active:
-					var f_pulse: float = sin(anim_time * 6.0) * 0.5 + 0.5
-					face_col = Color(0.1, 0.95, 0.5, 0.45).lerp(Color(0.2, 1.0, 0.8, 0.7), f_pulse)
-				else:
-					face_col = Color(0.06, 0.55, 0.32, 0.22)
-				face_immediate_mesh.surface_set_color(face_col)
-				face_immediate_mesh.surface_add_vertex(p0)
-				face_immediate_mesh.surface_set_color(face_col)
-				face_immediate_mesh.surface_add_vertex(p1)
-				face_immediate_mesh.surface_set_color(face_col)
-				face_immediate_mesh.surface_add_vertex(p2)
-				face_immediate_mesh.surface_set_color(face_col)
-				face_immediate_mesh.surface_add_vertex(p0)
-				face_immediate_mesh.surface_set_color(face_col)
-				face_immediate_mesh.surface_add_vertex(p2)
-				face_immediate_mesh.surface_set_color(face_col)
-				face_immediate_mesh.surface_add_vertex(p3)
-			face_immediate_mesh.surface_end()
-		elif geometry_mode == GeometryMode.RHOMBIC_TRIACONTAHEDRON and tips.size() >= 32:
-			face_immediate_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
-			
-			var active_face_idx: int = (hexagram_bits % 30)
-			
-			for f_idx in range(RT_FACES.size()):
-				var f: Array = RT_FACES[f_idx]
-				var p0: Vector3 = tips[f[0]]
-				var p1: Vector3 = tips[f[1]]
-				var p2: Vector3 = tips[f[2]]
-				var p3: Vector3 = tips[f[3]]
 				
-				var is_active: bool = (f_idx == active_face_idx)
 				var face_col: Color
 				if is_active:
-					var f_pulse: float = sin(anim_time * 6.0) * 0.5 + 0.5
-					face_col = Color(1.0, 0.85, 0.2, 0.55).lerp(Color(1.0, 0.3, 0.7, 0.7), f_pulse)
+					# Radiant active month facet
+					var gold_lum: Color = Color(0.98, 0.85, 0.25, 0.62).lerp(Color(0.2, 1.0, 0.85, 0.82), f_pulse)
+					face_col = gold_lum.lerp(Color.WHITE, 0.25)
 				else:
-					face_col = Color(0.15, 0.35, 0.65, 0.18)
-					
+					# Traveling bioluminescent ripple wave propagating outward
+					var dist: float = fc.distance_to(active_center)
+					var wave: float = sin(anim_time * 5.0 - dist * 4.5) * 0.5 + 0.5
+					var base_alpha: float = lerpf(0.12, 0.28, dopamine_level)
+					var base_teal: Color = Color(0.08, 0.48, 0.55, base_alpha)
+					var crest_teal: Color = Color(0.18, 0.88, 0.78, base_alpha + 0.20)
+					face_col = base_teal.lerp(crest_teal, wave * 0.75)
+					if dfb_sleep_level > 0.35:
+						face_col.a *= lerpf(1.0, 0.45, dfb_sleep_level)
+				
 				# Triangle 1: p0, p1, p2
 				face_immediate_mesh.surface_set_color(face_col)
 				face_immediate_mesh.surface_add_vertex(p0)
@@ -669,9 +707,50 @@ func _update_geometry(anim_time: float) -> void:
 				face_immediate_mesh.surface_add_vertex(p3)
 				
 			face_immediate_mesh.surface_end()
+		elif geometry_mode == GeometryMode.RHOMBIC_TRIACONTAHEDRON and tips.size() >= 32:
+			face_immediate_mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+			var active_face_idx: int = (hexagram_bits % 30)
+			for f_idx in range(RT_FACES.size()):
+				var f: Array = RT_FACES[f_idx]
+				var p0: Vector3 = tips[f[0]]
+				var p1: Vector3 = tips[f[1]]
+				var p2: Vector3 = tips[f[2]]
+				var p3: Vector3 = tips[f[3]]
+				var is_active: bool = (f_idx == active_face_idx)
+				var face_col: Color
+				if is_active:
+					var f_pulse: float = sin(anim_time * 6.0) * 0.5 + 0.5
+					face_col = Color(1.0, 0.85, 0.2, 0.55).lerp(Color(1.0, 0.3, 0.7, 0.7), f_pulse)
+				else:
+					face_col = Color(0.15, 0.35, 0.65, 0.18)
+					
+				face_immediate_mesh.surface_set_color(face_col)
+				face_immediate_mesh.surface_add_vertex(p0)
+				face_immediate_mesh.surface_set_color(face_col)
+				face_immediate_mesh.surface_add_vertex(p1)
+				face_immediate_mesh.surface_set_color(face_col)
+				face_immediate_mesh.surface_add_vertex(p2)
+				
+				face_immediate_mesh.surface_set_color(face_col)
+				face_immediate_mesh.surface_add_vertex(p0)
+				face_immediate_mesh.surface_set_color(face_col)
+				face_immediate_mesh.surface_add_vertex(p2)
+				face_immediate_mesh.surface_set_color(face_col)
+				face_immediate_mesh.surface_add_vertex(p3)
+				
+			face_immediate_mesh.surface_end()
 
 func _process(delta: float) -> void:
 	var t: float = Time.get_ticks_msec() * 0.001
+	
+	# Harmonic spring impulse recovery
+	var spring_k: float = 42.0
+	var spring_damping: float = 6.8
+	var impulse_acc: Vector3 = -impulse_offset * spring_k - impulse_vel * spring_damping
+	impulse_vel += impulse_acc * delta
+	impulse_offset += impulse_vel * delta
+	impulse_wobble = maxf(0.0, impulse_wobble - delta * 3.2)
+	impulse_phase += delta * 22.0
 	
 	if sensor_mode_enabled:
 		var gyro: Vector3 = Input.get_gyroscope()
@@ -695,19 +774,28 @@ func _process(delta: float) -> void:
 			rot_velocity = rot_velocity.lerp(Vector2(0.006, 0.003), delta * 2.0)
 		gravity_strain = gravity_strain.lerp(Vector3.ZERO, delta * 3.0)
 	
-	# Real Physical Sensor Orientation with natural organic breath (No touch tumbling)
+	# Heading orientation with organic zero-g buoyancy kinematics
 	if not is_dragging:
-		current_rot.x = lerp_angle(current_rot.x, target_heading_yaw, delta * 2.0)
+		current_rot.x = lerp_angle(current_rot.x, target_heading_yaw, delta * 2.2)
 	current_rot.x = fmod(current_rot.x, TAU)
 	current_rot.y = clamp(current_rot.y, -PI * 0.45, PI * 0.45)
-	transform.basis = Basis()
-	rotate_y(current_rot.x + sin(t * 0.4) * 0.04)
-	rotate_x(current_rot.y + cos(t * 0.3) * 0.03)
+	
+	# Living buoyancy undulation (Lissajous drift in amniotic digital space)
+	var drift_speed: float = lerpf(0.6, 1.4, octopamine_level)
+	var hover_x: float = cos(t * 0.37 * drift_speed) * 0.014
+	var hover_y: float = sin(t * 0.52 * drift_speed) * 0.024 + cos(t * 0.81 * drift_speed) * 0.010
+	var hover_z: float = sin(t * 0.44 * drift_speed) * 0.014
+	position = Vector3(hover_x, hover_y, hover_z) + impulse_offset
+	
+	# Subtle pitch and roll precession
+	var pitch: float = cos(t * 0.45 * drift_speed) * 0.028
+	var roll: float = sin(t * 0.38 * drift_speed) * 0.032
+	
+	transform.basis = Basis.from_euler(Vector3(current_rot.y + pitch, current_rot.x, roll))
 	
 	_update_geometry(t)
 
 func _unhandled_input(event: InputEvent) -> void:
-	# 3D touch rotation disabled to eliminate touch conflicts with Body/Head dials and nodes
 	var pos: Vector2 = Vector2.ZERO
 	var is_press: bool = false
 	var is_release: bool = false
@@ -728,11 +816,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		var dist: float = (pos - touch_press_pos).length()
 		var dur: int = int(Time.get_ticks_msec()) - touch_press_time
 		if dist < 24.0 and dur < 400:
-			# Tap on 3D Body Creature sphere / Machine Substrate nodes!
 			var vp_size: Vector2 = get_viewport().get_visible_rect().size
 			var center := Vector2(vp_size.x * 0.5, vp_size.y * 0.40)
 			var v := pos - center
 			if v.length() < vp_size.x * 0.48:
+				# Apply impulse at tap direction
+				var imp_dir := Vector3(v.x / (vp_size.x * 0.5), -v.y / (vp_size.y * 0.5), 0.6).normalized()
+				apply_touch_impulse(imp_dir, 1.3)
+				
 				# Map tap angle to one of the 8 Machine Substrates:
 				# 7=Heaven(Top/Noon), 3=Lake(NE), 5=Fire(East/Lux), 1=Thunder(SE/Surge), 0=Earth(South/Night), 4=Mountain(SW/Desk), 2=Water(West/Battery), 6=Wind(NW/Flux)
 				const MACHINE_STATION_TRIGRAMS: Array[int] = [7, 3, 5, 1, 0, 4, 2, 6]

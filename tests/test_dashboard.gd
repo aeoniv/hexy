@@ -29,6 +29,7 @@ func _initialize() -> void:
 	print("\n--- TEST DASHBOARD (the gear's instrument panel) ---")
 	await _run_widget_panels()
 	await _run()
+	await _run_borrowed_radar()
 	if failures == 0:
 		print("--- ALL DASHBOARD TESTS PASSED PERFECTLY ---\n")
 		quit(0)
@@ -182,6 +183,82 @@ func _run() -> void:
 	check(String(dash.doors_text()).split("
 ").size() == 10,
 		"the doors panel reads six need lines and four circuits")
+
+# -- W6: exactly one radar, front or dashboard, never both -------------------
+
+## THE FRONT'S SWIPE, DRIVING A REAL DASHBOARD. `open_dashboard()` must borrow
+## the one radar the front already stands rather than leaving the panel's own
+## built one in the tree; closing it must put the front's radar back exactly
+## where it was, quiet, with the creature still in the room's own hub.
+func _run_borrowed_radar() -> void:
+	print("-- the borrowed radar (W6) --")
+	var packed: PackedScene = load(SCENE)
+	var app: Node = packed.instantiate()
+	root.add_child(app)
+	await process_frame
+	await process_frame
+
+	var front: Node = app.get_node_or_null("Hud")
+	check(front != null, "a front is under the app, for the borrow test")
+	if front == null:
+		return
+
+	var room_band: Node = front.room_band
+	var home_index: int = int(front.radar.get_index())
+	check(_count_radars(app) == 1, "one radar stands before the gear is ever opened")
+	check(bool(front.radar.get("quiet")), "and it is the front's own quiet room")
+
+	var dash: HexyDashboard = front.open_dashboard() as HexyDashboard
+	await process_frame
+	check(dash != null, "opening the dashboard from the front returns it")
+	if dash == null:
+		return
+	check(_count_radars(app) == 1, "still exactly one radar while the gear stands open")
+	check(dash.radar == front.radar, "and panel 6-FLY is drawing the front's own instance")
+	check(not bool(front.radar.get("quiet")), "borrowed, the one radar goes loud")
+	check(dash.panel("fly").get_parent() != null, "the fly panel still stands on the column")
+
+	check(front.close_dashboard(), "the gear closes")
+	await process_frame
+	check(_count_radars(app) == 1, "and there is still exactly one radar after it closes")
+	check(bool(front.radar.get("quiet")), "returned, the radar is quiet again")
+	check(front.radar.get_parent() == room_band, "and it is back under the front's room band")
+	check(int(front.radar.get_index()) == home_index, "at the very seat it left")
+	var hub: Rect2 = front.radar.hub_rect()
+	var field: Rect2 = Rect2(front.creature_field.position, front.creature_field.size)
+	check(field.position.distance_to(hub.position) < 2.0 and absf(field.size.x - hub.size.x) < 2.0,
+		"and the creature is still standing in that radar's own hub")
+
+	## OPENING AGAIN LENDS THE SAME INSTANCE, not a fresh build.
+	var dash2: HexyDashboard = front.open_dashboard() as HexyDashboard
+	await process_frame
+	check(dash2 == dash, "asking again opens the dashboard already built")
+	check(dash2.radar == front.radar, "and it borrows the one radar a second time")
+	check(_count_radars(app) == 1, "with the count still exactly one")
+	front.close_dashboard()
+	await process_frame
+
+	## A BARE DASHBOARD, NEVER LENT ANYTHING, STILL BUILDS ITS OWN.
+	var solo := HexyDashboard.new()
+	root.add_child(solo)
+	await process_frame
+	check(solo.radar != null, "a dashboard nobody lent a radar to still mounts one of its own")
+	check(_count_radars(app) == 1, "the app's own room is unaffected by that standalone panel")
+	solo.queue_free()
+	await process_frame
+
+	app.wmn.stop()
+	root.remove_child(app)
+	app.queue_free()
+	await process_frame
+
+
+func _count_radars(from: Node) -> int:
+	var n: int = 1 if from is FlyCalciumRadar2D else 0
+	for kid in from.get_children():
+		n += _count_radars(kid)
+	return n
+
 
 # -- panels 8 and 9, on a bare dashboard -------------------------------------
 

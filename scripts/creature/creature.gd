@@ -1,4 +1,4 @@
-class_name Creature
+﻿class_name Creature
 extends Node3D
 
 ## THE BODY ON THE GLASS: one ball, one mandala, one camera.
@@ -68,6 +68,8 @@ func _init() -> void:
 	ball.name = "Ball"
 	mandala = MandalaScript.new()
 	mandala.name = "Mandala"
+	# Hide duplicated 8x8 icons & spokes so 3D tensegrity creature is clear
+	mandala.visible = false
 	camera = Camera3D.new()
 	camera.name = "Eye"
 	camera.position = Vector3(0.0, 0.0, 2.05)
@@ -79,6 +81,7 @@ func _ready() -> void:
 	add_child(ball)
 	add_child(mandala)
 	add_child(camera)
+	mandala.visible = false
 	if not ball.machine_node_clicked.is_connected(_on_machine_node_clicked):
 		ball.machine_node_clicked.connect(_on_machine_node_clicked)
 	set_process(true)
@@ -89,11 +92,15 @@ func _ready() -> void:
 ## solid out of shape.
 func set_breath_rate(r: float) -> void:
 	_breath_rate = clampf(r, 0.0, 1.0)
+	if ball != null and ball.has_method("set_breath_rate"):
+		ball.set_breath_rate(_breath_rate)
 
 
 ## One flare, for a line that just turned. It falls back on its own.
 func pulse() -> void:
 	_flare = 1.0
+	if ball != null and ball.has_method("apply_touch_impulse"):
+		ball.apply_touch_impulse(Vector3.UP, 0.7)
 
 
 func _process(delta: float) -> void:
@@ -188,6 +195,11 @@ func geometry_name() -> String:
 ## first; only a touch that hits no node turns the geometry.
 func tap(pos: Vector2) -> void:
 	_node_hit = false
+	if ball != null and ball.has_method("apply_touch_impulse"):
+		var ray_dir := Vector3.FORWARD
+		if camera != null and camera.is_inside_tree():
+			ray_dir = camera.project_ray_normal(pos)
+		ball.apply_touch_impulse(-ray_dir, 1.2)
 	var vp: Viewport = get_viewport()
 	if vp != null:
 		var down := InputEventScreenTouch.new()

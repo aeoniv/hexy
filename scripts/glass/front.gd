@@ -36,6 +36,15 @@ const SKIN := preload("res://scripts/glass/bubble.gd")
 ## that built one at boot would pay for a page nobody opened.
 const DIALS := preload("res://scripts/glass/hud3.gd")
 
+## THE GEAR'S PANEL, PRELOADED THE SAME WAY: heavy, and never built until a
+## swipe asks for it.
+const DASHBOARD := preload("res://scripts/glass/dashboard.gd")
+
+## THE TWO THIN SHEETS, preloaded and never built until a finger asks for one
+## -- the same bargain the dials strike above.
+const PEER_SHEET := preload("res://scripts/glass/peer_sheet.gd")
+const READING_SHEET := preload("res://scripts/glass/reading_sheet.gd")
+
 ## THE SENTENCE, LOADED RATHER THAN NAMED, exactly as the app loads the
 ## alchemy: it belongs to the core and the core may land after the glass does.
 ## When it is on disk the bar is its words; when it is not, the bar still says
@@ -118,6 +127,21 @@ var bubble: GlassBubble = null
 var dials: Node = null
 var back_layer: CanvasLayer = null
 var back_bar: PanelContainer = null
+
+## THE GEAR'S PANEL. Built the first time a swipe asks for it, either by
+## reusing the dials page's own copy (so opening the dashboard from the dials
+## page and opening it from the composer land on the same instance) or, when
+## the dials have never been opened, one the front owns outright. Either way
+## it borrows THIS front's one radar rather than growing a second.
+var dashboard: Node = null
+
+## THE TWO SHEETS, each built the first time a finger asks for it, each above
+## the room but under nothing else, and never both open at once -- opening one
+## closes the other, the same rule that keeps the dials the only other page.
+var peer_sheet: PeerSheet = null
+var reading_sheet: ReadingSheet = null
+var _peer_sheet_layer: CanvasLayer = null
+var _reading_sheet_layer: CanvasLayer = null
 
 var _store: Node = null
 var _mnn: Node = null
@@ -216,6 +240,18 @@ func _ready() -> void:
 	root.resized.connect(_layout_room)
 	_layout_room.call_deferred()
 	set_process(true)
+
+	## THE TWO SHEETS ANSWER THE FRONT'S OWN SIGNALS. A blip or the figure is
+	## touched, the front says so, and the front is also the one thing in this
+	## file that knows what a peer row and a chapter look like -- so it hears
+	## its own word and opens the page.
+	peer_tapped.connect(_open_peer_sheet)
+	reading_tapped.connect(_open_reading_sheet)
+	## A SWIPE UP OFF THE COMPOSER OPENS THE PANEL ITSELF. The front is the one
+	## thing that knows both what a dashboard is and which radar there is only
+	## one of, so it answers its own signal rather than leaving it for whoever
+	## mounts the front to reinvent.
+	dashboard_requested.connect(open_dashboard)
 
 
 ## 1. THE SENTENCE: one line, and the app has nothing else to say up here.
@@ -660,6 +696,14 @@ func _marks() -> Array:
 	return []
 
 
+## THE CHAPTER THIS FIGURE IS STANDING IN, as the beat already worked it out.
+## `_stage` is -1 until the first beat; a caller asking before then gets
+## ORDINARY for whatever figure is standing, which is the honest chapter for
+## a figure nobody has watched move yet.
+func current_chapter() -> Dictionary:
+	return Journey.chapter(_body_bits(), maxi(_stage, 0))
+
+
 func _refresh_glyph() -> void:
 	if glyph_label == null:
 		return
@@ -850,6 +894,8 @@ func _on_peer_gone(who: String) -> void:
 ## and parked over the front with the composer out of the way. Asking twice
 ## shows the page that is already there; it never builds a second one.
 func open_dials() -> Node:
+	close_peer_sheet()
+	close_reading_sheet()
 	if dials == null:
 		dials = DIALS.new()
 		dials.name = "Dials"
@@ -868,6 +914,10 @@ func open_dials() -> Node:
 			dials.set_addons(_addons)
 		if dials.has_method("set_who"):
 			dials.set_who(_who)
+		## THE DIALS' OWN GEAR OPENS THE SAME RADAR THIS FRONT STANDS, not a
+		## second one built underneath the third glass.
+		if dials.has_method("set_radar_lender"):
+			dials.set_radar_lender(self)
 		## ABOVE THE FRONT, whatever layer the page gave itself.
 		if dials.get("layer") != null:
 			(dials.get("layer") as CanvasLayer).layer = layer.layer + 1
@@ -967,15 +1017,190 @@ func _on_back_input(event: InputEvent) -> void:
 
 
 ## ANDROID'S OWN BACK BUTTON closes whatever page is open, and does nothing at
-## all on the front -- there is nowhere further back to go.
+## all on the front -- there is nowhere further back to go. A SHEET CLOSES
+## FIRST: it sits above the room, under nothing, so a back press unwinds the
+## nearest page first and the dials second.
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
-		close_dials()
+		back_requested()
 
 
-## The back request, as a test can raise it without a phone.
+## The back request, as a test can raise it without a phone. The dashboard
+## closes first -- it stands above everything else -- then whichever sheet is
+## open, then the dials; failing all three, nothing.
 func back_requested() -> bool:
+	if close_dashboard():
+		return true
+	if close_peer_sheet():
+		return true
+	if close_reading_sheet():
+		return true
 	return close_dials()
+
+
+# -- the gear's panel ----------------------------------------------------------
+
+## THE DASHBOARD, OPENED. Built the first time: the dials page's own copy is
+## reused when there is one (opening the gear from the dials page and from the
+## composer's own swipe must land on the one dashboard, not two), and one the
+## front owns outright otherwise. Either way the one radar this front stands
+## is lent to it before it is shown, so panel 6·FLY draws the SAME creature
+## the room does -- never a second one built underneath it.
+func open_dashboard() -> Node:
+	close_peer_sheet()
+	close_reading_sheet()
+	if dashboard == null:
+		if dials != null and dials.has_method("dashboard_page"):
+			dashboard = dials.dashboard_page()
+		else:
+			dashboard = DASHBOARD.new()
+			dashboard.name = "Dashboard"
+			root.add_child(dashboard)
+			if dashboard.has_method("set_host"):
+				dashboard.set_host(self)
+			if dashboard.has_method("bind"):
+				dashboard.bind(_store, _mnn, _wmn, _senses, _alchemy, _qwen)
+			if dashboard.has_method("set_addons"):
+				dashboard.set_addons(_addons)
+			if dashboard.has_method("set_heading"):
+				dashboard.set_heading(_heading)
+	if dashboard != null and radar != null and dashboard.has_method("borrow_radar"):
+		dashboard.borrow_radar(radar)
+	if dashboard != null and dashboard.has_method("open"):
+		dashboard.open()
+	if composer != null:
+		composer.visible = false
+	return dashboard
+
+
+func dashboard_open() -> bool:
+	return dashboard != null and dashboard.has_method("is_open") and bool(dashboard.is_open())
+
+
+## THE DASHBOARD, CLOSED. The radar is reclaimed into the front's own room the
+## moment it shuts, so the disc is never left parked in a hidden panel's slot.
+func close_dashboard() -> bool:
+	if not dashboard_open():
+		return false
+	dashboard.close()
+	reclaim_radar()
+	if composer != null and not peer_sheet_open() and not reading_sheet_open() and not dials_open():
+		composer.visible = true
+	return true
+
+
+## THE RADAR COMES HOME. Called once whoever borrowed it has handed it back:
+## the front's own layout -- size, quiet, the STOP filter and its own tap --
+## is re-applied so the creature stands where the room wants it and answers a
+## finger the way the room always has, not however the panel left it.
+func reclaim_radar() -> void:
+	if radar == null:
+		return
+	radar.mouse_filter = Control.MOUSE_FILTER_STOP
+	if not radar.gui_input.is_connected(_on_radar_input):
+		radar.gui_input.connect(_on_radar_input)
+	if radar.has_method("set_quiet"):
+		radar.set_quiet(true)
+	_layout_room()
+
+
+# -- the two sheets ------------------------------------------------------------
+
+## A PEER, LAZILY BUILT AND SHOWN. Reading a peer's row out of `wmn.peers()`
+## and their plot out of `radar.peer_plots()` is this file's job because it is
+## the file that was handed both objects; the sheet itself reads neither.
+func _open_peer_sheet(who: String) -> void:
+	close_reading_sheet()
+	close_dials()
+	if peer_sheet == null:
+		peer_sheet = PEER_SHEET.new()
+		peer_sheet.name = "PeerSheet"
+		_peer_sheet_layer = CanvasLayer.new()
+		_peer_sheet_layer.name = "PeerSheetLayer"
+		_peer_sheet_layer.layer = layer.layer + 1
+		add_child(_peer_sheet_layer)
+		_peer_sheet_layer.add_child(peer_sheet)
+		peer_sheet.guide_requested.connect(_on_guide_requested)
+		peer_sheet.guide_cleared.connect(_on_guide_cleared)
+		peer_sheet.closed.connect(close_peer_sheet)
+	var row: Dictionary = _peer_row(who)
+	var plot: Dictionary = _peer_plot(who)
+	peer_sheet.show_peer(row, plot)
+	_peer_sheet_layer.visible = true
+	if composer != null:
+		composer.visible = false
+
+
+func peer_sheet_open() -> bool:
+	return peer_sheet != null and _peer_sheet_layer != null and _peer_sheet_layer.visible
+
+
+func close_peer_sheet() -> bool:
+	if not peer_sheet_open():
+		return false
+	_peer_sheet_layer.visible = false
+	if composer != null and not reading_sheet_open() and not dials_open():
+		composer.visible = true
+	return true
+
+
+func _peer_row(who: String) -> Dictionary:
+	for row in _peer_rows():
+		if String((row as Dictionary).get("who", "")) == who:
+			return row as Dictionary
+	return {}
+
+
+func _peer_plot(who: String) -> Dictionary:
+	if radar != null and radar.has_method("peer_plots"):
+		var plots: Dictionary = radar.peer_plots()
+		if plots.has(who):
+			return plots[who] as Dictionary
+	return {}
+
+
+func _on_guide_requested(who: String) -> void:
+	if radar != null:
+		radar.guide_id = who
+
+
+func _on_guide_cleared() -> void:
+	if radar != null:
+		radar.guide_id = ""
+
+
+## A READING, LAZILY BUILT AND SHOWN. The chapter is the front's own tracked
+## journey state -- `current_chapter()` -- because the sheet does not know
+## what a stage or a body's path is; it only draws what it is handed.
+func _open_reading_sheet(bits: int) -> void:
+	close_peer_sheet()
+	close_dials()
+	if reading_sheet == null:
+		reading_sheet = READING_SHEET.new()
+		reading_sheet.name = "ReadingSheet"
+		_reading_sheet_layer = CanvasLayer.new()
+		_reading_sheet_layer.name = "ReadingSheetLayer"
+		_reading_sheet_layer.layer = layer.layer + 1
+		add_child(_reading_sheet_layer)
+		_reading_sheet_layer.add_child(reading_sheet)
+		reading_sheet.closed.connect(close_reading_sheet)
+	reading_sheet.show_reading(bits, current_chapter())
+	_reading_sheet_layer.visible = true
+	if composer != null:
+		composer.visible = false
+
+
+func reading_sheet_open() -> bool:
+	return reading_sheet != null and _reading_sheet_layer != null and _reading_sheet_layer.visible
+
+
+func close_reading_sheet() -> bool:
+	if not reading_sheet_open():
+		return false
+	_reading_sheet_layer.visible = false
+	if composer != null and not peer_sheet_open() and not dials_open():
+		composer.visible = true
+	return true
 
 
 # -- layout ------------------------------------------------------------------
