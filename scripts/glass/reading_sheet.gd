@@ -101,6 +101,13 @@ func _ready() -> void:
 	_gloss_label.add_theme_color_override("font_color", Color(0.75, 0.85, 0.98, 0.9))
 	col.add_child(_gloss_label)
 
+	## THE GLASS IS MEASURED ONCE THE SHEET IS IN IT, and again whenever it
+	## changes shape -- see [method _fit_to_viewport].
+	_fit_to_viewport()
+	var vp: Viewport = get_viewport()
+	if vp != null and not vp.size_changed.is_connected(_fit_to_viewport):
+		vp.size_changed.connect(_fit_to_viewport)
+
 
 ## THE ONE DOOR IN. [param bits] the figure; [param chapter] whatever the
 ## front's own `current_chapter()` returned -- title, stage name and gloss,
@@ -126,6 +133,7 @@ func show_reading(bits: int, chapter: Dictionary) -> void:
 	_chapter_label.text = String(ch.get("title", "%s · %s" % [_stage_name(0), KingWen.name(b)]))
 	_gloss_label.text = String(ch.get("gloss", _stage_gloss(0)))
 
+	_fit_to_viewport()
 	visible = true
 
 
@@ -227,3 +235,28 @@ func _cold_chapter(bits: int) -> Dictionary:
 		"hexagram_name": KingWen.name(bits),
 		"title": "%s · %s" % [_stage_name(0), KingWen.name(bits)],
 	}
+## THE SHEET IS THE WHOLE GLASS, MEASURED AND NOT ASSUMED.
+##
+## Anchored FULL_RECT under its own CanvasLayer this Control still measured
+## 0 x 0 on the Fold4's 1812 x 2176 inner screen, which is what the device
+## retest was really looking at: the transparent catcher behind the panel had
+## no area at all, so a tap on the ground beside the panel fell straight
+## through to the front underneath and the sheet never heard it -- and the
+## panel, sized to its own content, sat in the top-left corner of a very tall
+## screen looking like nothing had happened at all. The viewport's own visible
+## rect is the one measurement never in doubt; it is asked for, written in,
+## and asked again whenever the glass changes shape.
+##
+## TOP_LEFT ANCHORS ON PURPOSE: with all four anchors at zero, writing `size`
+## IS the layout rather than a fight with it, and Godot has no opposite
+## anchors to warn about overriding.
+func _fit_to_viewport() -> void:
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return
+	var r: Rect2 = vp.get_visible_rect()
+	if r.size.x < 8.0 or r.size.y < 8.0:
+		return
+	set_anchors_preset(Control.PRESET_TOP_LEFT)
+	position = Vector2.ZERO
+	size = r.size

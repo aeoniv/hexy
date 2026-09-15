@@ -312,9 +312,28 @@ func route_sense(msg: Dictionary) -> String:
 				circadian_clock.update(fposmod(here + diff * 0.1, 24.0))
 			_pending[SLOT_PHEROMONE] = clampf(_num(value, "strength", 1.0), 0.0, 1.0)
 		"words":
-			var w: Array = _floats(value, 3)
-			for i in range(3):
-				_pending[SLOT_WORDS + i] = float(w[i])
+			## A word is not a number: a String (or {"text": String}) is hashed
+			## down to three deterministic floats -- the same sentence always
+			## lands on the same three slots, a different sentence lands
+			## elsewhere, and an empty string leaves no stimulus at all. A
+			## numeric payload (Array/bare number) still routes as before.
+			var text: String = ""
+			var is_text: bool = false
+			if typeof(value) == TYPE_STRING:
+				text = String(value)
+				is_text = true
+			elif typeof(value) == TYPE_DICTIONARY and (value as Dictionary).has("text"):
+				text = String((value as Dictionary)["text"])
+				is_text = true
+			if is_text:
+				if text != "":
+					var wv: Array = _text_vec3(text)
+					for i in range(3):
+						_pending[SLOT_WORDS + i] = float(wv[i])
+			else:
+				var w: Array = _floats(value, 3)
+				for i in range(3):
+					_pending[SLOT_WORDS + i] = float(w[i])
 	routed += 1
 	return organ
 
@@ -382,6 +401,23 @@ static func _floats(value: Variant, n: int) -> Array:
 	elif typeof(src) in [TYPE_INT, TYPE_FLOAT]:
 		out[0] = float(src)
 	return out
+
+
+## THREE FLOATS OUT OF A SENTENCE, heuristic-free and stable across runs and
+## sessions: Godot's String.hash() is a fixed algorithm (not process-salted),
+## so the same text always yields the same 32-bit hash here, on this install
+## and the next. FlyHash (fly_hash.gd) projects a 768-dim embedding onto
+## Kenyon cells -- it has nothing to say about a bare String, so this splits
+## the hash's 24 low bits into three independent bytes instead, each
+## normalised to 0..1. A different sentence almost certainly lands on a
+## different hash and so a different triple.
+static func _text_vec3(text: String) -> Array:
+	var h: int = text.hash() & 0x7fffffff
+	return [
+		float(h & 0xFF) / 255.0,
+		float((h >> 8) & 0xFF) / 255.0,
+		float((h >> 16) & 0xFF) / 255.0,
+	]
 
 
 static func _vec3(value: Variant, fallback: Vector3) -> Vector3:

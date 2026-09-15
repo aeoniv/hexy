@@ -109,6 +109,7 @@ var has_target: bool = false
 ## when a goal IS set. Small on purpose: the fan-shaped body biases the bump,
 ## it does not teleport it, so a turn takes a visible second or two.
 const GOAL_GAIN: float = 1.5
+const PI_TIE_BREAK_EPS: float = 1e-3
 
 ## Sets the allocentric goal heading directly, in radians. The name the glass
 ## reaches for -- Hud3.steer_head calls this when it exists.
@@ -157,6 +158,12 @@ func compute_steering_vector() -> Vector2:
 	var err := steering_error()
 	var forward: float = maxf(cos(err), 0.0)
 	var turn: float = sin(err)
+	## Physics tie-break: sin(err) vanishes at err = +-PI, stranding the fly
+	## facing directly away from the goal with zero turn signal. No heuristic
+	## about which way is "better" -- just commit to the left turn so the fly
+	## keeps moving instead of parking at the antipode.
+	if absf(err) > PI - PI_TIE_BREAK_EPS:
+		turn = sign(err) if err != 0.0 else 1.0
 	return Vector2(forward, turn)
 
 ## Returns alignment with goal in [-1.0, 1.0]. (1.0 = perfectly on target)

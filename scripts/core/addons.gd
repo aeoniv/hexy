@@ -42,11 +42,27 @@ class GuardedBroker extends RefCounted:
 			return false
 		return _real.acquire(door, _who)
 
-	func release(door: String, who: String = "") -> void:
+	## THE DOOR TABLE'S OWN NAME, mirrored exactly: [method Broker.release_door].
+	func release_door(door: String, who: String = "") -> void:
+		if not _allowed.has(door):
+			push_warning("HexyAddons: %s asked to release undeclared door %s" % [_who, door])
+			return
 		_real.release_door(door, _who)
+
+	## DEPRECATED: the door table has no `release(door, holder)` of its own --
+	## that name belongs to [method Broker.release]'s four-law resource
+	## table. Kept only so an old add-on still built against this guard does
+	## not crash; forwards to [method release_door] with a warning.
+	func release(door: String, who: String = "") -> void:
+		push_warning("HexyAddons: %s called deprecated release(%s); use release_door()" % [_who, door])
+		release_door(door, who)
 
 	func holder(door: String) -> String:
 		return _real.holder(door)
+
+	## EVERY DOOR THIS HOLDER HAS, guarded the same way: [method Broker.release_all_doors].
+	func release_all_doors(who: String = "") -> void:
+		_real.release_all_doors(_who)
 
 
 static func scan_paths() -> PackedStringArray:

@@ -31,6 +31,10 @@ const IdentityScript := preload("res://scripts/social/identity.gd")
 const HexyMsgScript := preload("res://scripts/core/msg.gd")
 const HexyTopicScript := preload("res://scripts/core/topic.gd")
 
+## HOW CLOSE TWO CIRCADIAN PHASES HAVE TO BE to be called the same hour: a
+## tenth of the day, which is a bit under two and a half hours.
+const PHASE_WINDOW: float = 0.1
+
 ## Throttle for the pheromone Sense a received figure turns into: one per
 ## peer per second, so a room full of hexys does not flood the brain bus at
 ## figure-cast rate. (see _take_figure / _publish_pheromone)
@@ -229,6 +233,8 @@ func broadcast(head: Dictionary, body: Dictionary, earth: Dictionary = {}) -> Di
 		ledger.append(_self_h, [])
 	presence.force_due()
 	presence.due(now_ms())
+	## ONE LINE PER PULSE ON THE WIRE, for a device pass to grep out of logcat.
+	print("hexy.wire tx head=%d body=%d" % [bits, int(payload.get("body", 0))])
 	fabric.emit_event(WIRE_KIND,
 		{WIRE_KEY: Envelope6.to_wire(Envelope6.KIND_FIGURE, bits, payload)},
 		FIGURE_TTL)
@@ -310,6 +316,8 @@ func _take_figure(src: String, bits: int, payload: Dictionary) -> void:
 	if payload.has("bw") and typeof(payload["bw"]) == TYPE_DICTIONARY:
 		msg_body = HexyMsgScript.body_from_wire(payload["bw"], now_ms() * 1000000)
 		_peer_body_msg[src] = msg_body
+	## ONE LINE PER FIGURE HEARD, same grep, the other direction.
+	print("hexy.wire rx %s bits=%d" % [src, bits & 63])
 	peer_figure.emit(src, h)
 	_publish_room()
 	if not msg_body.is_empty():
@@ -331,7 +339,8 @@ func _publish_pheromone(src: String, msg_body: Dictionary) -> void:
 	var their_phase: Variant = peer_phase().get(src, null)
 	var in_phase := false
 	if their_phase != null and _own_phase >= 0.0:
-		in_phase = absf(float(their_phase) - _own_phase) < 0.1
+		in_phase = phase_gap(float(their_phase), _own_phase) < PHASE_WINDOW
+	print("hexy.pheromone %s in_phase=%s" % [src, str(in_phase)])
 	var meta := {
 		"who": src,
 		"band": String(peer_proximity().get(src, "")),
@@ -341,6 +350,16 @@ func _publish_pheromone(src: String, msg_body: Dictionary) -> void:
 	}
 	_bus.publish(HexyTopicScript.TOPIC_SENSE,
 		HexyMsgScript.sense("pheromone", "radio", now * 1000000, msg_body, meta))
+
+
+## HOW FAR APART TWO PHASES ARE, ROUND THE DAY. A phase is a point on a CIRCLE
+## and 0.0 and 1.0 are the same midnight, so the distance between them is the
+## short way round -- never the straight subtraction, which said two phones a
+## few minutes either side of midnight (0.99 and 0.01) were nearly a whole day
+## apart and refused to call them in phase. Always in 0..0.5.
+static func phase_gap(a: float, b: float) -> float:
+	var d: float = fposmod(a - b, 1.0)
+	return minf(d, 1.0 - d)
 
 
 func _take_chirp(src: String, payload: Dictionary) -> void:
@@ -467,6 +486,12 @@ func bind(store: Node) -> void:
 ## Senses. Pass null to detach.
 func attach_bus(topic: Object) -> void:
 	_bus = topic
+
+
+## Whether a bus has been latched via attach_bus(). Lets a boot-wiring test
+## assert the wire actually happened without reaching into _bus directly.
+func has_bus() -> bool:
+	return _bus != null
 
 
 func unbind() -> void:

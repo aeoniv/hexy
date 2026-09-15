@@ -214,6 +214,36 @@ func _run() -> void:
 	check(is_equal_approx(Hud3.day_phase_of(0.0), 0.25),
 		"and runs the day clockwise round the ring")
 
+	# -- 4b. A SCRUB SNAPS BACK ON RELEASE (device bug 3) --------------------
+	## The device showed a balloon left standing after a drag round the EARTH
+	## ring -- "Food same -> #16 Providing-For" -- which is a PREVIEW that never
+	## went away. Letting go must put the page back to now: no balloon, and the
+	## three captions re-read off the store rather than off the finger.
+	var earth_before: int = int(app.store.earth_bits())
+	hud.bubble.say("Food same -> #16 Providing-For", Vector2(100.0, 100.0))
+	check(hud.bubble.visible, "a balloon is standing before the release")
+	scrubs.clear()
+	lets_go.clear()
+	earth.gui_input.emit(_press(emid + Vector2(ereach, 0.0)))
+	earth.gui_input.emit(_motion(emid + Vector2(0.0, ereach)))
+	check(scrubs.size() == 1, "the ring previews while the finger travels")
+	earth.gui_input.emit(_tap(emid + Vector2(0.0, ereach)))
+	check(lets_go.size() == 1, "and the release is announced once")
+	check(not hud.bubble.visible, "the scrub balloon is gone when the finger comes up")
+	check(String(hud.earth_cap.text).contains("EARTH"),
+		"and the earth caption has snapped back to the figure that is standing")
+	check(String(hud.earth_cap.text).contains(KingWen.name(earth_before)),
+		"which is the store's own earth figure, unchanged by the scrub")
+	check(int(app.store.earth_bits()) == earth_before,
+		"a scrub is a question: it never wrote the earth")
+	## A PRESS THAT NEVER MOVED IS STILL A TAP. The swallow is only for a real
+	## scrub, or the ring would stop answering fingers altogether.
+	lets_go.clear()
+	earth.gui_input.emit(_press(emid + Vector2(ereach, 0.0)))
+	earth.gui_input.emit(_tap(emid + Vector2(ereach, 0.0)))
+	check(lets_go.size() == 1, "a press that never travelled still ends the gesture")
+	check(not hud._earth_scrubbed_any, "and left no scrub behind it")
+
 	# -- 5. opening the gear FROM the dials page still borrows one radar -----
 	front.open_dials()
 	await process_frame
@@ -376,6 +406,37 @@ func _run_w7a() -> void:
 	virgin.steer_toward_target(1.0)
 	check(is_equal_approx(virgin.current_heading, 1.0),
 		"a central complex nobody steered is not steered by this")
+
+	## FIX 3: sin(err) vanishes at err = +-PI, stranding the fly facing
+	## directly away from the goal with zero turn signal. Straight-behind
+	## must still resolve to the goal, not sit at the antipode forever.
+	var behind := FlyCentralComplex.new()
+	behind.current_heading = 0.0
+	behind.set_target_hexagram(1)
+	behind.target_heading = PI
+	behind.has_target = true
+	for i in range(100):
+		behind.steer_toward_target(0.05)
+	check(absf(behind.current_heading - PI) < 0.05,
+		"dead-behind (0 -> PI) still converges (got %f)" % behind.current_heading)
+
+	var opp_a := FlyCentralComplex.new()
+	opp_a.current_heading = PI * 0.5
+	opp_a.target_heading = PI * 1.5
+	opp_a.has_target = true
+	for i in range(100):
+		opp_a.steer_toward_target(0.05)
+	check(absf(fposmod(opp_a.current_heading - PI * 1.5 + PI, TAU) - PI) < 0.05,
+		"PI/2 -> 3PI/2 also converges (got %f)" % opp_a.current_heading)
+
+	var opp_b := FlyCentralComplex.new()
+	opp_b.current_heading = PI * 1.5
+	opp_b.target_heading = PI * 0.5
+	opp_b.has_target = true
+	for i in range(100):
+		opp_b.steer_toward_target(0.05)
+	check(absf(fposmod(opp_b.current_heading - PI * 0.5 + PI, TAU) - PI) < 0.05,
+		"3PI/2 -> PI/2 also converges (got %f)" % opp_b.current_heading)
 
 	app.queue_free()
 	await process_frame

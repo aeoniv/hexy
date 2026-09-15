@@ -196,6 +196,11 @@ func _ready() -> void:
 	if organism != null and organism.has_method("attach_bus"):
 		organism.attach_bus(topic)
 	store.attach_bus(topic)
+	## FIX 1: wmn latches /body for the bw wire Body shape and publishes
+	## pheromone Senses on receive, but nothing was calling attach_bus on it --
+	## it sat on the mesh deaf to the one topic every other part hears.
+	if wmn.has_method("attach_bus"):
+		wmn.attach_bus(topic)
 	topic.subscribe(HexyTopic.TOPIC_SENSE, Callable(self, "_on_bus_sense"))
 	## THE TWO ACT PRODUCERS. Both live here rather than in scripts/brain: the
 	## brain is canon and owns no doors, so the ROOT -- which already holds
@@ -221,6 +226,11 @@ func _ready() -> void:
 	})
 	if front.has_method("set_addons"):
 		front.set_addons(addons)
+	## AND THE BROKER WITH THEM. Panel 10 of the instrument panel names the
+	## holder standing on each door, and the only object that knows one is this
+	## broker -- built here at boot and, until now, handed to nobody on the glass.
+	if front.has_method("set_broker"):
+		front.set_broker(broker)
 
 	mnn.token.connect(_on_token)
 	mnn.done.connect(_on_done)

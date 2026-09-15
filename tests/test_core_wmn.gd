@@ -38,6 +38,7 @@ func _initialize() -> void:
 	_test_room()
 	_test_presence()
 	_test_earth_hook()
+	_test_pheromone_on_bus()
 	await _test_loopback()
 
 	print("checks: ", _checks, " (floor ", MIN_CHECKS, ")")
@@ -307,6 +308,31 @@ func _test_earth_hook() -> void:
 	store.queue_free()
 
 
+## FIX 1: app-level boot must call wmn.attach_bus(topic), or a received figure
+## with a "bw" body-wire never becomes a pheromone Sense on the app's topic.
+## Proved here the same way test_earth_hook proves bind() -- one wmn, no phone.
+func _test_pheromone_on_bus() -> void:
+	print("\n[ attach_bus + a received bw figure makes a pheromone Sense ]")
+	var wmn: Node = WmnScript.new()
+	root.add_child(wmn)
+	var topic := HexyTopicScript.new()
+	_check(not wmn.has_bus(), "a fresh wmn reports no bus attached")
+	wmn.attach_bus(topic)
+	_check(wmn.has_bus(), "attach_bus makes has_bus true, the way app.gd's boot now does")
+	_check(topic.last(HexyTopicScript.TOPIC_SENSE).is_empty(), "nothing on /sense yet")
+
+	var msg_body: Dictionary = HexyMsgScript.body_from_bits(0b010101)
+	var bw: Dictionary = HexyMsgScript.body_to_wire(msg_body)
+	wmn.ingest("peer-with-bw", {"e6": Envelope6.to_wire(Envelope6.KIND_FIGURE, 0b010101,
+		{"moving": 0, "body": 0b010101, "body_moving": 0,
+		"throws": [7, 7, 7, 7, 7, 7], "when": 1, "who": "peer",
+		"source": "room", "sig": "", "bw": bw})})
+	var sense: Dictionary = topic.last(HexyTopicScript.TOPIC_SENSE)
+	_check(not sense.is_empty(), "a received bw figure published a pheromone Sense on the app's topic")
+	_check(String(sense.get("organ", "")) == "pheromone", "and it is the pheromone organ")
+	wmn.queue_free()
+
+
 # --- 6. two nodes on loopback ----------------------------------------------
 
 func _test_loopback() -> void:
@@ -417,6 +443,21 @@ func _test_loopback() -> void:
 		"stage is null or an int, same bargain")
 	_check(a.own_phase() == -1.0 and a.own_stage() == -1,
 		"a node that was never told its own phase says so")
+
+	# W10 -- IN PHASE IS MEASURED ROUND THE DAY, NOT ACROSS IT. A circadian
+	# phase is a point on a CIRCLE: 0.0 and 1.0 are the same midnight. The old
+	# straight subtraction called two phones a few minutes either side of
+	# midnight almost a whole day apart and refused them the wing song.
+	_check(is_equal_approx(WmnScript.phase_gap(0.99, 0.01), 0.02),
+		"either side of midnight is two hundredths of a day apart, not ninety-eight")
+	_check(WmnScript.phase_gap(0.99, 0.01) < WmnScript.PHASE_WINDOW,
+		"so two phones keeping the same hours across the seam ARE in phase")
+	_check(is_equal_approx(WmnScript.phase_gap(0.25, 0.30), 0.05),
+		"and inside the day the gap is the plain difference")
+	_check(is_equal_approx(WmnScript.phase_gap(0.0, 0.5), 0.5),
+		"opposite hours are half a day apart, which is as far as it goes")
+	_check(WmnScript.phase_gap(0.1, 0.6) >= WmnScript.PHASE_WINDOW,
+		"and half a day apart is never in phase")
 
 	# THE ONE BODY SHAPE arrives at beta: the Body alpha latched on "/body"
 	# (bits/heading identical to what alpha published) shows up on beta's

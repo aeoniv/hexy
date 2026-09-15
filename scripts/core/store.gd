@@ -189,6 +189,8 @@ func note_cast(kind: String = "cast_confirmed", c: Dictionary = {}) -> float:
 func note_seat(seat: int, c: Dictionary) -> void:
 	var is_head: bool = seat != Seat.BODY
 	var n: Dictionary = _normalise_hexagram(c, is_head)
+	## ONE LINE PER SEAT, for a device pass to grep out of logcat.
+	print("hexy.cast %d %s" % [seat, String(c.get("kind", c.get("source", "seat")))])
 	seat_landed.emit(seat, n)
 	match seat:
 		Seat.HEAD:

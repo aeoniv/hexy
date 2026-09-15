@@ -30,6 +30,7 @@ func _initialize() -> void:
 	await _run_widget_panels()
 	await _run()
 	await _run_borrowed_radar()
+	await _run_fold_open()
 	await _run_phase_panel()
 	if failures == 0:
 		print("--- ALL DASHBOARD TESTS PASSED PERFECTLY ---\n")
@@ -261,6 +262,116 @@ func _run_borrowed_radar() -> void:
 	app.wmn.stop()
 	root.remove_child(app)
 	app.queue_free()
+	await process_frame
+
+
+## W11 -- THE GEAR ON A TALL PHONE (Galaxy Z Fold4, 1812x2176 inner screen).
+##
+## The device retest found the dashboard rendering broken on the fold: the
+## creature jammed into a corner, no panels, no composer. Nothing about the
+## panel itself is tall-screen specific, so the repro is the whole front at
+## the fold's own pixel count, opened the way a finger opens it.
+func _run_fold_open() -> void:
+	print("-- the gear on a 1812x2176 glass --")
+	var px := Vector2i(1812, 2176)
+	root.size = px
+	root.content_scale_size = px
+	await process_frame
+	await process_frame
+
+	var packed: PackedScene = load(SCENE)
+	var app: Node = packed.instantiate()
+	root.add_child(app)
+	await process_frame
+	await process_frame
+
+	var front: Node = app.get_node_or_null("Hud")
+	check(front != null, "a front stands on the fold's glass")
+	if front == null:
+		return
+	var home_r: float = float(front.radar.radar_radius)
+
+	var dash: HexyDashboard = front.open_dashboard() as HexyDashboard
+	for i in 6:
+		await process_frame
+	check(dash != null, "the swipe-up opens the dashboard on the fold")
+	if dash == null:
+		return
+
+	# -- the overlay owns the whole glass ------------------------------------
+	check(dash.visible and dash.is_open(), "and it is standing")
+	check(absf(dash.size.x - float(px.x)) < 2.0 and absf(dash.size.y - float(px.y)) < 2.0,
+		"the dashboard root fills the viewport (got %s, want %s)" % [dash.size, px])
+	check(absf(dash.backdrop.size.x - float(px.x)) < 2.0
+		and absf(dash.backdrop.size.y - float(px.y)) < 2.0,
+		"the backdrop fills it too (got %s)" % dash.backdrop.size)
+	check(dash.scroll != null and dash.scroll.size.x > 8.0 and dash.scroll.size.y > 8.0,
+		"the scrolling column has a real size (got %s)" % (dash.scroll.size if dash.scroll else Vector2.ZERO))
+	## AND THE OVERLAY IS ANCHORED, NOT HAND-SIZED. `open()` used to write
+	## `size` onto a node whose opposite anchors differ, which Godot overrides
+	## on the next layout pass and warns about every single time -- the two
+	## lines the fold's logcat was full of. The preset is the whole of it now.
+	check(is_equal_approx(dash.anchor_right, 1.0) and is_equal_approx(dash.anchor_bottom, 1.0)
+		and is_equal_approx(dash.offset_right, 0.0) and is_equal_approx(dash.offset_bottom, 0.0),
+		"the overlay is full-rect by anchor and offset, so nothing warns about overriding it")
+	check(is_equal_approx(dash.backdrop.anchor_right, 1.0)
+		and is_equal_approx(dash.backdrop.offset_right, 0.0),
+		"and so is the backdrop")
+	check(dash.scroll != null and dash.scroll.size.y <= float(px.y),
+		"and it does not overflow the glass (got %s)" % (dash.scroll.size if dash.scroll else Vector2.ZERO))
+
+	# -- every panel stands, sized, on screen ---------------------------------
+	var shown: int = 0
+	var bad: Array[String] = []
+	for kind in dash._panels.keys():
+		var p: Control = dash.panel(String(kind))
+		if p == null:
+			continue
+		if p.visible and p.size.x > 8.0 and p.size.y > 8.0:
+			shown += 1
+		else:
+			bad.append("%s%s" % [kind, p.size])
+	check(shown > 0, "panels stand on the fold's column (%d of %d; starved: %s)"
+		% [shown, dash._panels.size(), str(bad)])
+	check(bad.is_empty(), "and none of them is starved of size (%s)" % str(bad))
+
+	# -- the borrowed radar keeps the PANEL'S floor plan, not the room's -----
+	check(dash.radar == front.radar, "panel 6-FLY is drawing the one radar")
+	check(absf(float(front.radar.radar_radius) - 88.0) < 1.0,
+		"and the front's per-frame room layout has not blown its radius up (got %s)"
+		% str(front.radar.radar_radius))
+	var fly: Control = dash.panel("fly")
+	check(fly != null and fly.get_global_rect().size.y < float(px.y),
+		"the fly panel is a panel and not a screenful (got %s)"
+		% (fly.get_global_rect().size if fly else Vector2.ZERO))
+	check(fly != null and fly.get_global_rect().encloses(front.radar.get_global_rect()),
+		"the radar sits inside the fly panel (panel %s, radar %s)"
+		% [fly.get_global_rect() if fly else Rect2(), front.radar.get_global_rect()])
+
+	# -- and the composer is out of the way ----------------------------------
+	check(front.composer != null and not front.composer.visible,
+		"the front's composer is down while the gear stands")
+
+	# -- closing hands everything back ---------------------------------------
+	check(front.close_dashboard(), "the gear closes on the fold")
+	for i in 4:
+		await process_frame
+	check(front.radar.get_parent() == front.room_band, "the radar is back in the front's room")
+	check(bool(front.radar.get("quiet")), "quiet again")
+	check(float(front.radar.radar_radius) > 8.0, "and sized for the room once more (got %s)"
+		% str(front.radar.radar_radius))
+	check(front.composer.visible, "the composer comes back")
+	var hub: Rect2 = front.radar.hub_rect()
+	check(front.creature_field.position.distance_to(hub.position) < 2.0,
+		"and the creature is parked in that radar's hub again")
+	var _unused := home_r
+
+	app.wmn.stop()
+	root.remove_child(app)
+	app.queue_free()
+	await process_frame
+	root.size = Vector2i(1080, 2400)
+	root.content_scale_size = Vector2i(1080, 2400)
 	await process_frame
 
 
@@ -550,6 +661,41 @@ func _run_phase_panel() -> void:
 		"the front pushes a fresh snapshot on every beat the dashboard is open")
 	check(not (dash.phase_snapshot().get("marks", null) == null),
 		"and the snapshot it pushes carries the six marks")
+
+
+	## W11 -- PANEL 10 IS HANDED THE APP'S OWN BROKER.
+	##
+	## `set_broker` existed on this panel and nobody ever called it: the app
+	## built a Broker at boot, the front never received it, and the doors panel
+	## could only read the add-on loader's static declaration. The handle now
+	## travels app -> front -> dials -> dashboard, and the row a person reads is
+	## the LIVE holder.
+	check(dash._broker != null, "the doors panel holds a broker")
+	check(dash._broker == app.broker, "and it is the very broker the app built at boot")
+	var declared: Dictionary = app.addons.doors() as Dictionary
+	check(not declared.is_empty(), "the loader declares at least one door (got %s)" % str(declared))
+	if not declared.is_empty():
+		var door: String = String(declared.keys()[0])
+		## THE LIVE HOLDER, NOT THE DECLARATION. The add-on took this door at
+		## boot, so the broker already has an answer -- and the proof that the
+		## row is READ off the broker rather than off the loader's table is that
+		## giving the door back changes what the row says.
+		check(String(app.broker.holder(door)) != "",
+			"the broker already has a holder standing on the %s door" % door)
+		check(String(dash.doors_text()).contains("%s: %s" % [door, String(app.broker.holder(door))]),
+			"and panel 10 names exactly that holder")
+		var was: String = String(app.broker.holder(door))
+		app.broker.release_door(door, was)
+		check(String(app.broker.holder(door)) == "", "the door is given back")
+		check(String(dash.doors_text()).contains("%s: hexy_example" % door),
+			"and with nobody standing on it the row falls back to the declaration")
+		check(app.broker.acquire(door, "compound_eye"), "another organ takes it")
+		var held: String = String(dash.doors_text())
+		check(held.contains("%s: compound_eye" % door),
+			"and the row follows the broker to the new holder (got '%s')"
+			% held.replace("
+", " / "))
+		app.broker.release_door(door, "compound_eye")
 
 	app.queue_free()
 	await process_frame

@@ -48,7 +48,7 @@ func detach() -> void:
 		_topic.unsubscribe(_sub_id)
 	_sub_id = -1
 	if _broker != null:
-		_broker.release(DOOR)
+		_broker.release_door(DOOR)
 	_broker = null
 	_topic = null
 	_last_body = {}

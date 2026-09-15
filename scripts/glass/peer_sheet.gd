@@ -45,6 +45,9 @@ var _seen_label: Label = null
 var _who: String = ""
 var _guiding: bool = false
 var _drag_from: float = INF
+## Whether the finger that is down landed on the ground around the panel
+## rather than on the panel itself: a tap there is a dismissal.
+var _pressed_outside: bool = false
 
 const PHASE_WORDS: Array[String] = ["night", "dawn", "day", "dusk"]
 
@@ -67,6 +70,11 @@ func _ready() -> void:
 	panel.offset_top = 40.0
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.add_theme_stylebox_override("panel", SKIN.skin())
+	## THE PANEL HEARS THE SWIPE TOO. It covers the top of the glass and STOPs
+	## input of its own, so a finger that starts a swipe DOWN -- which is where
+	## a swipe down starts -- never reached the sheet underneath it, and the
+	## sheet had no working way out at all.
+	panel.gui_input.connect(_on_panel_input)
 	add_child(panel)
 
 	var margin := MarginContainer.new()
@@ -143,6 +151,13 @@ func _ready() -> void:
 	_seen_label.add_theme_color_override("font_color", Color(0.6, 0.7, 0.8, 0.8))
 	col.add_child(_seen_label)
 
+	## THE GLASS IS MEASURED ONCE THE SHEET IS IN IT, and again whenever it
+	## changes shape -- see [method _fit_to_viewport].
+	_fit_to_viewport()
+	var vp: Viewport = get_viewport()
+	if vp != null and not vp.size_changed.is_connected(_fit_to_viewport):
+		vp.size_changed.connect(_fit_to_viewport)
+
 
 ## THE ONE DOOR IN. [param row] is a `wmn.peers()` row; [param plot] is that
 ## same peer's entry out of `radar.peer_plots()`, or {} when the radar has
@@ -177,6 +192,7 @@ func show_peer(row: Dictionary, plot: Dictionary) -> void:
 
 	_seen_label.text = _last_seen_text(int(row.get("last_seen_ms", 0)))
 
+	_fit_to_viewport()
 	visible = true
 
 
@@ -212,17 +228,39 @@ func _on_trigram_input(event: InputEvent) -> void:
 		guide_requested.emit(_who)
 
 
+## A finger on the ground around the panel.
 func _on_input(event: InputEvent) -> void:
+	_read_gesture(event, true)
+
+
+## A finger on the panel itself: it can swipe the sheet away, but a tap on the
+## panel is a tap on what the panel says and never a dismissal.
+func _on_panel_input(event: InputEvent) -> void:
+	_read_gesture(event, false)
+
+
+## THE TWO WAYS OUT, read in one place. Swipe down anywhere -- the panel
+## included -- and the sheet is done; tap the ground beside the panel and it
+## is done as well. Both say `closed` and nothing else: the sheet does not
+## know what is underneath it and must not pretend to.
+func _read_gesture(event: InputEvent, outside: bool) -> void:
 	var press: Variant = _press_at(event)
 	if press != null:
 		_drag_from = (press as Vector2).y
+		_pressed_outside = outside
 		return
 	var at: Variant = _release_at(event)
-	if at == null:
+	if at == null or is_inf(_drag_from):
 		return
 	var travel: float = (at as Vector2).y - _drag_from
+	var began_outside: bool = _pressed_outside
 	_drag_from = INF
+	_pressed_outside = false
 	if travel >= SWIPE_PX:
+		accept_event()
+		closed.emit()
+		return
+	if began_outside:
 		accept_event()
 		closed.emit()
 
@@ -268,3 +306,28 @@ func _stage_name(stage: int) -> String:
 		return "stage %d" % stage
 	var name: String = String(_gauge.call("stage_name", stage))
 	return name if name != "" else "stage %d" % stage
+## THE SHEET IS THE WHOLE GLASS, MEASURED AND NOT ASSUMED.
+##
+## Anchored FULL_RECT under its own CanvasLayer this Control still measured
+## 0 x 0 on the Fold4's 1812 x 2176 inner screen, which is what the device
+## retest was really looking at: the transparent catcher behind the panel had
+## no area at all, so a tap on the ground beside the panel fell straight
+## through to the front underneath and the sheet never heard it -- and the
+## panel, sized to its own content, sat in the top-left corner of a very tall
+## screen looking like nothing had happened at all. The viewport's own visible
+## rect is the one measurement never in doubt; it is asked for, written in,
+## and asked again whenever the glass changes shape.
+##
+## TOP_LEFT ANCHORS ON PURPOSE: with all four anchors at zero, writing `size`
+## IS the layout rather than a fight with it, and Godot has no opposite
+## anchors to warn about overriding.
+func _fit_to_viewport() -> void:
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return
+	var r: Rect2 = vp.get_visible_rect()
+	if r.size.x < 8.0 or r.size.y < 8.0:
+		return
+	set_anchors_preset(Control.PRESET_TOP_LEFT)
+	position = Vector2.ZERO
+	size = r.size

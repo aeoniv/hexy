@@ -102,6 +102,8 @@ func _on_act(msg: Dictionary) -> bool:
 	if not HexyMsg.ACT_DOORS.has(door):
 		return _refuse("no such door '%s'" % door)
 	last_door = door
+	## ONE LINE PER ACT, for a device pass to grep out of logcat.
+	print("hexy.act %s" % door)
 	match door:
 		"speaker":
 			return _wing_song(msg)

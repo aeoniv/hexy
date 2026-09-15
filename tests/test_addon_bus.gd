@@ -37,6 +37,7 @@ class BadWriteAddon extends HexyAddon:
 ## A DOOR IT NEVER DECLARED: the wrapped broker refuses the acquire.
 class UndeclaredDoorAddon extends HexyAddon:
 	var acquired: bool = true
+	var _guard = null  ## the GuardedBroker attach() was handed, kept for FIX 2's asserts
 
 	func addon_name() -> String:
 		return "hexy_sneaky"
@@ -49,6 +50,7 @@ class UndeclaredDoorAddon extends HexyAddon:
 
 	func attach(bus: Dictionary) -> void:
 		var broker = bus.get("broker", null)
+		_guard = broker
 		acquired = broker.acquire("camera", addon_name())
 
 
@@ -176,6 +178,30 @@ func _run() -> void:
 	for path in HexyAddons.scan_paths():
 		check(String(path).begins_with("res://addons/hexy_"),
 			"scan_paths only ever names res://addons/hexy_* (%s)" % path)
+
+	# -- FIX 2: GuardedBroker mirrors the door table exactly --------------------
+	print("\n[ GuardedBroker: release_door, deprecated release, undeclared refusals ]")
+	var guard_bus: Dictionary = {"topic": topic, "broker": broker}
+	var loader3 := HexyAddons.new()
+	loader3.name = "Addons3"
+	root.add_child(loader3)
+	loader3._bus = guard_bus
+	loader3._broker = broker
+	var guarded_addon := UndeclaredDoorAddon.new()
+	check(loader3.attach_one(guarded_addon), "an add-on declaring wifi attaches")
+	check(guarded_addon._guard != null, "the add-on was handed a GuardedBroker")
+	check(guarded_addon._guard.acquire("wifi", "hexy_sneaky"), "it can acquire its declared door")
+	check(broker.holder("wifi") == "hexy_sneaky", "and the real broker shows it holding wifi")
+	guarded_addon._guard.release_door("wifi", "hexy_sneaky")
+	check(broker.holder("wifi") == "", "release_door hands the real door back")
+	check(guarded_addon._guard.acquire("wifi", "hexy_sneaky"), "it re-acquires wifi")
+	guarded_addon._guard.release("wifi", "hexy_sneaky")
+	check(broker.holder("wifi") == "", "the deprecated release() still works, forwarding to release_door")
+	check(not guarded_addon._guard.acquire("camera", "hexy_sneaky"), "acquire still refuses an undeclared door")
+	guarded_addon._guard.release_door("camera", "hexy_sneaky")
+	check(broker.holder("camera") == "", "release_door on an undeclared door is refused too, not forwarded")
+	loader3.detach_all()
+	loader3.queue_free()
 
 	loader.queue_free()
 	loader2.queue_free()

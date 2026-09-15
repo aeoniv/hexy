@@ -426,6 +426,12 @@ func _build_composer() -> void:
 	btn_send.pressed.connect(_on_send_pressed)
 	row.add_child(btn_send)
 
+	## THE WHOLE BAND HEARS THE SWIPE, not just the sliver of panel the field
+	## and the buttons leave uncovered.
+	_watch_swipe(ask_field)
+	_watch_swipe(btn_mic)
+	_watch_swipe(btn_send)
+
 
 ## THE STAGE, under every other pixel and the whole size of the glass, which is
 ## the third glass's own ruling: an opaque viewport the size of the screen has
@@ -595,6 +601,22 @@ func set_addons(addons: Node) -> void:
 	_addons = addons
 	if dials != null and dials.has_method("set_addons"):
 		dials.set_addons(addons)
+
+
+## THE BROKER, PASSED STRAIGHT THROUGH. The front has no use for it: panel 10
+## of the instrument panel does, and the dashboard is only ever reached from
+## here or from the dials page, so this is where the handle has to be kept.
+## Without it the doors panel could only ever read the add-on loader's static
+## table and never the holder actually standing on a door.
+var _broker: Node = null
+
+
+func set_broker(b: Node) -> void:
+	_broker = b
+	if dials != null and dials.has_method("set_broker"):
+		dials.set_broker(b)
+	if dashboard != null and dashboard.has_method("set_broker"):
+		dashboard.set_broker(b)
 
 
 func set_who(who_name: String) -> void:
@@ -1033,21 +1055,79 @@ func _on_glyph_input(event: InputEvent) -> void:
 ## A SWIPE UP OFF THE COMPOSER ASKS FOR THE DASHBOARD. Pressed low, released
 ## eighty pixels higher: a drag, not a tap, so the field and the two buttons
 ## under the finger keep their own taps.
-var _drag_from: float = INF
+## A TAP IS SHORTER THAN THIS MUCH TRAVEL, whichever way it went. A finger on
+## glass jitters a few pixels even when the person meant to stand perfectly
+## still, and the fold's touch emulation can deliver a press and a release with
+## no motion event at all between them.
+const TAP_PX: float = 16.0
+
+var _drag_from: Vector2 = Vector2.INF
+## Which control the finger that is down went down ON. A release that belongs
+## to some other control is not the far end of this gesture.
+var _drag_on: Control = null
 
 func _on_composer_input(event: InputEvent) -> void:
+	_on_swipe_input(event, composer)
+
+
+## THE FIELD AND THE BUTTONS ARE PART OF THE COMPOSER, as far as a swipe is
+## concerned. The `ask` field fills nearly the whole band and STOPs input of
+## its own, so a finger that starts on the composer almost never starts on the
+## PanelContainer itself -- which is why the gesture was unreachable on a
+## phone. Every child is read in ITS OWN coordinates, which is enough: the
+## travel is a difference, and both ends are measured in the same rect.
+func _on_swipe_input(event: InputEvent, from: Control) -> void:
+	if from == null:
+		return
 	var press: Variant = _press_at(event)
 	if press != null:
-		_drag_from = (press as Vector2).y
+		_drag_from = press as Vector2
+		_drag_on = from
 		return
 	var at: Variant = _release_at(event)
 	if at == null:
 		return
-	var travel: float = _drag_from - (at as Vector2).y
-	_drag_from = INF
-	if travel >= SWIPE_PX:
-		composer.accept_event()
+	## NO PRESS REMEMBERED, NO SWIPE. A release arriving with nothing behind it
+	## -- the press was swallowed elsewhere, or the finger was taken over
+	## mid-gesture -- used to subtract from INF, hand back INF of travel and
+	## open the gear. THAT is why a plain tap on `ask` opened the dashboard on
+	## the phone instead of taking the caret.
+	if is_inf(_drag_from.x) or _drag_on != from:
+		_drag_from = Vector2.INF
+		_drag_on = null
+		return
+	## Positive y is travel UP the glass, which is the direction that asks.
+	var d: Vector2 = _drag_from - (at as Vector2)
+	_drag_from = Vector2.INF
+	_drag_on = null
+	## A TAP IS A TAP, jitter and all: under sixteen pixels the person stood
+	## still, the field takes the caret, and the gear is not opened.
+	if d.length() < TAP_PX:
+		if (from == ask_field or from == composer) and ask_field != null:
+			ask_field.grab_focus()
+		return
+	## AND A SWIPE IS UP, NOT ACROSS. The vertical leg has to beat twice the
+	## horizontal one, so a finger dragged sideways along the band never counts.
+	if d.y >= swipe_threshold() and absf(d.y) > 2.0 * absf(d.x):
+		from.accept_event()
 		dashboard_requested.emit()
+
+
+## Whatever sits inside the composer hears the swipe too.
+func _watch_swipe(c: Control) -> void:
+	if c != null and not c.gui_input.is_connected(_on_swipe_input.bind(c)):
+		c.gui_input.connect(_on_swipe_input.bind(c))
+
+
+## HOW FAR IS A SWIPE. Eighty pixels, or a quarter of the glass when the glass
+## is small enough that eighty would be most of it. DISTANCE ONLY: no fling
+## velocity is required, so a slow drag -- the only kind `adb shell input
+## swipe` can make -- opens the dashboard exactly as a flick does.
+func swipe_threshold() -> float:
+	var h: float = root.size.y if root != null else 0.0
+	if h <= 8.0:
+		return SWIPE_PX
+	return minf(SWIPE_PX, h * 0.25)
 
 
 func _on_send_pressed() -> void:
@@ -1174,6 +1254,8 @@ func open_dials() -> Node:
 			dials.set_heading(_heading)
 		if dials.has_method("set_addons"):
 			dials.set_addons(_addons)
+		if dials.has_method("set_broker"):
+			dials.set_broker(_broker)
 		if dials.has_method("set_who"):
 			dials.set_who(_who)
 		## THE DIALS' OWN GEAR OPENS THE SAME RADAR THIS FRONT STANDS, not a
@@ -1206,8 +1288,17 @@ func dials_page() -> Node:
 	return dials
 
 
+## WHETHER THE FRONT PUT THE PAGE UP, which is the front's own book-keeping
+## and NOT a reading of the page's CanvasLayer. The page may take its own
+## layer down before it says `closed` -- hud3.close() does exactly that -- and
+## a front that asked the layer would then decide there was nothing to close
+## and leave its room hidden, its composer hidden and its creature parented
+## inside the page: a black screen that answers no finger.
+var _dials_shown: bool = false
+
+
 func dials_open() -> bool:
-	return dials != null and _page_layer_visible()
+	return dials != null and (_dials_shown or _page_layer_visible())
 
 
 ## Close whatever page is standing. On the front itself this does nothing,
@@ -1215,13 +1306,22 @@ func dials_open() -> bool:
 func close_dials() -> bool:
 	if not dials_open():
 		return false
+	_dials_shown = false
 	if _creature != null:
 		set_creature(_creature)
 	_show_page(false)
+	## THE PAGE IS TOLD TOO, so a front-driven close leaves no half-held drag
+	## behind on the page. Its `closed` comes back here and finds the door
+	## already shut, which is not an error.
+	## Only when the page is still standing: when it was the PAGE that closed
+	## itself, it is already down and saying so twice is a second `closed`.
+	if dials != null and dials.has_method("close") and dials.has_method("is_open") 			and bool(dials.is_open()):
+		dials.close()
 	return true
 
 
 func _show_page(on: bool) -> void:
+	_dials_shown = on
 	if dials != null and dials.get("layer") != null:
 		(dials.get("layer") as CanvasLayer).visible = on
 	if back_layer != null:
@@ -1293,7 +1393,26 @@ func _on_back_input(event: InputEvent) -> void:
 ## nearest page first and the dials second.
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
-		back_requested()
+		_go_back()
+
+
+## THE ONE BACK HANDLER. Android's back button and the desktop's ui_cancel say
+## the same thing, and they say it here: shut the top page and stay; on the
+## front itself -- where there is nowhere further back to go -- let the app
+## leave. `application/config/quit_on_go_back` is off in project.godot so the
+## engine no longer quits out from under a sheet before this ever runs.
+func _go_back() -> void:
+	if back_requested():
+		return
+	var tree: SceneTree = get_tree()
+	if tree != null:
+		tree.quit()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		if back_requested():
+			get_viewport().set_input_as_handled()
 
 
 ## The back request, as a test can raise it without a phone. The dashboard
@@ -1335,6 +1454,8 @@ func open_dashboard() -> Node:
 				dashboard.set_bus(_topic, _gauge)
 			if dashboard.has_method("set_addons"):
 				dashboard.set_addons(_addons)
+			if dashboard.has_method("set_broker"):
+				dashboard.set_broker(_broker)
 			if dashboard.has_method("set_heading"):
 				dashboard.set_heading(_heading)
 	if dashboard != null and radar != null and dashboard.has_method("borrow_radar"):
@@ -1369,6 +1490,19 @@ func close_dashboard() -> bool:
 func reclaim_radar() -> void:
 	if radar == null:
 		return
+	## THE BORROWER'S MINIMUM GOES BACK TOO. Panel 6 pins 210 x 190 on it so it
+	## can share a row with the bars; the room wants the whole band and no floor
+	## at all, and a 190-tall minimum left behind is a band that will not shrink.
+	radar.custom_minimum_size = Vector2.ZERO
+	## AND THE BORROWER'S RECT GOES BACK TOO. Panel 6's row is a Container: it
+	## writes anchors 0 and a 210 x 210 rect onto the node, and the room band
+	## lays nobody out, so without this the disc came home the size of a
+	## dashboard tile and drew its 771 px room outside it -- the split front,
+	## where a blip is painted where no `gui_input` can ever fire.
+	radar.set_anchors_preset(Control.PRESET_FULL_RECT, false)
+	radar.position = Vector2.ZERO
+	if room_band != null:
+		radar.size = room_band.size
 	radar.mouse_filter = Control.MOUSE_FILTER_STOP
 	if not radar.gui_input.is_connected(_on_radar_input):
 		radar.gui_input.connect(_on_radar_input)
@@ -1398,9 +1532,19 @@ func _open_peer_sheet(who: String) -> void:
 		peer_sheet.closed.connect(close_peer_sheet)
 		peer_sheet.set_gauge(_gauge)
 	var row: Dictionary = _peer_row(who)
+	## THE SHEET MUST KNOW WHO IT IS ABOUT. The row comes out of `wmn.peers()`
+	## and the blip comes out of the radar, and the two do not always agree: a
+	## peer the radar has plotted but the fabric has not listed yet gave an
+	## EMPTY row, so the sheet's `_who` was "" and the guide tap asked the front
+	## for guidance to nobody -- which is why the rim arrow never appeared. The
+	## id under the finger is the one fact this is certain of; it is written in.
+	if String(row.get("who", "")) == "":
+		row = row.duplicate()
+		row["who"] = who
 	var plot: Dictionary = _peer_plot(who)
 	peer_sheet.show_peer(row, plot)
 	_peer_sheet_layer.visible = true
+	peer_sheet.visible = true
 	if composer != null:
 		composer.visible = false
 
@@ -1413,6 +1557,10 @@ func close_peer_sheet() -> bool:
 	if not peer_sheet_open():
 		return false
 	_peer_sheet_layer.visible = false
+	## THE SHEET ITSELF IS TAKEN DOWN AS WELL, not just the layer it rides on:
+	## a full-rect STOP that is only "invisible" is still a wall a finger runs
+	## into, and this sheet is the one that was swallowing the front's swipe.
+	peer_sheet.visible = false
 	if composer != null and not reading_sheet_open() and not dials_open():
 		composer.visible = true
 	return true
@@ -1492,9 +1640,37 @@ func _process(_delta: float) -> void:
 func _layout_room() -> void:
 	if room_band == null or radar == null or creature_field == null:
 		return
+	## THE ROOM LAYS OUT THE RADAR ONLY WHILE THE RADAR IS IN THE ROOM.
+	## `_process` runs this every single frame, and the dashboard BORROWS this
+	## same instance into panel 6's row -- where the panel has sized it 88 px
+	## and given it a 210-wide minimum. Left unguarded, the next frame read the
+	## FRONT's band (the whole tall glass), wrote `radar_radius = 790` onto a
+	## node living inside a ScrollContainer column, and the column's minimum
+	## size exploded: no panels, no composer, and a creature framed off a hub
+	## rect measured in the wrong coordinate space -- the fold's broken gear.
+	## Whoever borrowed it owns its floor plan until `reclaim_radar` takes it
+	## back.
+	if radar.get_parent() != room_band:
+		return
 	var band: Vector2 = room_band.size
 	if band.x < 8.0 or band.y < 8.0:
 		return
+	## THE RADAR TAKES THE WHOLE BAND, RE-STATED EVERY FRAME. The band is a
+	## plain Control and never lays its children out, so the rect the radar
+	## carries is whatever the LAST parent left on it -- and panel 6's row is a
+	## Container, which pins anchors to 0 and writes a 210 x 210 rect straight
+	## onto the node. Handed back, the radar kept that 210 px rect while
+	## `radar_radius` went back to the band's own 771: a disc drawn far outside
+	## its own rect (the "split" room), blips no finger could reach because
+	## `gui_input` only fires inside the rect, and a hub square parked off to
+	## one side. Anchors and offsets are re-applied here, not just in
+	## `reclaim_radar`, so no borrower can leave the room bent.
+	if radar.anchor_right != 1.0 or radar.anchor_bottom != 1.0 \
+			or not radar.position.is_equal_approx(Vector2.ZERO) \
+			or not radar.size.is_equal_approx(band):
+		radar.set_anchors_preset(Control.PRESET_FULL_RECT, false)
+		radar.position = Vector2.ZERO
+		radar.size = band
 	var want_r: float = minf(band.x * 0.44, band.y * 0.40)
 	if absf(float(radar.radar_radius) - want_r) > 0.5:
 		radar.radar_radius = want_r
@@ -1504,7 +1680,9 @@ func _layout_room() -> void:
 		var fr: float = radar.field_radius()
 		var c: Vector2 = radar.disc_center()
 		hub = Rect2(c - Vector2(fr, fr) * 0.34, Vector2(fr, fr) * 0.68)
-	creature_field.position = hub.position
+	## THE HUB RECT IS THE RADAR'S OWN COORDINATES; the square is a SIBLING
+	## of the radar, so the radar's seat in the band is added back in.
+	creature_field.position = radar.position + hub.position
 	creature_field.size = hub.size
 	_frame_creature()
 
@@ -1527,8 +1705,13 @@ func _frame_creature() -> void:
 	var z: float = SOLID_DIAMETER * box.y / (2.0 * half * want_px)
 	var mid: Vector2 = creature_field.global_position - root.global_position + creature_field.size * 0.5
 	var world_per_px: float = 2.0 * half * z / box.y
+	## THE EYE MOVES THE OTHER WAY ALONG X. Sliding the camera right puts the
+	## solid further LEFT on the glass, so the offset is negated; Y already
+	## reads that way because screen-down is world-up. While the hub sat dead
+	## centre the sign could not be seen -- it showed the instant the room bent
+	## and put the creature on the mirrored side of the disc.
 	cam.position = Vector3(
-		(mid.x - box.x * 0.5) * world_per_px,
+		(box.x * 0.5 - mid.x) * world_per_px,
 		(mid.y - box.y * 0.5) * world_per_px,
 		z)
 

@@ -51,6 +51,9 @@ func _init() -> void:
 	check(radar != null, "the glass mounted the calcium radar")
 	check(radar != null and bool(radar.get("_fed")), "the radar has been fed a state at least once")
 
+	var wmn: Node = app.get_node_or_null("Wmn")
+	check(wmn != null and wmn.has_method("has_bus") and wmn.has_bus(), "the wmn has a bus attached at boot")
+
 	print("=== FLY BOOT WIRING: passed %d, failed %d ===" % [passes, failures])
 	if failures == 0:
 		print("=== ALL PASS ===")

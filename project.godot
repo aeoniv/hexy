@@ -11,6 +11,9 @@ config/version="1.0.0"
 run/main_scene="res://scenes/hexy.tscn"
 config/icon="res://icon.png"
 config/features=PackedStringArray("4.7", "Mobile")
+; Android back is handled in scripts/glass/front.gd (_go_back): it shuts the
+; top page and only leaves the app from the front itself.
+config/quit_on_go_back=false
 
 [autoload]
 

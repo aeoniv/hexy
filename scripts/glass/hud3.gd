@@ -277,6 +277,9 @@ var _pacing: Script = null
 ## The two joysticks, and where a swipe went down. INF is nothing held.
 var _head_steering: bool = false
 var _earth_scrubbing: bool = false
+## Whether the finger actually TRAVELLED round the ring. A press that never
+## moved is a tap and must reach the dial; only a real scrub is swallowed.
+var _earth_scrubbed_any: bool = false
 var _swipe_from: float = INF
 
 # -- building ----------------------------------------------------------------
@@ -640,6 +643,7 @@ func close() -> void:
 		layer.visible = false
 	_head_steering = false
 	_earth_scrubbing = false
+	_earth_scrubbed_any = false
 	_swipe_from = INF
 	closed.emit()
 
@@ -739,15 +743,32 @@ func _on_earth_gesture(event: InputEvent) -> void:
 	if down != null:
 		var d: float = (down as Vector2).distance_to(mid)
 		_earth_scrubbing = r > 1.0 and d >= r * RING_INNER and d <= r * RING_OUTER
+		_earth_scrubbed_any = false
 		return
 	if _release_at(event) != null:
 		if _earth_scrubbing:
+			var dragged: bool = _earth_scrubbed_any
 			_earth_scrubbing = false
+			_earth_scrubbed_any = false
 			earth_released.emit()
+			## A SCRUB SNAPS BACK. The dial's own `_gui_input` would read this
+			## release as a TAP -- writing the earth and leaving a balloon up --
+			## which would turn a preview into a sample and is exactly the thing
+			## a scrub must not do. Godot emits `gui_input` BEFORE the virtual,
+			## so consuming it here is what keeps the ring a question. The page
+			## is then put back to now: the balloon is dismissed and the three
+			## captions are re-read off the store.
+			if dragged:
+				dial.accept_event()
+				if bubble != null:
+					bubble.close()
+				_refresh_earth_lines()
+				_refresh_captions()
 		return
 	var moved: Variant = _drag_at(event)
 	if moved == null or not _earth_scrubbing:
 		return
+	_earth_scrubbed_any = true
 	earth_scrubbed.emit(day_phase_of(((moved as Vector2) - mid).angle()))
 
 
@@ -866,6 +887,18 @@ func set_addons(addons: Node) -> void:
 	_addons = addons
 	if dashboard != null:
 		dashboard.set_addons(addons)
+
+
+## THE BROKER, passed straight through to the doors panel the same way. This
+## page has no opinion about who holds a door either; it only knows where the
+## panel that shows it is.
+var _broker: Node = null
+
+
+func set_broker(b: Node) -> void:
+	_broker = b
+	if dashboard != null and dashboard.has_method("set_broker"):
+		dashboard.set_broker(b)
 
 
 ## THE BUS AND THE GAUGE, handed down from the app through the front. The
@@ -1601,6 +1634,8 @@ func _build_dashboard() -> void:
 		dashboard.set_bus(_topic, _gauge)
 	if _addons != null:
 		dashboard.set_addons(_addons)
+	if _broker != null and dashboard.has_method("set_broker"):
+		dashboard.set_broker(_broker)
 	## BORROW THE ONE RADAR, if somebody is standing one. Without a lender
 	## (this page built on its own, as the standalone dashboard test still
 	## does) the panel keeps the radar it just built for itself.
