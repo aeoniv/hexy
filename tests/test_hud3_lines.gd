@@ -9,8 +9,9 @@ extends SceneTree
 ## seconds, and every one of the twelve stations evicted from the earth band
 ## still exists as a method somebody can call.
 ##
-## It boots the scene that actually ships, the way test_hud_telemetry_smoke
-## does, because a Hud3 built by hand is a Hud3 nobody uses.
+## It boots the scene that actually ships and opens the dials PAGE the way a
+## finger opens it -- `front.open_dials()` -- because a Hud3 built by hand is a
+## Hud3 nobody uses.
 
 var failures: int = 0
 
@@ -31,8 +32,11 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 
-	var hud: Node = node.get_node("Hud")
-	check(hud != null, "Hud3 stands under the app")
+	var front: Node = node.get_node("Hud")
+	check(front != null, "the front stands under the app")
+	var hud: Node = front.open_dials()
+	await process_frame
+	check(hud != null and hud is Hud3, "and the dials page opens behind it")
 
 	_test_day_line(hud)
 	_test_earth_lines(hud)

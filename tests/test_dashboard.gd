@@ -2,8 +2,9 @@ extends SceneTree
 
 ## THE GEAR OPENS THE INSTRUMENT PANEL.
 ##
-## scenes/hexy.tscn is booted for real and the configure button's own handler
-## is called -- the same path a finger takes -- and then every claim the
+## scenes/hexy.tscn is booted for real, the dials page is opened off the front
+## the way a finger opens it, `toggle_dashboard()` is called -- the same path a
+## finger takes -- and then every claim the
 ## dashboard makes is checked against the objects it was bound to: seven panels
 ## on the column, every one of them painted at least once, sixty-four cells of
 ## sense data, the store's own three figures. And while it stands, the three
@@ -46,23 +47,29 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 
-	var hud: Node = app.get_node_or_null("Hud")
-	check(hud != null, "the glass is under the app")
+	var front: Node = app.get_node_or_null("Hud")
+	check(front != null, "the front is under the app")
+	if front == null:
+		return
+	var hud: Node = front.open_dials()
+	await process_frame
+	check(hud != null and hud is Hud3, "and the dials page opens behind it")
 	if hud == null:
 		return
 	var store: HexyStore = app.store
 
-	var dash: HexyDashboard = hud.dashboard
-	check(dash != null, "the glass built a dashboard at bind()")
+	check(hud.dashboard == null, "the page builds no dashboard until one is asked for")
+	var dash: HexyDashboard = hud.dashboard_page()
+	check(dash != null, "and builds one the moment it is")
 	if dash == null:
 		return
-	check(not dash.is_open(), "and it is hidden at boot")
+	check(not dash.is_open(), "it is hidden when it is built")
 	check(not dash.visible, "the overlay takes no pixel until it is asked for")
 
 	# -- the gear ------------------------------------------------------------
-	hud._on_configure_pressed()
+	hud.toggle_dashboard()
 	await process_frame
-	check(dash.is_open() and dash.visible, "the configure button opens it")
+	check(dash.is_open() and dash.visible, "toggling opens it")
 
 	# Let a few beats pass so every panel has painted from a real snapshot.
 	for i in 12:
@@ -151,12 +158,12 @@ func _run() -> void:
 	dash.close()
 	await process_frame
 	check(not dash.is_open() and not dash.visible, "close() shuts it")
-	hud._on_configure_pressed()
+	hud.toggle_dashboard()
 	await process_frame
-	check(dash.is_open(), "the gear toggles it back open")
-	hud._on_configure_pressed()
+	check(dash.is_open(), "toggle_dashboard() puts it back")
+	hud.toggle_dashboard()
 	await process_frame
-	check(not dash.is_open(), "and the gear shuts it again")
+	check(not dash.is_open(), "and shuts it again")
 
 	# -- the two new panels are on the live column too ------------------------
 	check(dash.panel("tunables") != null and dash.panel("tunables").get_parent() == dash.column,

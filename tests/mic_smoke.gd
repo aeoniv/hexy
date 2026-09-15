@@ -99,7 +99,9 @@ func _glass() -> void:
 	await process_frame
 	await process_frame
 
-	var hud: Hud3 = app.hud
+	## THE MIC IS THE FRONT'S NOW. The dials page gave up the composer in W4;
+	## the field, the button and the meter all live on the front glass.
+	var hud: Front = app.front
 	check(app.mic != null, "the app builds a mic")
 	if not hud.has_method("set_mic"):
 		print("SKIP: this glass has no MIC button yet; the core half stands alone")
@@ -108,7 +110,7 @@ func _glass() -> void:
 		return
 	check(hud.mic_button() != null, "the composer has a MIC button")
 	check(not hud.mic_button().disabled, "and the mock un-greys it")
-	check(hud.mic_button().text == Hud3.MIC_IDLE, "which says MIC while it waits")
+	check(hud.mic_button().text == Front.MIC_IDLE, "which says MIC while it waits")
 
 	var sent: Array[String] = ([] as Array[String])
 	app.store.answer_changed.connect(func(a: String) -> void: sent.append(a))
@@ -117,9 +119,8 @@ func _glass() -> void:
 	hud.mic_button().emit_signal("pressed")
 	await process_frame
 	check(hud.mic_listening(), "a tap on MIC starts listening")
-	check(hud.mic_button().text == Hud3.MIC_LIVE, "and the button says LISTENING")
+	check(hud.mic_button().text == Front.MIC_LIVE, "and the button says LISTENING")
 	check(hud.mic_meter.visible, "and the level shows")
-	check(hud.status_text().ends_with(Hud3.MIC_PHRASE), "and line 2 says MIC: listening")
 
 	await _until(func() -> bool: return hud.ask_field.text != "", "a partial")
 	check(hud.ask_field.text == Mic.MOCK_PARTIAL, "the partial streams into the composer")
@@ -128,11 +129,10 @@ func _glass() -> void:
 	await process_frame
 
 	check(not hud.mic_listening(), "the glass hears the stop")
-	check(hud.mic_button().text == Hud3.MIC_IDLE, "and the button says MIC again")
+	check(hud.mic_button().text == Front.MIC_IDLE, "and the button says MIC again")
 	check(not hud.mic_meter.visible, "and the level goes away")
 	check(hud.ask_field.text == Mic.MOCK_TEXT, "the result replaces the partial")
 	check(sent.is_empty(), "AND NOTHING WAS SENT: the person still taps SEND")
-	check(not hud.status_text().ends_with(Hud3.MIC_PHRASE), "line 2 is the state again")
 
 	check(hud.composer_send(hud.ask_field.text), "and when they do, it goes")
 

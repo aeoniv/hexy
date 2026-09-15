@@ -4,9 +4,10 @@ extends SceneTree
 ##
 ## This used to boot scenes/main.tscn and scripts/mobile_hud.gd, a second scene
 ## graph that nothing loaded. The shipping surface is scenes/hexy.tscn ->
-## scripts/glass/app.gd -> Hud3, so that is what gets smoked here: the status
-## strip, the telemetry panel, and the connectome panel that now reads the one
-## fly brain through the character.
+## scripts/glass/app.gd -> Front, and the three dials are a PAGE behind that
+## front: so the page is opened the way a finger opens it and the words are
+## read off it -- the captions, the telemetry panel, and the connectome panel
+## that reads the one fly brain through the character.
 
 func _initialize() -> void:
 	print("--- TESTING HUD TELEMETRY SMOKE ---")
@@ -17,11 +18,17 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 
-	var hud = node.get_node("Hud")
-	assert(hud != null, "Hud3 must exist under the app")
+	var front = node.get_node("Hud")
+	assert(front != null, "the front must exist under the app")
+	var hud = front.open_dials()
+	await process_frame
+	assert(hud != null and hud is Hud3, "open_dials must put the dials page up")
 
-	print("Status: ", hud.status_text())
-	assert(hud.status_text().length() > 0, "Status strip must say something")
+	print("Figures: ", hud.figures_phrase())
+	assert(hud.figures_phrase().length() > 0, "the captions must say something")
+	assert(hud.head_cap.text.contains("HEAD"), "the head dial carries its own caption")
+	assert(hud.body_cap.text.contains("BODY"), "the body dial carries its own caption")
+	assert(hud.earth_cap.text.contains("EARTH"), "the earth dial carries its own caption")
 
 	var telem: String = hud.telemetry_text()
 	print("Telemetry text:")

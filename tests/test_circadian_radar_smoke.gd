@@ -5,7 +5,7 @@ const FlyCalciumRadar2DScript := preload("res://scripts/brain/fly_calcium_radar_
 const FlyCentralComplexScript := preload("res://scripts/brain/fly_central_complex.gd")
 const CharacterScript := preload("res://scripts/brain/character.gd")
 const GeoScript := preload("res://scripts/core/geo.gd")
-const Hud3Script := preload("res://scripts/glass/hud3.gd")
+const FrontScript := preload("res://scripts/glass/front.gd")
 const WmnScript := preload("res://scripts/core/wmn/wmn.gd")
 
 var passes := 0
@@ -33,7 +33,8 @@ func _process(_delta: float) -> bool:
 	_test_caption()
 	_test_glass_wiring()
 	_test_phase_and_mentor()
-	
+	_test_quiet_mode()
+
 	print("\n=== CIRCADIAN & RADAR RESULTS ===")
 	print("Passed: %d, Failed: %d" % [passes, failures])
 	if failures == 0:
@@ -318,12 +319,12 @@ func _test_caption() -> void:
 	r.free()
 
 
-## THE GLASS SIDE OF THE SEAM, checked without a viewport: the surface exists,
-## the app can hand the compass over, and a peer the fabric drops leaves the
-## dial.
+## THE GLASS SIDE OF THE SEAM, checked without a viewport: the front is the
+## surface that owns the room now, the app can hand the compass over, and a
+## peer the fabric drops leaves the dial.
 func _test_glass_wiring() -> void:
 	print("\n- the wiring the app relies on")
-	var hud: Object = Hud3Script.new()
+	var hud: Object = FrontScript.new()
 	check(hud != null, "the glass parses")
 	check(hud.has_method("set_heading"), "the glass takes a compass from the app")
 	check(hud.has_method("_on_peer_gone"), "and forwards the fabric's goodbye to the dial")
@@ -416,5 +417,59 @@ func _test_phase_and_mentor() -> void:
 	check(not r.peer_plots().has("b"), "a dropped peer leaves the phase map")
 	r.set_peer_phase({"b": 0.2})
 	check(r.peer_plots().has("b"), "and can walk back in")
+	r.free()
+
+
+## QUIET MODE: the same instance on the front glass as "the room", the creature
+## standing in hub_rect(). Wedges and bars gone, the ring faint, peer rings
+## dimmed -- but the facts (field_radius, peer_plots) do not change with the
+## instrument panel around them.
+func _test_quiet_mode() -> void:
+	print("\n- quiet mode: the room, not the instrument panel")
+	var r: Control = _radar()
+	r.set_peer_headings({"a": 0.3, "b": 1.1})
+	r.set_peer_proximity({"a": "touch", "b": "far"})
+	r.set_peer_phase({"a": 0.4})
+	r.set_peer_stage({"a": 1})
+	r.set_own_phase(0.41, 0)
+
+	check(not r.quiet, "quiet starts off")
+	check(r.show_wedges and r.show_bars, "and both flags start showing")
+
+	var loud_plots: Dictionary = r.peer_plots()
+	var loud_fr: float = r.field_radius()
+
+	r.set_quiet(true)
+	check(r.quiet, "set_quiet(true) sets the flag")
+	check(not r.show_wedges, "and hides the wedges")
+	check(not r.show_bars, "and hides the bars")
+
+	var quiet_plots: Dictionary = r.peer_plots()
+	check(quiet_plots.hash() == loud_plots.hash(), "peer_plots() is byte-identical whatever the mode")
+	check(is_equal_approx(r.field_radius(), loud_fr), "field_radius() is identical whatever the mode")
+
+	r.set_quiet(false)
+	check(not r.quiet, "set_quiet(false) clears the flag")
+	check(r.show_wedges and r.show_bars, "and restores both flags")
+	check(r.peer_plots().hash() == loud_plots.hash(), "and peer_plots() is still the same dictionary")
+
+	# A caller may mix the two flags independently of quiet.
+	r.show_wedges = false
+	check(not r.show_wedges and r.show_bars, "show_wedges and show_bars are independent knobs")
+	r.show_wedges = true
+
+	# The hub the creature parks in: centred on the disc, sized off field_radius().
+	var hub: Rect2 = r.hub_rect()
+	check(hub.get_center().is_equal_approx(r.disc_center()), "hub_rect() is centred on disc_center()")
+	check(is_equal_approx(hub.size.x, hub.size.y), "hub_rect() is square")
+	check(is_equal_approx(hub.size.x, 2.0 * r.field_radius() * FlyCalciumRadar2DScript.HUB_FRAC),
+		"hub_rect() side is 2 * field_radius() * HUB_FRAC")
+	r.set_quiet(true)
+	check(hub.is_equal_approx(r.hub_rect()), "hub_rect() does not move between modes either")
+
+	# Drawing in quiet mode does not blow up: force a redraw through the tree.
+	r.set_quiet(true)
+	r.queue_redraw()
+	check(true, "quiet mode queues a redraw without erroring")
 	r.free()
 

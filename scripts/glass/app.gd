@@ -41,10 +41,14 @@ var mic: Mic = null
 ## be: a position is a future add-on's gift, handed in through
 ## `Heading.set_fix()`.
 var heading: Heading = null
-## The surface is the THIRD GLASS: five bands, three dials, one bubble.
-## scripts/glass/glass.gd and scripts/glass/hud_bridge.gd both stay on disk,
-## and the import wall still keeps them honest, but nothing boots them.
-var hud: Hud3 = null
+## THE SURFACE IS THE FRONT GLASS: one sentence, one room, one composer. The
+## third glass is still on disk and still the page a finger opens by tapping
+## the creature -- the front instantiates it itself, once, and parks it over
+## the room -- but the app mounts the FRONT and nothing else. One glass child,
+## one bind, and every page beyond the dials is somebody else's signal to
+## answer. scripts/glass/glass.gd and scripts/glass/hud_bridge.gd both stay on
+## disk, and the import wall still keeps them honest, but nothing boots them.
+var front: Front = null
 
 ## THE ALCHEMY, LOADED RATHER THAN NAMED. It belongs to the core and the core
 ## may land after the glass does; naming the class outright would stop the
@@ -103,9 +107,9 @@ func _ready() -> void:
 	heading.name = "Heading"
 	add_child(heading)
 
-	hud = Hud3.new()
-	hud.name = "Hud"
-	add_child(hud)
+	front = Front.new()
+	front.name = "Hud"
+	add_child(front)
 
 	creature = Creature.new()
 	creature.name = "Creature"
@@ -117,22 +121,23 @@ func _ready() -> void:
 	if alchemy != null and alchemy.has_method("bind"):
 		alchemy.bind(store, senses)
 
-	hud.bind(store, qwen, mnn, wmn)
-	hud.set_senses(senses)
-	hud.set_creature(creature)
-	hud.set_alchemy(alchemy)
+	## THE SIX OBJECTS, IN ONE CALL. The front takes what the third glass took
+	## in four calls -- store, mnn, wmn, senses, alchemy, qwen -- and hands the
+	## same six on to the dials page when a finger asks for it.
+	front.bind(store, mnn, wmn, senses, alchemy, qwen)
+	front.set_creature(creature)
 	## THE GLASS MAY NOT HAVE ITS MIC BUTTON YET. The core node is built either
 	## way, because the test that walks the mock does not need a surface, and an
 	## app that will not boot against a slightly older glass teaches nobody.
-	if hud.has_method("set_mic"):
-		hud.set_mic(mic)
-	if hud.has_method("set_heading"):
-		hud.set_heading(heading)
+	if front.has_method("set_mic"):
+		front.set_mic(mic)
+	if front.has_method("set_heading"):
+		front.set_heading(heading)
 	creature.bind(store)
 	creature.set_senses(senses)
 
-	hud.set_who(_identity_name())
-	wmn.start(hud.who())
+	front.set_who(_identity_name())
+	wmn.start(front.who())
 
 	## THE ADD-ONS, LAST, AFTER EVERY CORE OBJECT IS BOUND. An add-on may only
 	## write through the seat bus, the homeostat and the registry, so it must
@@ -145,8 +150,8 @@ func _ready() -> void:
 		"character": store.get_character(),
 		"alchemy": alchemy,
 	})
-	if hud.has_method("set_addons"):
-		hud.set_addons(addons)
+	if front.has_method("set_addons"):
+		front.set_addons(addons)
 
 	mnn.token.connect(_on_token)
 	mnn.done.connect(_on_done)
@@ -176,13 +181,13 @@ func _ready() -> void:
 ## phone that delivers nothing says so instead of looking still.
 func _fly_lamp() -> void:
 	var prof: Dictionary = DeviceProfile.resolve()
-	var dial: Control = hud.radar_dial()
+	var dial: Control = front.radar_dial()
 	print("hexy fly: profile=%s view=%s oracle=%s hud_char=%d oracle_char=%d radar=%s/%s" % [
 		String(prof.get("id", "?")), str(DisplayServer.window_get_size()),
 		"yes" if oracle != null else "no",
-		hud._store.get_character().get_instance_id() if hud._store != null else -1,
+		front._store.get_character().get_instance_id() if front._store != null else -1,
 		oracle.store.get_character().get_instance_id() if oracle.store != null else -1,
-		hud.radar_layout(), "fed" if dial != null and dial.is_visible_in_tree() else "cold"])
+		front.radar_layout(), "fed" if dial != null and dial.is_visible_in_tree() else "cold"])
 	## THE INPUTS THE PROFILE WAS RESOLVED FROM, said out loud, because a lamp
 	## that names the answer and not the question cannot tell a wrong table
 	## from a wrong measurement.
@@ -228,6 +233,10 @@ func _on_tick() -> void:
 		ch.tick(now)
 	if alchemy != null and alchemy.has_method("tick"):
 		alchemy.tick(now)
+	## AND THE GLASS BEATS ON THE SAME CLOCK. One call: the front pushes the
+	## room into the radar, samples the day, and composes its one sentence.
+	if front != null:
+		front.beat()
 
 
 ## The alchemy, if the core has landed. One load, no stub, no substitute.

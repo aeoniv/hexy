@@ -1,18 +1,23 @@
 extends SceneTree
 
-## THE THIRD GLASS, BOOTED FOR REAL.
+## THE DIALS PAGE, BOOTED FOR REAL AND OPENED THE WAY A FINGER OPENS IT.
 ##
 ## scenes/hexy.tscn is instanced into a live tree with no device, no model and
-## no room, and then poked exactly the way a finger would poke it: a tick on
-## the head ring, a station on the earth ring, a hub, a question in the
-## composer. Nothing here calls a private helper -- every act goes through the
-## signal or the input a real touch would have raised, because a smoke test
-## that takes a shortcut the user cannot take is testing a program nobody runs.
+## no room, the front's own `open_dials()` puts the page up, and then the page
+## is poked exactly the way a finger would poke it: a tick on the head ring, a
+## station on the earth ring, a hub, a drag round each joystick. Nothing here
+## calls a private helper -- every act goes through the signal or the input a
+## real touch would have raised, because a smoke test that takes a shortcut the
+## user cannot take is testing a program nobody runs.
 ##
-## AND IT IS MEASURED TWICE. The five bands are checked at 1080x2408 and again
-## at 1812x2176, because "nothing overlaps" is a claim about a layout, not
-## about a screenshot, and a layout that is only true at one size is not a
-## layout.
+## THE STRIP AND THE COMPOSER ARE NOT HERE ANY MORE. The front owns the one
+## sentence and the one field, and test_front_smoke.gd is where they are asked
+## about; what is left on this page is three dials, three captions and a way
+## back.
+##
+## AND IT IS MEASURED TWICE. The bands are checked at 1080x2408 and again at
+## 1812x2176, because "nothing overlaps" is a claim about a layout, not about a
+## screenshot, and a layout that is only true at one size is not a layout.
 
 const SCENE: String = "res://scenes/hexy.tscn"
 
@@ -40,7 +45,7 @@ func check(ok: bool, label: String) -> void:
 
 
 func _initialize() -> void:
-	print("\n--- TEST GLASS SMOKE (boot + three dials + bubble + composer) ---")
+	print("\n--- TEST GLASS SMOKE (boot + the dials page + bubble + joysticks) ---")
 	await _run()
 	if failures == 0:
 		print("--- ALL GLASS SMOKE TESTS PASSED PERFECTLY ---\n")
@@ -72,28 +77,41 @@ func _run() -> void:
 	check(_is_ascii(boot), "the boot line is plain ASCII")
 
 	var store: HexyStore = app.store
-	var hud: Hud3 = app.hud
+	var front: Front = app.front
+	check(front != null, "the app mounted a front")
 
-	# -- the status strip ----------------------------------------------------
+	# -- the dials are a PAGE the front opens --------------------------------
+	check(front.dials_page() == null, "no dials page stands until a finger asks")
+	var hud: Hud3 = front.open_dials() as Hud3
 	await process_frame
-	var strip: String = hud.status_text()
-	print("status: ", strip)
-	check(hud.status_strip() != null, "the status strip is a panel of its own")
-	var summary: String = hud.status_summary()
-	print("summary: ", summary)
-	check(strip.strip_edges() != "", "the status strip says something")
-	check(strip.contains("\n"), "the status strip holds its figures over its news")
-	check(strip.contains("HEAD") and strip.contains("BODY"),
-		"the figures hold the top line whatever else is happening")
-	check(summary.contains("FPS"), "the strip's state carries the frame rate")
-	check(_is_ascii_but_marks(summary),
-		"the strip's own summary is ASCII but for the owner's marks")
-	check(summary.contains("HEAD") and summary.contains("BODY"),
-		"the summary names both figures")
-	check(summary.contains(KingWen.name(int(store.head_bits()))),
+	await process_frame
+	check(hud != null, "open_dials puts the third glass up")
+	check(_count_of_type(app, "hud3") == 1, "and exactly one of it in the whole tree")
+	check(hud.is_open(), "the page says it is standing")
+	check(hud.has_signal("closed"), "and it can say when it is not")
+
+	# -- the three captions --------------------------------------------------
+	var figures: String = hud.figures_phrase()
+	print("figures: ", figures)
+	check(figures.contains("HEAD") and figures.contains("BODY"),
+		"the page names the two figures it is holding")
+	check(_is_ascii_but_marks(figures),
+		"the page's own phrase is ASCII but for the owner's marks")
+	check(figures.contains(KingWen.name(int(store.head_bits()))),
 		"and carries the owner's own name for the HEAD figure")
-	check(summary.contains(Hud3.MOON) and summary.contains(Hud3.SUN),
+	check(figures.contains(Hud3.MOON) and figures.contains(Hud3.SUN),
 		"and marks them with the owner's moon and sun")
+	check(String(hud.head_cap.text).contains("HEAD"), "a caption stands under the head dial")
+	check(String(hud.body_cap.text).contains("BODY"), "a caption stands under the body dial")
+	check(String(hud.earth_cap.text).contains("EARTH"), "a caption stands under the earth dial")
+	check(String(hud.head_cap.text).contains(KingWen.name(int(store.head_bits()))),
+		"and the head caption is the store's own head figure")
+
+	# -- the strip and the composer are gone ---------------------------------
+	for gone in ["status_text", "status_strip", "status_summary", "composer_send",
+			"set_heading", "radar_dial", "_feed_radar", "_build_composer"]:
+		check(not hud.has_method(gone), "the page no longer owns %s()" % gone)
+	check(hud.get("radar") == null, "and it stands no radar of its own")
 
 	# -- the bubble is a reply, not a greeting -------------------------------
 	check(not hud.bubble_visible(), "nothing is speaking at boot, so no bubble stands")
@@ -200,27 +218,22 @@ func _run() -> void:
 	check(hud.bubble_text().strip_edges() != "", "and that human sense has a sentence")
 	hud.bubble.close()
 
-	# -- a question is answered ----------------------------------------------
-	store.set_answer("")
-	check(hud.composer_send("what is this moment"), "the composer takes a question")
-	check(not hud.composer_send("   "), "and refuses an empty one")
-	var waited: float = 0.0
-	while store.answer == "" and waited < 2.0:
-		await create_timer(0.05).timeout
-		waited += 0.05
-	check(store.answer != "", "an answer landed in the store within 2 s: %s" % store.answer)
-	await process_frame
-	check(hud.bubble_text().strip_edges() != "", "and the bubble is carrying it")
-
-	# -- the creature stands inside the body ring -----------------------------
-	check(app.creature.get_parent() == hud.view, "the creature stands in the stage viewport")
+	# -- the page's own stage is still lit ------------------------------------
 	check(hud.view.get_node_or_null("WorldEnvironment") != null,
 		"the stage carries the owner's environment")
 	check(hud.view.get_node_or_null("DirectionalLight3D") != null
 			and hud.view.get_node_or_null("DirectionalLight3D2") != null,
 		"the stage carries the owner's two lights")
-	check(hud.creature_field.get_global_rect().size.x > 8.0,
-		"the creature has a square of its own to be tapped in")
+
+	# -- the way back ---------------------------------------------------------
+	var shut: Array = []
+	hud.closed.connect(func() -> void: shut.append(1))
+	check(hud.back_bar != null, "the page carries a back bar of its own")
+	hud.back_bar.gui_input.emit(_tap(Vector2(20.0, 10.0)))
+	await process_frame
+	check(shut.size() == 1, "a tap on the back bar shuts the page")
+	check(not hud.is_open(), "and the page is down")
+	check(not front.dials_open(), "and the front took it off the glass")
 
 	app.wmn.stop()
 	root.remove_child(app)
@@ -275,6 +288,14 @@ static func _is_ascii_but_marks(s: String) -> bool:
 			continue
 		return false
 	return true
+
+
+## How many Hud3 pages stand anywhere under this node.
+func _count_of_type(from: Node, _kind: String) -> int:
+	var n: int = 1 if from is Hud3 else 0
+	for kid in from.get_children():
+		n += _count_of_type(kid, _kind)
+	return n
 
 
 static func _is_ascii(s: String) -> bool:

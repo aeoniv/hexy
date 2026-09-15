@@ -1,28 +1,56 @@
 class_name Hud3
 extends Node
 
-## THE THIRD GLASS: FIVE BANDS, THREE DIALS, ONE VOICE.
+## THE DIALS PAGE: THREE DIALS, ONE VOICE, AND A WAY BACK.
 ##
-## The surface before this one was a stack of panels that each wanted the whole
-## width, and the two dials -- the only things on the screen a person actually
-## reads -- were squeezed between them. This one inverts that. Top to bottom:
-## one STATUS LINE, the HEAD dial small, the BODY dial big with the creature
-## standing inside it, the EARTH dial small, and the composer. Everything else
-## the app has to say arrives in a floating BUBBLE next to whatever said it,
-## and leaves again after six seconds.
+## This used to be the whole surface -- a status strip, a radar, a composer and
+## the three dials all at once. It is a PAGE now. `scripts/glass/front.gd` is
+## what a person carries; this is what they open when they want to READ the
+## machine, and it is opened from the front and closed back to it. Everything
+## the front already owns has been taken out of here: the sentence, the one
+## room, the mic and the field, the compass. What is left is the part the front
+## has no room for.
 ##
-## THE BANDS ARE ANCHORED, NOT MEASURED. The five live in a box that fills the
-## glass, three of them with a fixed small height and the body free to take
-## what is left. That is why nothing overlaps at 1080x2408 and nothing overlaps
-## at 1812x2176: no band is ever told a pixel size, only its share.
+## Top to bottom there are four things and no more: a slim BACK BAR, the HEAD
+## dial, the BODY dial with the creature standing inside it, and the EARTH
+## dial. Each dial carries one CAPTION under it saying which figure it is
+## holding, which is the one sentence the strip above them used to say.
+##
+## THE BANDS ARE ANCHORED, NOT MEASURED. They live in a box that fills the
+## glass, the small ones with a fixed height and the body free to take what is
+## left. That is why nothing overlaps at 1080x2408 and nothing overlaps at
+## 1812x2176: no band is ever told a pixel size, only its share.
 ##
 ## THE THREE DIALS SPEAK THE SAME LANGUAGE. Same rim, same sixty-four ticks,
 ## same diamonds, same colours: cyan is the machine, gold is the human, orange
-## is the Huohoutu, green is enhanced. The head walks the oracle, the body
-## follows the senses, and the earth is the app's own eight controls -- so the
-## chrome that used to be a row of buttons is now the third member of a family.
+## is the Huohoutu, green is enhanced.
 ##
-## TAP ONLY. Every act on this surface is one visible target touched once.
+## TAP, AND TWO DRAGS. Every act is one visible target touched once, except the
+## two joysticks: a finger dragged round the HEAD ring steers the fly's goal
+## heading, and a finger dragged round the EARTH ring scrubs the day. Both end
+## where they always did -- the release is still the tap.
+##
+## THE WAY OUT IS ALWAYS THERE. The bar closes the page, a swipe down anywhere
+## that is not a dial closes the page, and Android's own back button closes the
+## page. All three come out of the one `closed` signal the front listens to.
+
+## THE PAGE IS SHUT. Whoever put this page on the glass hears this and takes
+## it off again; the page never removes itself, because it does not own where
+## it stands.
+signal closed
+
+## THE HEAD JOYSTICK. A finger dragged round the head ring says where round the
+## allocentric circle it is pointing, in radians, 0..TAU. The fly's own goal
+## heading is set from it when there is a fly to set; the signal is raised
+## either way, so a listener never has to know whether a brain was attached.
+signal head_steered(angle_rad: float)
+
+## THE EARTH SCRUB. Where round the earth ring the finger is, as a share of the
+## day, 0..1, raised every frame the finger is held and moving. Nothing in base
+## consumes it yet; it is the hook a day-scrubber lands on.
+signal earth_scrubbed(day_phase: float)
+## And the finger came up again.
+signal earth_released
 
 ## The one skin, borrowed from the bubble so there is only one of it.
 const SKIN := preload("res://scripts/glass/bubble.gd")
@@ -38,17 +66,13 @@ const PACING_PATH: String = "res://scripts/core/iching/pacing.gd"
 const GROUND: Color = Color(0.0588235, 0.0823529, 0.12549, 1.0)
 
 ## The fixed bands, in pixels of the band's own height. The body takes the rest.
-const STATUS_H: float = 70.0
+## The back bar's height, and the caption under each dial's.
+const BACK_H: float = 40.0
+const CAPTION_H: float = 22.0
+
 const HEAD_H: float = 270.0
 const EARTH_H: float = 270.0
-const COMPOSER_H: float = 72.0
 const BAND_GAP: int = 16
-## The left column the radar takes on a fold that is open, in pixels, and the
-## two sizes the radar itself is given in its two placements.
-const RADAR_PANE_W: float = 300.0
-const RADAR_TALL_H: float = 420.0
-const RADAR_DISC_H: float = 190.0
-
 ## THE STAGE IS THE WHOLE GLASS, which is how the owner's own scene did it.
 ##
 ## A square stage inside the body band left a SEAM: a 3D viewport cleared to a
@@ -103,18 +127,7 @@ const PERIODS_MS: Array[int] = [3500, 1000, 2000, 8000]
 ## The two Pacing numbers, for when Pacing is not on disk to say them.
 const CIVIL_FIRE_THRESHOLD: float = 2.5
 
-## THE MIC'S THREE WORDS. The button says one of two things and the strip says
-## the third, and none of them is ever a spinner: a person looking at the glass
-## can tell whether the phone is listening without tapping anything.
-const MIC_IDLE: String = "MIC"
-const MIC_LIVE: String = "LISTENING"
-const MIC_PHRASE: String = "MIC: listening"
-## The loudest the meter draws, in the dB scale onRmsChanged speaks.
-const MIC_RMS_FULL: float = 10.0
 const MARTIAL_THRESHOLD: float = 0.85
-
-## The strip is composed four times a second, not sixty.
-const STATUS_PERIOD_MS: int = 250
 
 ## THE SIX DRAWER KEYS THIS GLASS OBEYS. Every one of them is pulled once at
 ## boot and again the moment the drawer says it moved, so a person turning a
@@ -123,7 +136,6 @@ const STATUS_PERIOD_MS: int = 250
 const KEY_DWELL_RING: String = "hud.dwell_ring"
 const KEY_LINE_FLASH: String = "hud.line_flash"
 const KEY_EARTH_MODE: String = "hud.earth_mode"
-const KEY_STATUS_MODE: String = "hud.status_mode"
 const KEY_ROOM_HIGHLIGHT: String = "hud.room_highlight"
 const KEY_BREATHE: String = "creature.breathe_with_dwell"
 
@@ -145,7 +157,17 @@ const COL_FLASH: Color = Color(1.0, 0.92, 0.55, 0.98)
 ## standing on the same figure.
 const COL_ROOM: Color = Color(0.35, 1.0, 0.65, 0.95)
 
-var _status_at: int = 0
+## How far DOWN a finger has to travel off the glass before the page closes.
+## The same eighty pixels the front uses for its own swipe, so the gesture that
+## opens a page and the gesture that shuts one are mirror images.
+const SWIPE_PX: float = 80.0
+
+## THE RING A JOYSTICK ANSWERS IN, as a share of the dial's own radius. Inside
+## the inner bound is the hub and the stations, which are taps and stay taps;
+## past the outer bound is the band's own margin.
+const RING_INNER: float = 0.55
+const RING_OUTER: float = 1.35
+
 var _pacing_consts: Dictionary = {}
 
 ## The live answers to the six keys, cached so `_process` reads a bool and not
@@ -153,7 +175,6 @@ var _pacing_consts: Dictionary = {}
 var _cfg_dwell_ring: bool = true
 var _cfg_line_flash: bool = true
 var _cfg_earth_mode: String = "lines"
-var _cfg_status_mode: String = "day"
 var _cfg_room_highlight: bool = true
 var _cfg_breathe: bool = true
 
@@ -168,8 +189,11 @@ var root: Control = null
 var ground: ColorRect = null
 var bands: VBoxContainer = null
 
-var status_panel: PanelContainer = null
-var status_label: Label = null
+## THE WAY BACK, and the full-glass sheet under the bands that hears a swipe.
+## The sheet is added to the root BEFORE the pad, so every dial and every panel
+## is picked ahead of it and it only ever hears a finger that touched nothing.
+var back_bar: PanelContainer = null
+var gestures: Control = null
 
 var head: MandalaDialTap = null
 var body_band: Control = null
@@ -185,25 +209,17 @@ var earth_lines: EarthLinesDial = null
 var dwell_ring: Control = null
 var room_mark: Control = null
 
-## THE CALCIUM RADAR, the fly's own ellipsoid body drawn where a person can
-## see it. It is fed one `get_fly_state()` dictionary a frame and nothing else,
-## and where it stands is DeviceProfile's decision, not this file's:
-##   dual pane   a column of its own down the left, the bands moved off it
-##   tall slab   a small disc in a band of its own directly under the body
-## Either way it is laid out beside the three dials and never over them.
-var radar: Control = null
-var radar_pane: CenterContainer = null
+## ONE CAPTION UNDER EACH DIAL: the figure that dial is holding, said the way
+## the strip above them used to say all three at once.
+var head_cap: Label = null
+var body_cap: Label = null
+var earth_cap: Label = null
+
 var pad: MarginContainer = null
 
 var stage: SubViewportContainer = null
 var view: SubViewport = null
 var creature_field: Control = null
-
-var composer: PanelContainer = null
-var ask_field: LineEdit = null
-var btn_mic: Button = null
-var mic_meter: ProgressBar = null
-var btn_send: Button = null
 
 var bubble: GlassBubble = null
 
@@ -222,12 +238,6 @@ var _wmn: Node = null
 var _senses: Node = null
 var _creature: Node = null
 var _alchemy: Node = null
-## THE COMPASS. `scripts/core/heading.gd`, built by the app, read once a frame
-## in `_feed_radar` and never reached for anywhere else.
-var _heading: Node = null
-var _mic: Node = null
-var _mic_listening: bool = false
-
 var _who: String = "hexy"
 var _stream: String = ""
 var _enhanced: bool = true
@@ -236,10 +246,11 @@ var _enhanced: bool = true
 ## not throw a panel over the head dial at boot: the bubble is a REPLY.
 var _awaiting: bool = false
 var _pacing: Script = null
-## Which of the two radar placements is standing. Re-read on every resize, and
-## the radar is only moved when the answer actually changed.
-var _radar_layout: String = ""
 
+## The two joysticks, and where a swipe went down. INF is nothing held.
+var _head_steering: bool = false
+var _earth_scrubbing: bool = false
+var _swipe_from: float = INF
 
 # -- building ----------------------------------------------------------------
 
@@ -285,12 +296,12 @@ func _ready() -> void:
 	bands.add_theme_constant_override("separation", BAND_GAP)
 	pad.add_child(bands)
 
-	_build_status()
+	_build_back_bar()
 	_build_head()
 	_build_body()
 	_build_earth()
-	_build_composer()
-	_build_radar()
+	_build_gestures()
+	_refresh_captions()
 
 	bubble = GlassBubble.new()
 	root.add_child(bubble)
@@ -312,7 +323,6 @@ func _watch_config() -> void:
 	_cfg_dwell_ring = bool(cfg.get_value(KEY_DWELL_RING))
 	_cfg_line_flash = bool(cfg.get_value(KEY_LINE_FLASH))
 	_cfg_earth_mode = String(cfg.get_value(KEY_EARTH_MODE))
-	_cfg_status_mode = String(cfg.get_value(KEY_STATUS_MODE))
 	_cfg_room_highlight = bool(cfg.get_value(KEY_ROOM_HIGHLIGHT))
 	_cfg_breathe = bool(cfg.get_value(KEY_BREATHE))
 	if not cfg.changed.is_connected(_on_config_changed):
@@ -325,7 +335,6 @@ func _on_config_changed(key: String, value: Variant) -> void:
 		KEY_DWELL_RING: _cfg_dwell_ring = bool(value)
 		KEY_LINE_FLASH: _cfg_line_flash = bool(value)
 		KEY_EARTH_MODE: _cfg_earth_mode = String(value)
-		KEY_STATUS_MODE: _cfg_status_mode = String(value)
 		KEY_ROOM_HIGHLIGHT: _cfg_room_highlight = bool(value)
 		KEY_BREATHE: _cfg_breathe = bool(value)
 		_: return
@@ -340,7 +349,6 @@ func _apply_config() -> void:
 	if room_mark != null:
 		room_mark.visible = _cfg_room_highlight
 	_apply_earth_mode()
-	_refresh_status_strip(true)
 
 
 ## Which face the earth band wears. Nothing is rebuilt: one is shown, the other
@@ -366,153 +374,7 @@ func earth_mode() -> String:
 func _refresh_earth_lines() -> void:
 	if earth_lines != null:
 		earth_lines.set_figures(_body_bits(), _head_bits())
-
-
-## THE RADAR AND ITS LEFT PANE. The pane is a container of its own so the
-## radar is centred in it without this file doing arithmetic, and the bands are
-## pushed off it by the one margin that already exists.
-func _build_radar() -> void:
-	radar_pane = CenterContainer.new()
-	radar_pane.name = "RadarPane"
-	radar_pane.set_anchors_preset(Control.PRESET_LEFT_WIDE)
-	radar_pane.offset_left = 8.0
-	radar_pane.offset_right = 8.0 + RADAR_PANE_W
-	radar_pane.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	radar_pane.visible = false
-	root.add_child(radar_pane)
-
-	radar = FlyCalciumRadar2D.new()
-	radar.name = "CalciumRadar"
-	## A STOP FILTER, BECAUSE A BLIP IS A THING YOU TAP. The disc is the only
-	## part of this Control that answers: `_on_radar_input` measures the finger
-	## against `disc_center()` and lets anything outside fall straight through to
-	## the glass behind, so the six neuromodulator bars under the dial are not a
-	## dead zone the size of the pane.
-	radar.mouse_filter = Control.MOUSE_FILTER_STOP
-	radar.gui_input.connect(_on_radar_input)
-	_apply_radar_layout()
-
-
-## A TAP ON A BLIP PICKS SOMEBODY TO WALK TOWARD. Tapping again lets them go --
-## one gesture in, the same gesture out, which is the radar's own rule and this
-## file only routes it.
-func _on_radar_input(event: InputEvent) -> void:
-	if radar == null:
-		return
-	var at: Vector2 = Vector2.ZERO
-	if event is InputEventMouseButton:
-		var mb: InputEventMouseButton = event
-		if not (mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT):
-			return
-		at = mb.position
-	elif event is InputEventScreenTouch:
-		var st: InputEventScreenTouch = event
-		if not st.pressed:
-			return
-		at = st.position
-	else:
-		return
-	if at.distance_to(radar.disc_center()) > radar.field_radius():
-		return
-	radar.tap(at)
-	radar.accept_event()
-
-
-## WHERE THE RADAR STANDS, asked of DeviceProfile and nobody else. A fold open
-## has room for a column beside the glass; a slab does not, and gets the disc.
-func _apply_radar_layout() -> void:
-	if radar == null or root == null or bands == null or pad == null:
-		return
-	var box: Vector2i = Vector2i(root.size)
-	if box.x < 8 or box.y < 8:
-		box = DisplayServer.window_get_size()
-	var profile: Dictionary = DeviceProfile.resolve(-1, box, "")
-	var want: String = "dual_pane" if bool(profile.get("is_dual_pane", false)) else "tall_slab"
-	if want == _radar_layout and radar.get_parent() != null:
-		return
-	_radar_layout = want
-	if radar.get_parent() != null:
-		radar.get_parent().remove_child(radar)
-	if want == "dual_pane":
-		radar_pane.visible = true
-		radar_pane.add_child(radar)
-		radar.radar_radius = 108.0
-		radar.ring_thickness = 24.0
-		radar.show_neuromodulators = true
-		radar.custom_minimum_size = Vector2(RADAR_PANE_W, RADAR_TALL_H)
-		pad.add_theme_constant_override("margin_left", int(RADAR_PANE_W) + 16)
-	else:
-		radar_pane.visible = false
-		radar.radar_radius = 66.0
-		radar.ring_thickness = 15.0
-		radar.show_neuromodulators = false
-		radar.custom_minimum_size = Vector2.ZERO
-		radar_pane.add_child(radar)
-		pad.add_theme_constant_override("margin_left", 8)
-
-
-## The radar's placement, as a word: "dual_pane" or "tall_slab".
-func radar_layout() -> String:
-	return _radar_layout
-
-
-func radar_dial() -> Control:
-	return radar
-
-
-## 1. THE STATUS STRIP: one line that keeps a person informed, newest first,
-## with a configure button on the top-right.
-func _build_status() -> void:
-	status_panel = PanelContainer.new()
-	status_panel.name = "Status"
-	status_panel.custom_minimum_size = Vector2(0.0, STATUS_H)
-	status_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	## THE STRIP ANSWERS A FINGER NOW. It is the shortest sentence the app has
-	## about the day, and the journal behind it is the longest, so the one opens
-	## the other. The gear button is still a child with its own STOP filter and
-	## keeps its own tap.
-	status_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	status_panel.gui_input.connect(_on_status_input)
-	status_panel.add_theme_stylebox_override("panel", SKIN.skin())
-	bands.add_child(status_panel)
-
-	var margin := MarginContainer.new()
-	margin.name = "Margin"
-	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	margin.add_theme_constant_override("margin_left", 10)
-	margin.add_theme_constant_override("margin_right", 10)
-	margin.add_theme_constant_override("margin_top", 4)
-	margin.add_theme_constant_override("margin_bottom", 4)
-	status_panel.add_child(margin)
-
-	var hbox := HBoxContainer.new()
-	hbox.name = "HBox"
-	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	margin.add_child(hbox)
-
-	status_label = Label.new()
-	status_label.name = "Line"
-	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	status_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	status_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	status_label.add_theme_font_size_override("font_size", 15)
-	status_label.add_theme_color_override("font_color", Color(0.78, 0.88, 0.98, 1.0))
-	status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hbox.add_child(status_label)
-	status_label.text = "waking"
-
-	var btn_config := Button.new()
-	btn_config.name = "ConfigBtn"
-	btn_config.text = "⚙"
-	btn_config.flat = true
-	btn_config.custom_minimum_size = Vector2(48.0, 48.0)
-	btn_config.add_theme_font_size_override("font_size", 24)
-	btn_config.add_theme_color_override("font_color", Color(0.75, 0.88, 1.0, 0.9))
-	btn_config.mouse_filter = Control.MOUSE_FILTER_STOP
-	btn_config.pressed.connect(_on_configure_pressed)
-	hbox.add_child(btn_config)
+	_refresh_captions()
 
 
 ## 2. THE HEAD DIAL, SMALL: the oracle, walked by a finger on its own ticks.
@@ -525,9 +387,16 @@ func _build_head() -> void:
 	head.ring_slot_tapped.connect(_on_head_ring_tapped)
 	head.human_station_clicked.connect(_on_human_dot_tapped)
 	head.center_hub_clicked.connect(_on_head_hub_tapped)
+	## THE JOYSTICK LISTENS BESIDE THE DIAL, NOT INSIDE IT. Every Control emits
+	## `gui_input` for the same events its own `_gui_input` is handed, so the
+	## drag is read here without one line changing in MandalaDialTap -- and the
+	## dial's own tap, walk and snap all still happen exactly as before.
+	head.gui_input.connect(_on_head_gesture)
 
 	room_mark = RoomMark.new(self)
 	head.add_child(room_mark)
+
+	head_cap = _build_caption("HeadCaption")
 
 
 ## 3. THE BODY DIAL, BIG, DRAWN AROUND THE CREATURE. The ring is the whole
@@ -562,6 +431,7 @@ func _build_body() -> void:
 	creature_field.gui_input.connect(_on_creature_input)
 	body_band.add_child(creature_field)
 	body_band.resized.connect(_layout_stage)
+	body_cap = _build_caption("BodyCaption")
 	_layout_stage.call_deferred()
 
 
@@ -642,68 +512,261 @@ func _build_earth() -> void:
 	bands.add_child(earth_lines)
 	earth_lines.line_tapped.connect(_on_earth_line_tapped)
 	earth_lines.hub_tapped.connect(_on_earth_hub_tapped)
+	## BOTH FACES ARE SCRUBBED THE SAME WAY, and neither of them knows it.
+	earth.gui_input.connect(_on_earth_gesture)
+	earth_lines.gui_input.connect(_on_earth_gesture)
+
+	earth_cap = _build_caption("EarthCaption")
 	_apply_earth_mode()
 
 
-## 5. THE COMPOSER: ask, a mic that is honest about being a stub, and send.
-func _build_composer() -> void:
-	composer = PanelContainer.new()
-	composer.name = "Composer"
-	composer.custom_minimum_size = Vector2(0.0, COMPOSER_H)
-	composer.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	composer.add_theme_stylebox_override("panel", SKIN.skin())
-	bands.add_child(composer)
+# -- the way out, the captions and the two joysticks -------------------------
 
-	var margin := MarginContainer.new()
-	margin.name = "Margin"
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 6)
-	composer.add_child(margin)
+## THE BACK BAR: the first band, and the only chrome on the page. One word and
+## an arrow, because the page it goes back to has a name and a person knows it.
+func _build_back_bar() -> void:
+	back_bar = PanelContainer.new()
+	back_bar.name = "BackBar"
+	back_bar.custom_minimum_size = Vector2(0.0, BACK_H)
+	back_bar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	back_bar.mouse_filter = Control.MOUSE_FILTER_STOP
+	back_bar.add_theme_stylebox_override("panel", SKIN.skin())
+	back_bar.gui_input.connect(_on_back_input)
+	bands.add_child(back_bar)
 
-	var row := HBoxContainer.new()
-	row.name = "HBox"
-	row.add_theme_constant_override("separation", 6)
-	margin.add_child(row)
+	var lab := Label.new()
+	lab.name = "Back"
+	lab.text = "\u2190 front"
+	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lab.add_theme_font_size_override("font_size", 15)
+	lab.add_theme_color_override("font_color", Color(0.78, 0.88, 0.98, 1.0))
+	lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	back_bar.add_child(lab)
 
-	ask_field = LineEdit.new()
-	ask_field.name = "Ask"
-	ask_field.placeholder_text = "ask"
-	ask_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	ask_field.custom_minimum_size = Vector2(0.0, 46.0)
-	ask_field.add_theme_font_size_override("font_size", 16)
-	ask_field.text_submitted.connect(_on_submitted)
-	row.add_child(ask_field)
 
-	btn_mic = Button.new()
-	btn_mic.name = "Mic"
-	btn_mic.text = MIC_IDLE
-	btn_mic.disabled = true
-	btn_mic.custom_minimum_size = Vector2(64.0, 46.0)
-	btn_mic.add_theme_font_size_override("font_size", 15)
-	btn_mic.pressed.connect(_on_mic_pressed)
-	row.add_child(btn_mic)
+## ONE CAPTION, BUILT AND PARKED IN THE BAND ORDER. It is a band of its own
+## rather than a child of the dial, so the dial's rect stays the dial's rect
+## and the three bands can still be measured against each other.
+func _build_caption(node_name: String) -> Label:
+	var lab := Label.new()
+	lab.name = node_name
+	lab.custom_minimum_size = Vector2(0.0, CAPTION_H)
+	lab.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lab.autowrap_mode = TextServer.AUTOWRAP_OFF
+	lab.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	lab.add_theme_font_size_override("font_size", 14)
+	lab.add_theme_color_override("font_color", Color(0.78, 0.88, 0.98, 1.0))
+	lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bands.add_child(lab)
+	return lab
 
-	## The loudness the recogniser reports, and nothing else. It stands beside
-	## the button rather than inside it, so the word on the button never moves.
-	mic_meter = ProgressBar.new()
-	mic_meter.name = "MicLevel"
-	mic_meter.custom_minimum_size = Vector2(8.0, 0.0)
-	mic_meter.fill_mode = ProgressBar.FILL_BOTTOM_TO_TOP
-	mic_meter.show_percentage = false
-	mic_meter.min_value = 0.0
-	mic_meter.max_value = MIC_RMS_FULL
-	mic_meter.value = 0.0
-	mic_meter.visible = false
-	mic_meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(mic_meter)
 
-	btn_send = Button.new()
-	btn_send.name = "Send"
-	btn_send.text = "SEND"
-	btn_send.custom_minimum_size = Vector2(74.0, 46.0)
-	btn_send.add_theme_font_size_override("font_size", 15)
-	btn_send.pressed.connect(_on_send_pressed)
-	row.add_child(btn_send)
+## THE SHEET THAT HEARS A SWIPE. Full glass, STOP, and third in the root so
+## every dial and every panel is picked ahead of it: it only ever hears a
+## finger that landed on nothing, which is exactly what "outside the dials"
+## means without this file having to measure a single rect.
+func _build_gestures() -> void:
+	gestures = Control.new()
+	gestures.name = "Gestures"
+	gestures.set_anchors_preset(Control.PRESET_FULL_RECT)
+	gestures.mouse_filter = Control.MOUSE_FILTER_STOP
+	gestures.gui_input.connect(_on_sheet_input)
+	root.add_child(gestures)
+	root.move_child(gestures, 2)
+
+
+## The three captions, one figure each, marked the way the strip marked them.
+func _refresh_captions() -> void:
+	if head_cap != null:
+		head_cap.text = "%s HEAD %s" % [MOON, _figure_word(_head_bits())]
+	if body_cap != null:
+		body_cap.text = "%s BODY %s" % [SUN, _figure_word(_body_bits())]
+	if earth_cap != null:
+		earth_cap.text = "%s EARTH %s" % [EARTH_ICON, _figure_word(_earth_bits())]
+
+
+## The three figures in one line, which is what the captions say between them.
+func figures_phrase() -> String:
+	return _figures_phrase()
+
+
+## THE PAGE IS PUT UP. Whoever owns the layer may also show it themselves; this
+## is the same act said in one word, so a caller does not have to know that a
+## CanvasLayer is what a page is made of.
+func open() -> void:
+	if layer != null:
+		layer.visible = true
+
+
+## AND TAKEN DOWN. The page hides itself and SAYS SO, and it is the saying that
+## matters: the front owns the composer and its own room and has to know they
+## may come back. Closing a page that is already down is not an error -- the
+## back button is allowed to be pressed twice.
+func close() -> void:
+	if layer != null:
+		layer.visible = false
+	_head_steering = false
+	_earth_scrubbing = false
+	_swipe_from = INF
+	closed.emit()
+
+
+## Whether the page is standing.
+func is_open() -> bool:
+	return layer != null and layer.visible
+
+
+## ANDROID'S OWN BACK BUTTON shuts the page, which is the only thing back can
+## mean on a page that was opened from somewhere.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		close()
+
+
+## A tap anywhere on the bar goes back.
+func _on_back_input(event: InputEvent) -> void:
+	if not _is_release(event):
+		return
+	back_bar.accept_event()
+	close()
+
+
+## A DRAG DOWN OFF THE GLASS GOES BACK TOO. Eighty pixels, the same distance
+## the front asks for upward, and nothing shorter: a tap on the ground between
+## two dials must not throw the page away.
+func _on_sheet_input(event: InputEvent) -> void:
+	var down: Variant = _press_at(event)
+	if down != null:
+		_swipe_from = (down as Vector2).y
+		return
+	var up: Variant = _release_at(event)
+	if up == null:
+		return
+	var travel: float = (up as Vector2).y - _swipe_from
+	_swipe_from = INF
+	if travel >= SWIPE_PX:
+		gestures.accept_event()
+		close()
+
+
+## THE HEAD JOYSTICK. Down on the ring arms it, every motion while it is armed
+## says the angle the finger is standing at, and the release disarms it and
+## leaves the dial's own tap to do what it has always done.
+func _on_head_gesture(event: InputEvent) -> void:
+	if head == null:
+		return
+	var mid: Vector2 = head.size * 0.5
+	var r: float = minf(head.size.x, head.size.y) * 0.44
+	var down: Variant = _press_at(event)
+	if down != null:
+		var d: float = (down as Vector2).distance_to(mid)
+		_head_steering = r > 1.0 and d >= r * RING_INNER and d <= r * RING_OUTER
+		return
+	if _release_at(event) != null:
+		_head_steering = false
+		return
+	var moved: Variant = _drag_at(event)
+	if moved == null or not _head_steering:
+		return
+	steer_head(fposmod(((moved as Vector2) - mid).angle(), TAU))
+
+
+## WHERE THE HEAD IS POINTED, said once and pushed once. The signal is always
+## raised; the fly's own goal heading is set as well when there is a fly, and
+## the name that is set is the one the connectome really spells --
+## `FlyCentralComplex.target_heading`, the fan-shaped body's goal vector. There
+## is no `set_target_heading` on it, only `set_target_hexagram` and
+## `set_target_trigram`, and neither of those is an angle.
+func steer_head(angle_rad: float) -> void:
+	var a: float = fposmod(angle_rad, TAU)
+	head_steered.emit(a)
+	var cx: Object = central_complex()
+	if cx == null:
+		return
+	if cx.has_method("set_target_heading"):
+		cx.call("set_target_heading", a)
+	elif "target_heading" in cx:
+		cx.set("target_heading", a)
+
+
+## The fan-shaped body, through the character the store keeps, or null when no
+## brain has been built -- which is what a hand-made Hud3 with no store is.
+func central_complex() -> Object:
+	if _store == null or not _store.has_method("get_character"):
+		return null
+	var ch: Variant = _store.get_character()
+	if ch == null:
+		return null
+	return ch.get("central_complex") as Object
+
+
+## THE EARTH SCRUB. The same shape as the head's, saying a share of the day
+## rather than an angle, because the earth ring is the year and not a compass.
+func _on_earth_gesture(event: InputEvent) -> void:
+	var dial: Control = _earth_control()
+	if dial == null:
+		return
+	var mid: Vector2 = dial.size * 0.5
+	var r: float = minf(dial.size.x, dial.size.y) * 0.44
+	var down: Variant = _press_at(event)
+	if down != null:
+		var d: float = (down as Vector2).distance_to(mid)
+		_earth_scrubbing = r > 1.0 and d >= r * RING_INNER and d <= r * RING_OUTER
+		return
+	if _release_at(event) != null:
+		if _earth_scrubbing:
+			_earth_scrubbing = false
+			earth_released.emit()
+		return
+	var moved: Variant = _drag_at(event)
+	if moved == null or not _earth_scrubbing:
+		return
+	earth_scrubbed.emit(day_phase_of(((moved as Vector2) - mid).angle()))
+
+
+## AN ANGLE ROUND THE EARTH RING, AS A SHARE OF THE DAY. Midnight is straight
+## up and the day runs clockwise, which is the way every dial on this glass
+## already reads.
+static func day_phase_of(angle_rad: float) -> float:
+	return clampf(fposmod(angle_rad + PI * 0.5, TAU) / TAU, 0.0, 1.0)
+
+
+## Where a finger went down, or null if this event is not a press.
+static func _press_at(event: InputEvent) -> Variant:
+	if event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
+		return (event as InputEventScreenTouch).position
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+			return mb.position
+	return null
+
+
+## Where a finger came up, or null.
+static func _release_at(event: InputEvent) -> Variant:
+	if event is InputEventScreenTouch and not (event as InputEventScreenTouch).pressed:
+		return (event as InputEventScreenTouch).position
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if not mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+			return mb.position
+	return null
+
+
+## Where a finger that is still down has moved to, or null.
+static func _drag_at(event: InputEvent) -> Variant:
+	if event is InputEventScreenDrag:
+		return (event as InputEventScreenDrag).position
+	if event is InputEventMouseMotion:
+		return (event as InputEventMouseMotion).position
+	return null
+
+
+static func _is_release(event: InputEvent) -> bool:
+	return _release_at(event) != null
 
 
 # -- wiring ------------------------------------------------------------------
@@ -730,36 +793,7 @@ func bind(store: Node, qwen: Node, mnn: Node, wmn: Node) -> void:
 		_join(_store, "room_changed", _on_room_changed)
 		_join(_store, "answer_changed", _on_answer_changed)
 	_join(_mnn, "token", _on_token)
-	## A PEER THAT STOPS SHOUTING LEAVES THE DIAL. `_feed_radar` only ever adds
-	## what the fabric currently holds, and a heading dictionary that keeps a
-	## dead entry would keep drawing a blip for somebody who walked out. The
-	## fabric's own timeout is the authority on who is gone; the glass just
-	## forwards the word.
-	_join(_wmn, "peer_gone", _on_peer_gone)
-	_build_dashboard()
 	_refresh_dials()
-
-
-func _on_peer_gone(who: String) -> void:
-	if radar != null:
-		radar.drop_peer(who)
-	## THERE ARE TWO RADARS AND ONE FABRIC. The dashboard carries the dial a
-	## SLAB phone can actually open -- the pane above it is not drawn there --
-	## so the goodbye has to reach both or one of them keeps a ghost.
-	if dashboard != null and dashboard.has_method("drop_peer"):
-		dashboard.drop_peer(who)
-
-
-## THE COMPASS NODE, HANDED IN BY THE APP. Duck-typed and optional: the app that
-## boots without one (headless, or a phone with no magnetometer) draws exactly
-## the allocentric dial it drew before this existed.
-func set_heading(h: Node) -> void:
-	_heading = h
-	## The dashboard's own radar is the one a slab phone can open, so the
-	## compass goes down with it. `_build_dashboard` re-sends it if it builds
-	## after this call.
-	if dashboard != null and dashboard.has_method("set_heading"):
-		dashboard.set_heading(h)
 
 
 func set_senses(senses: Node) -> void:
@@ -789,31 +823,6 @@ func who() -> String:
 	return _who
 
 
-## THE MIC. The button is grey until the core says there is a recogniser --
-## the phone's own, or the desktop mock -- and from then on a tap starts it and
-## a second tap stops it. What comes back is WRITTEN INTO THE COMPOSER AND LEFT
-## THERE: the person still taps SEND. Nothing here sends by itself.
-func set_mic(mic: Node) -> void:
-	_mic = mic
-	if _mic == null:
-		btn_mic.disabled = true
-		return
-	_join(_mic, "partial", _on_mic_partial)
-	_join(_mic, "result", _on_mic_result)
-	_join(_mic, "error", _on_mic_error)
-	_join(_mic, "level", _on_mic_level)
-	_join(_mic, "state", _on_mic_state)
-	btn_mic.disabled = not bool(_mic.call("available"))
-
-
-func mic_button() -> Button:
-	return btn_mic
-
-
-func mic_listening() -> bool:
-	return _mic_listening
-
-
 ## THE ADD-ON LOADER, passed straight through to the doors panel. The glass
 ## itself has no opinion about add-ons; it only knows where the panel is.
 func set_addons(addons: Node) -> void:
@@ -834,14 +843,6 @@ func alchemy() -> Node:
 
 
 # -- what the glass is asked for ---------------------------------------------
-
-func status_text() -> String:
-	return status_label.text
-
-
-func status_strip() -> Control:
-	return status_panel
-
 
 func bubble_text() -> String:
 	return bubble.says()
@@ -881,19 +882,6 @@ func _earth_control() -> Control:
 	if earth_lines != null and earth_lines.visible:
 		return earth_lines
 	return earth
-
-
-## A question, sent the way the send button sends one.
-func composer_send(text: String) -> bool:
-	var q: String = text.strip_edges()
-	if q == "" or _qwen == null:
-		return false
-	_stream = ""
-	_awaiting = true
-	ask_field.text = ""
-	bubble.say("...", _hub_point(head))
-	_qwen.ask(q)
-	return true
 
 
 # -- the finger --------------------------------------------------------------
@@ -1045,7 +1033,7 @@ func _on_earth_line_tapped(i: int) -> void:
 ## Where a line of the earth ring is, in the bubble's own coordinates.
 func _earth_line_point(i: int) -> Vector2:
 	if earth_lines == null or not earth_lines.visible:
-		return _hub_point(composer)
+		return _hub_point(head)
 	return _point_in_root(earth_lines, earth_lines.line_position(clampi(i, 0, 5)))
 
 
@@ -1090,55 +1078,6 @@ func _on_throw_requested(_trigram: int) -> void:
 	var bb: int = _body_bits()
 	bubble.say("BODY (MACHINE SENSORS)\n%s\n%s | %s" % [
 		_figure_word(bb), _geometry_word(), _pacing_phrase()], at)
-
-
-func _on_send_pressed() -> void:
-	composer_send(ask_field.text)
-
-
-# -- the mic -----------------------------------------------------------------
-
-func _on_mic_pressed() -> void:
-	if _mic == null:
-		return
-	if _mic_listening:
-		_mic.call("stop")
-	else:
-		_mic.call("start")
-
-
-func _on_mic_partial(text: String) -> void:
-	ask_field.text = text
-	ask_field.caret_column = text.length()
-
-
-func _on_mic_result(text: String) -> void:
-	if text.strip_edges() == "":
-		return
-	ask_field.text = text
-	ask_field.caret_column = text.length()
-
-
-func _on_mic_error(code: int, message: String) -> void:
-	bubble.say("MIC
-%s (%d)" % [message, code], _hub_point(head))
-
-
-func _on_mic_level(rms: float) -> void:
-	mic_meter.value = clampf(rms, 0.0, MIC_RMS_FULL)
-
-
-func _on_mic_state(name_of: String) -> void:
-	_mic_listening = name_of == "listening"
-	btn_mic.text = MIC_LIVE if _mic_listening else MIC_IDLE
-	mic_meter.visible = _mic_listening
-	if not _mic_listening:
-		mic_meter.value = 0.0
-	_refresh_status_strip(true)
-
-
-func _on_submitted(text: String) -> void:
-	composer_send(text)
 
 
 # -- what the store says back ------------------------------------------------
@@ -1198,7 +1137,7 @@ func _on_answer_changed(a: String) -> void:
 func _answer_point() -> Vector2:
 	if _cfg_earth_mode == "lines" and _last_moved_line >= 0 and earth_lines != null:
 		return _earth_line_point(_last_moved_line)
-	return _hub_point(composer)
+	return _hub_point(head)
 
 
 func _on_token(t: String) -> void:
@@ -1210,8 +1149,6 @@ func _on_token(t: String) -> void:
 # -- refreshing --------------------------------------------------------------
 
 func _process(_delta: float) -> void:
-	_refresh_status_strip()
-	_feed_radar()
 	_feed_breath()
 
 
@@ -1222,54 +1159,6 @@ func _feed_breath() -> void:
 	if not _cfg_breathe or _creature == null or not _creature.has_method("set_breath_rate"):
 		return
 	_creature.set_breath_rate(dwell_fraction())
-
-
-## THE STRIP IS NOT A FRAME-RATE COUNTER FOR THE RENDERER TO CHASE. The strip
-## carries an FPS number, and a Label reshapes its whole line whenever the text
-## it is handed differs from the text it holds. Written every frame, the number
-## differed every frame the moment the phone left a flat 60, so the strip paid
-## a full text shaping on every frame, which cost frames, which moved the
-## number again: the phone latched at 22-24 FPS and stayed there. Now the
-## sentence is composed four times a second and only assigned when it really
-## changed, so a still screen shapes no text at all.
-func _refresh_status_strip(force: bool = false) -> void:
-	var now: int = Time.get_ticks_msec()
-	if not force and now - _status_at < STATUS_PERIOD_MS:
-		return
-	_status_at = now
-	var line: String = _status_line()
-	if line != status_label.text:
-		status_label.text = line
-
-
-## ONE DICTIONARY A FRAME, and the swarm's headings beside it. Both are read
-## duck-typed through the objects bind() handed over; the glass names no brain
-## and no transport.
-func _feed_radar() -> void:
-	if radar == null:
-		return
-	if _store != null and _store.has_method("get_character"):
-		var ch: Variant = _store.get_character()
-		if ch != null and ch.has_method("get_fly_state"):
-			radar.set_state(ch.get_fly_state() as Dictionary)
-	if _wmn != null and _wmn.has_method("peer_headings"):
-		radar.set_peer_headings(_wmn.peer_headings() as Dictionary)
-	if _wmn != null and _wmn.has_method("peer_proximity"):
-		radar.set_peer_proximity(_wmn.peer_proximity() as Dictionary)
-	## AND THE COMPASS, WHICH IS GODOT'S OWN AND NOBODY'S PLUGIN. Seven facts a
-	## frame, pushed rather than pulled, so the radar never reaches for a sensor
-	## and the app can boot with no Heading at all -- which is exactly what
-	## headless is. Duck-typed like everything else the glass is handed.
-	if _heading != null and _heading.has_method("heading_rad"):
-		radar.set_compass({
-			"heading_rad": _heading.heading_rad(),
-			"accuracy": _heading.accuracy(),
-			"pose": _heading.pose(),
-			"live": _heading.live(),
-			"seen": _heading.seen(),
-			"true_north": _heading.true_north(),
-			"declination": _heading.declination(),
-		})
 
 
 func _refresh_dials() -> void:
@@ -1300,7 +1189,6 @@ func _refresh_room() -> void:
 func _layout_stage() -> void:
 	if root == null or stage == null or body_band == null or creature_field == null or body == null:
 		return
-	_apply_radar_layout()
 	var box: Vector2 = root.size
 	if box.x < 8.0 or box.y < 8.0:
 		return
@@ -1354,39 +1242,7 @@ func _to_stage(p: Vector2) -> Vector2:
 	return Vector2(clampf(q.x, 0.0, v.x), clampf(q.y, 0.0, v.y))
 
 
-# -- the status line ---------------------------------------------------------
-
-## TWO LINES, NEWEST FIRST. The top line is whatever just happened -- a line
-## of the body turning, and how it was earned -- and when nothing has just
-## happened it falls back to the thing the owner's old surface put in the
-## biggest type it had: WHICH TWO FIGURES ARE STANDING. The second line is the
-## state that is always true and never news: the fabric, the pacing, the tier
-## and the frame rate.
-## THE FIGURES ALWAYS HOLD THE TOP LINE, and the news displaces the STATE
-## underneath them. The first arrangement gave a fresh flip the top line, which
-## read well and worked badly: under stillness the alchemy turns a line about
-## as often as a flip stays news, so the two figures -- the thing the owner's
-## old surface set in the biggest type it had -- would have been shown almost
-## never. What a person is holding outranks what just happened to it.
-func _status_line() -> String:
-	## THE DAY DISPLACES THE STATE, NOT THE FIGURES. The rule written above
-	## holds for this mode too: what a person is HOLDING keeps the top line, and
-	## the day's one sentence takes the line the fabric and the frame rate used
-	## to have. `day_line` is the sentence on its own, for whoever wants it.
-	if _mic_listening:
-		return _figures_phrase() + "\n" + MIC_PHRASE
-	if _cfg_status_mode == "day":
-		return _figures_phrase() + "\n" + day_line()
-	var news: String = _flip_phrase()
-	return _figures_phrase() + "\n" + (news if news != "" else _state_phrase())
-
-
-## The strip with no news on it: the two figures over the state. This is the
-## glass's OWN sentence, and it is ASCII but for the owner's two marks. The
-## news that displaces it is the core's own words and is left as it is spoken.
-func status_summary() -> String:
-	return _figures_phrase() + "\n" + _state_phrase()
-
+# -- the day ---------------------------------------------------------------
 
 ## THE DAY, IN ONE SENTENCE: "Day 3 · Breath opens". Which day of the journal a
 ## person is on, which of the six habits is the one currently turning, and which
@@ -1486,14 +1342,6 @@ func journal_text() -> String:
 	return "\n".join(lines)
 
 
-## A finger on the strip opens the journal behind it.
-func _on_status_input(event: InputEvent) -> void:
-	if not GlassBubble._is_release(event):
-		return
-	status_panel.accept_event()
-	bubble.open_large(journal_text(), _hub_point(status_panel))
-
-
 # -- the dwell ---------------------------------------------------------------
 
 ## HOW FULL THE CIVIL FIRE IS, 0..1: the stillness the senses are reporting over
@@ -1553,38 +1401,6 @@ func room_echo() -> bool:
 func _figures_phrase() -> String:
 	return "%s HEAD %s   %s BODY %s   %s EARTH %s" % [
 		MOON, _figure_word(_head_bits()), SUN, _figure_word(_body_bits()), EARTH_ICON, _figure_word(_earth_bits())]
-
-
-## What is always true and never news.
-func _state_phrase() -> String:
-	var state: Array[String] = ([] as Array[String])
-	state.append(_mesh_phrase())
-	state.append(_pacing_phrase())
-	state.append(_tier_phrase())
-	state.append("%d FPS" % Engine.get_frames_per_second())
-	return " | ".join(state)
-
-
-func _flip_phrase() -> String:
-	if _store == null or not ("last_flip" in _store):
-		return ""
-	var f: Dictionary = _store.last_flip
-	var when: int = int(f.get("when", 0))
-	if when <= 0 or (_now_ms() - when) > FLIP_FRESH_MS:
-		return ""
-	return "flip L%d %s %s" % [
-		int(f.get("line", 0)) + 1,
-		"yang" if bool(f.get("to_yang", false)) else "yin",
-		String(f.get("reason", "")),
-	]
-
-
-func _mesh_phrase() -> String:
-	if _wmn == null:
-		return "mesh off"
-	var fabric: String = "lan" if bool(_wmn.force_lan) else "nearby"
-	var backend: String = String(_mnn.backend_name()) if _mnn != null else "none"
-	return "%s %s %dp" % [fabric, backend, _peer_count()]
 
 
 func _pacing_phrase() -> String:
@@ -1650,19 +1466,20 @@ func config_text() -> String:
 	return "\n".join(lines)
 
 
-## THE GEAR OPENS THE DASHBOARD. config_text() is still the words, and the
-## telemetry tests still read them; the finger gets the gauges.
-func _on_configure_pressed() -> void:
-	toggle_dashboard()
-
-
 ## The dashboard, opened or shut. Returns whether it now stands.
 func toggle_dashboard() -> bool:
+	return bool(dashboard_page().toggle()) if dashboard_page() != null else false
+
+
+## THE DASHBOARD, BUILT THE FIRST TIME SOMEBODY ASKS FOR IT AND NOT AT BIND.
+## It carries a calcium radar of its own, and the front already stands one in
+## the room; building it at bind would have put a second radar in the tree the
+## moment a finger opened the dials, which is exactly the thing this page was
+## taken apart to stop. Asked for, it is built, hidden, and returned.
+func dashboard_page() -> HexyDashboard:
 	if dashboard == null:
 		_build_dashboard()
-	if dashboard == null:
-		return false
-	return bool(dashboard.toggle())
+	return dashboard
 
 
 func dashboard_open() -> bool:
@@ -1678,8 +1495,6 @@ func _build_dashboard() -> void:
 	root.add_child(dashboard)
 	dashboard.set_host(self)
 	dashboard.bind(_store, _mnn, _wmn, _senses, _alchemy, _qwen)
-	if _heading != null:
-		dashboard.set_heading(_heading)
 	if _addons != null:
 		dashboard.set_addons(_addons)
 
@@ -2063,60 +1878,3 @@ class RoomMark extends Control:
 		var ang: float = float(dial.get("dial_angle")) + float(int(dial.call("head_slot"))) * (TAU / 64.0)
 		var dir := Vector2(cos(ang), sin(ang))
 		draw_line(mid + dir * (r * 0.86), mid + dir * (r * 1.06), Hud3.COL_ROOM, 3.0)
-
-
-class AxisSpine extends Control:
-	var _hud: Node = null
-	func _init(h: Node) -> void:
-		_hud = h
-		name = "AxisSpine"
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		set_anchors_preset(Control.PRESET_FULL_RECT)
-
-	func _process(_delta: float) -> void:
-		queue_redraw()
-
-	func _draw() -> void:
-		return
-		if _hud == null:
-			return
-		var st: Control = _hud.get("status_panel")
-		var hd: Control = _hud.get("head")
-		var bd: Control = _hud.get("body_band")
-		var et: Control = _hud.get("earth")
-		var cp: Control = _hud.get("composer")
-		if st == null or hd == null or bd == null or et == null or cp == null:
-			return
-
-		var cx: float = size.x * 0.5
-		var col_glow := Color(0.12, 0.65, 0.95, 0.28)
-		var col_line := Color(0.25, 0.80, 1.0, 0.65)
-		var col_pip := Color(1.0, 0.85, 0.35, 0.95)
-
-		# Pairs of (upper_bottom_y, lower_top_y) representing the meridian gaps
-		# | [status] | (head) | (body) | (earth) | [chat] |
-		var gaps: Array = [
-			[0.0, st.position.y],
-			[st.position.y + st.size.y, hd.position.y],
-			[hd.position.y + hd.size.y, bd.position.y],
-			[bd.position.y + bd.size.y, et.position.y],
-			[et.position.y + et.size.y, cp.position.y],
-			[cp.position.y + cp.size.y, size.y]
-		]
-
-		for g in gaps:
-			var y0: float = float(g[0])
-			var y1: float = float(g[1])
-			if y1 > y0 + 2.0:
-				draw_line(Vector2(cx, y0), Vector2(cx, y1), col_glow, 4.0)
-				draw_line(Vector2(cx, y0), Vector2(cx, y1), col_line, 1.8)
-				var mid_y: float = (y0 + y1) * 0.5
-				var pip_h: float = minf(4.0, (y1 - y0) * 0.25)
-				var pip_w: float = 3.0
-				var pts: PackedVector2Array = [
-					Vector2(cx, mid_y - pip_h),
-					Vector2(cx + pip_w, mid_y),
-					Vector2(cx, mid_y + pip_h),
-					Vector2(cx - pip_w, mid_y)
-				]
-				draw_colored_polygon(pts, col_pip)

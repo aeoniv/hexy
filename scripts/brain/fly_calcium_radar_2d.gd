@@ -172,6 +172,42 @@ var _blips: Dictionary = {}
 @export var ring_thickness: float = 18.0
 @export var show_neuromodulators: bool = true
 
+## QUIET MODE: the same instance parked on the front glass as "the room", the
+## creature standing in `hub_rect()`. No wedges, no neuromod bars, the ring
+## track thinned to a single faint arc, peer rings dimmed -- but the needle,
+## the north caption, the blips, the in-phase ring, the mentor tick and the
+## guide line all stay, because those are the room, not the instrument panel.
+var quiet: bool = false
+## Independent of `quiet` so a caller can mix (e.g. wedges off, bars on).
+## `set_quiet` drives both together; toggling one directly is also honest.
+var show_wedges: bool = true
+var show_bars: bool = true
+## The ring track's alpha in quiet mode, against the loud `Color(0.12, 0.16, 0.22, 0.8)` above.
+const QUIET_TRACK_ALPHA := 0.35
+## Peer rings in quiet mode: PEER_RING_COLOR's own alpha times this.
+const QUIET_PEER_RING_MUL := 0.5
+## The creature's parking spot, as a fraction of field_radius(), side length.
+const HUB_RECT_FRAC := HUB_FRAC
+
+
+## Sets `quiet` and, with it, `show_wedges` / `show_bars` together: quiet hides
+## both, loud restores both. Queues a redraw so the change is seen on the next
+## frame rather than waiting for whatever else happens to touch the tree.
+func set_quiet(on: bool) -> void:
+	quiet = on
+	show_wedges = not on
+	show_bars = not on
+	queue_redraw()
+
+
+## The square the creature stands in: centred on the disc, side
+## `2 * field_radius() * HUB_FRAC`. Identical in both modes -- the room's
+## floor plan does not change when the instrument panel does.
+func hub_rect() -> Rect2:
+	var side: float = 2.0 * field_radius() * HUB_RECT_FRAC
+	var c: Vector2 = disc_center()
+	return Rect2(c - Vector2(side, side) * 0.5, Vector2(side, side))
+
 
 func _init() -> void:
 	custom_minimum_size = Vector2(220, 260)
@@ -586,9 +622,13 @@ func _draw() -> void:
 	var center := Vector2(size.x * 0.5, radar_radius + 18.0)
 	var tau_slice: float = TAU / 8.0
 	
-	# 1. Background ring track
-	draw_arc(center, radar_radius, 0.0, TAU, 48, Color(0.12, 0.16, 0.22, 0.8), ring_thickness, true)
-	
+	# 1. Background ring track. Loud: the full wedge-thick band. Quiet: a
+	# single faint arc -- the room's wall, not an instrument.
+	if quiet:
+		draw_arc(center, radar_radius, 0.0, TAU, 48, Color(0.12, 0.16, 0.22, QUIET_TRACK_ALPHA), 1.0, true)
+	else:
+		draw_arc(center, radar_radius, 0.0, TAU, 48, Color(0.12, 0.16, 0.22, 0.8), ring_thickness, true)
+
 	# 2. Draw 8 Calcium Activity Wedges
 	var activities: Array = [0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125]
 	var current_heading: float = 0.0
@@ -600,24 +640,25 @@ func _draw() -> void:
 			activities = central_complex.activity
 		if "current_heading" in central_complex:
 			current_heading = central_complex.current_heading
-	
-	for i in range(8):
-		var start_angle: float = float(i) * tau_slice - (tau_slice * 0.5)
-		var end_angle: float = start_angle + tau_slice * 0.92
-		var act: float = float(activities[i]) if i < activities.size() else 0.125
-		
-		# Fluorescent GCaMP Calcium Green/Cyan glow
-		var glow_alpha: float = clampf(act * 2.5, 0.15, 1.0)
-		var glow_color := Color(0.1, 0.95, 0.7, glow_alpha)
-		if act > 0.22:
-			glow_color = Color(0.4, 1.0, 0.85, glow_alpha) # Peak excitation
-			
-		draw_arc(center, radar_radius, start_angle, end_angle, 12, glow_color, ring_thickness * clampf(act * 2.2, 0.7, 1.3), true)
-		
-		# Trigram label on perimeter
-		var label_angle: float = float(i) * tau_slice
-		var label_pos: Vector2 = center + Vector2(cos(label_angle), sin(label_angle)) * (radar_radius + ring_thickness * 0.5 + 14.0)
-		draw_string(ThemeDB.fallback_font, label_pos + Vector2(-12, 5), TRIGRAM_NAMES[i], HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color(0.75, 0.82, 0.9, glow_alpha))
+
+	if show_wedges:
+		for i in range(8):
+			var start_angle: float = float(i) * tau_slice - (tau_slice * 0.5)
+			var end_angle: float = start_angle + tau_slice * 0.92
+			var act: float = float(activities[i]) if i < activities.size() else 0.125
+
+			# Fluorescent GCaMP Calcium Green/Cyan glow
+			var glow_alpha: float = clampf(act * 2.5, 0.15, 1.0)
+			var glow_color := Color(0.1, 0.95, 0.7, glow_alpha)
+			if act > 0.22:
+				glow_color = Color(0.4, 1.0, 0.85, glow_alpha) # Peak excitation
+
+			draw_arc(center, radar_radius, start_angle, end_angle, 12, glow_color, ring_thickness * clampf(act * 2.2, 0.7, 1.3), true)
+
+			# Trigram label on perimeter
+			var label_angle: float = float(i) * tau_slice
+			var label_pos: Vector2 = center + Vector2(cos(label_angle), sin(label_angle)) * (radar_radius + ring_thickness * 0.5 + 14.0)
+			draw_string(ThemeDB.fallback_font, label_pos + Vector2(-12, 5), TRIGRAM_NAMES[i], HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color(0.75, 0.82, 0.9, glow_alpha))
 	
 	# 3b. THE ROOM INSIDE THE RING. The proximity rings on the disc, the log
 	# rings when somebody has handed in metres, and one blip per peer, coloured
@@ -625,18 +666,21 @@ func _draw() -> void:
 	var fr: float = field_radius()
 	refresh_blips()
 	var plots: Dictionary = peer_plots()
+	var ring_color: Color = PEER_RING_COLOR
+	if quiet:
+		ring_color = Color(ring_color.r, ring_color.g, ring_color.b, ring_color.a * QUIET_PEER_RING_MUL)
 	if has_metres():
 		# 10 m / 100 m / 1 km. Drawn only when there are metres to be log of;
 		# a dial that showed a metric scale for a touch/room/far transport would
 		# be inventing a precision nobody measured.
 		for i in RING_M.size():
 			var rr: float = fr * log_frac(RING_M[i])
-			draw_arc(center, rr, 0.0, TAU, 64, PEER_RING_COLOR, 1.0, true)
+			draw_arc(center, rr, 0.0, TAU, 64, ring_color, 1.0, true)
 			draw_string(ThemeDB.fallback_font, center + Vector2(6.0, -rr + 11.0),
 				RING_LABELS[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 9, DIM_COLOR)
 	else:
 		for cls in RING_ORDER:
-			draw_arc(center, fr * ring_frac(cls), 0.0, TAU, 40, PEER_RING_COLOR, 1.0, true)
+			draw_arc(center, fr * ring_frac(cls), 0.0, TAU, 40, ring_color, 1.0, true)
 	# 3c. HOW MUCH TO BELIEVE EACH BEARING, as a BAND ALONG THAT PEER'S OWN RING
 	# -- never as a wedge from the centre. A shape that starts at your character
 	# and opens outward is the universal drawing of a FIELD OF VIEW, and every
@@ -691,9 +735,9 @@ func _draw() -> void:
 	draw_circle(center, 4.0, needle_col)
 	
 	# 4. Neuromodulator Spectrum Gauges
-	if show_neuromodulators and _fed:
+	if show_neuromodulators and show_bars and _fed:
 		_draw_bars(center, Array(_mods))
-	elif show_neuromodulators and character != null and "_fullness" in character:
+	elif show_neuromodulators and show_bars and character != null and "_fullness" in character:
 		_draw_bars(center, Array(character._fullness))
 
 

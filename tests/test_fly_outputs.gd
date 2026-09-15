@@ -175,7 +175,13 @@ func _test_radar_in_the_glass() -> void:
 	_check(found.custom_minimum_size.x >= 220.0,
 		"and it is at least 220 px wide wherever it stands")
 
-	var hud: Hud3 = app.hud
+	## THE DIALS ARE A PAGE NOW, so the three bands are measured on the page a
+	## finger opens rather than on the app's own child. The radar found above is
+	## the FRONT's one room, and the layout word is the front's too.
+	var front: Front = app.front
+	var hud: Hud3 = front.open_dials() as Hud3
+	await process_frame
+	await process_frame
 	for px in [TALL, WIDE]:
 		await _use(px)
 		var h: Rect2 = hud.head_rect()
@@ -183,19 +189,22 @@ func _test_radar_in_the_glass() -> void:
 		var e: Rect2 = hud.earth_rect()
 		var r: Rect2 = found.get_global_rect()
 		print("at %dx%d: radar %s (%s) head %s body %s earth %s" % [
-			px.x, px.y, r, hud.radar_layout(), h, b, e])
+			px.x, px.y, r, front.radar_layout(), h, b, e])
 		_check(not h.intersects(b) and not b.intersects(e) and not h.intersects(e),
 			"at %dx%d the three dials still keep out of each other's way" % [px.x, px.y])
 		_check(h.size.x > 8.0 and b.size.x > 8.0 and e.size.x > 8.0,
 			"at %dx%d all three dials still have a band" % [px.x, px.y])
-		if hud.radar_layout() == "dual_pane":
-			_check(found.is_visible_in_tree(), "at %dx%d the radar is on the glass" % [px.x, px.y])
-			_check(not r.intersects(h) and not r.intersects(b) and not r.intersects(e),
-				"at %dx%d the radar lies beside the dials, never over one" % [px.x, px.y])
+		_check(r.size.x > 8.0, "at %dx%d the radar still has a room of its own" % [px.x, px.y])
 
 	# The radar is fed the character's own dictionary, not a brain member.
 	await _use(WIDE)
-	_check(hud.radar_layout() == "dual_pane", "the fold open puts the radar in its own column")
+	## THE ROOM IS THE FRONT'S AND IT HAS ONE PLACEMENT. The two-placement dance
+	## the dials page used to do went away with the dials page's own radar: the
+	## front stands one room, full width, whatever phone it is on.
+	_check(front.radar_layout() == "front", "the front has one placement for its one room")
+	front.close_dials()
+	await process_frame
+	_check(found.is_visible_in_tree(), "and with the page shut the room is on the glass")
 	var fly: Dictionary = app.store.get_character().get_fly_state()
 	found.set_state(fly)
 	found.set_peer_headings({"p1": 0.5, "p2": -1.0})
