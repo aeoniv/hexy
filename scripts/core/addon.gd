@@ -13,11 +13,12 @@ extends Node
 ## manifest and hands it the bus. Nothing in scripts/ may name an add-on, and
 ## no add-on may name another: the only edge is add-on -> base.
 ##
-## ONE STATE, STILL. An attached add-on writes through `store.note_seat`,
-## `Character.feed` / `Character.reward_event` and `Config.set_value` -- never
-## into a field of its own that somebody else then has to read. That is why
-## `store.dump()` before an attach and after a detach must be the same
-## dictionary, which is what tests/test_addon_bus.gd proves.
+## ONE STATE, STILL. An attached add-on writes through `store.note_seat`, a
+## need-line write through `bus.alchemy.nudge` (so marks and hysteresis apply),
+## a circuit write through `Character.feed` / `Character.reward_event`, and
+## `Config.set_value` -- never into a field of its own that somebody else then
+## has to read. That is why `store.dump()` before an attach and after a detach
+## must be the same dictionary, which is what tests/test_addon_bus.gd proves.
 
 ## THE FOUR CIRCUITS a door may drive instead of a need line. The six need
 ## lines are 0..5 (Character.LINE_BODY .. LINE_CONNECTION); these start at ten

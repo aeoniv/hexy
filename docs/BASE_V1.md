@@ -12,60 +12,84 @@ and with none present the base is byte-identical to this page (`tests/test_addon
   in `scripts/`; these two files are the whole story.
 - Orientation portrait, 720×1280 viewport, `canvas_items` stretch, Mobile renderer.
 
-## The nine objects the root builds (`scripts/glass/app.gd:67-140`)
+## The phase spine
 
-| object | file | what it is |
+PHASE runs at four timescales, each owned by one file and persisted in its own
+store section:
+
+| timescale | file | store section |
 |---|---|---|
-| `store` | `scripts/core/store.gd` | the one state: head / body / earth / room |
-| `mnn` | `scripts/core/mnn/mnn.gd` + `scripts/brain/mnn_runtime.gd` | on-device Qwen through the `ixmnn` aar, mock off-phone |
-| `qwen` | `scripts/core/qwen/qwen.gd` | judgements, prompt shaping |
-| `wmn` | `scripts/core/wmn/wmn.gd` | the fabric: presence, chirp clock, envelope6, ledger |
-| `senses` | `scripts/senses/senses.gd` | the sixteen (8 human + 8 machine) |
-| `alchemy` | `scripts/core/alchemy.gd` | the ONE body writer; nothing else turns a body line |
-| `oracle` | `scripts/sensor_oracle.gd` | raw accel/gyro/light → the fly's per-frame sample |
-| `mic` | `scripts/core/mic.gd` | Android recogniser, desktop mock |
-| `heading` | `scripts/core/heading.gd` | the compass — `Input.get_magnetometer()`, engine API, no plugin |
-| `creature` | `scripts/creature/creature.gd` | the solid in the body ring |
-| `hud` | `scripts/glass/hud3.gd` | the third glass |
-| `addons` | `scripts/core/addons.gd` | scans `res://addons/hexy_*/addon.gd`; empty here |
+| seconds | `scripts/brain/fly_calcium_radar_2d.gd` (calcium radar, live) | `body` (read only, not persisted itself) |
+| day | `scripts/core/entrain.gd` — entrained to the user, not the sun | `entrain` |
+| weeks–months | `scripts/core/alchemy.gd` — marks with hysteresis, the one body writer | `alchemy` |
+| life | `scripts/core/iching/journey.gd` — hero's-journey chapters over the hexagram path | `path` |
 
-The fly brain (`scripts/brain/fly_*.gd`) is native GDScript, not a plugin:
-central complex, mushroom body, giant fiber, circadian clock, conductance,
-hash, recall.
+Peers carry phase + stage over the mesh (`scripts/core/wmn/wmn.gd`,
+`scripts/net/mesh_fabric.gd`) as a social zeitgeber: a room's chirp clock and
+Envelope6 payload are a figure, not raw sensor data, so what crosses the wire
+is the same PHASE the local dials show.
 
-The I Ching (`scripts/core/iching/`) is King Wen 64, the Q6 lattice and the
-versioned Q6 prior, casting, pacing and debounce.
+## Screens and gestures
 
-## Surfaces a finger can reach
+- **FRONT** (`scripts/glass/front.gd`) — sentence bar, one quiet radar (room),
+  creature, hexagram, composer. This is what a person carries.
+- Tap the creature → **DIALS** (`scripts/glass/hud3.gd`): HEAD ring drag is
+  the tiller into `FlyCentralComplex` target heading, EARTH ring drag is the
+  day scrubber preview, BODY is read-only.
+- Tap a blip/dot → **PEER** sheet (`scripts/glass/peer_sheet.gd`).
+- Tap the hexagram → **READING** sheet (`scripts/glass/reading_sheet.gd`).
+- Swipe up → **DASHBOARD** (`scripts/glass/dashboard.gd`), which borrows the
+  radar loud. Panel 11 is the four timescales; panel 10 is the doors (which
+  add-on, if any, feeds each need line / circuit).
+- Back unwinds DASHBOARD → sheet → DIALS → FRONT. No long press anywhere.
 
-1. **The glass** — `scripts/glass/hud3.gd`: status line, HEAD dial, BODY dial
-   with the creature inside it, EARTH dial, composer. Tap only.
-2. **The bubble** — every reply, six seconds, beside whatever said it.
-3. **The dashboard** — `scripts/glass/dashboard.gd`, opened from the status
-   strip: ten panels on one scrolling column — identity/device, engine,
-   figures, the sixteen as an 8×8, fires & pacing, **fly (with the radar)**,
-   mesh, tunables, controls, doors.
-4. **The radar** — `scripts/brain/fly_calcium_radar_2d.gd`. Two placements:
-   - a fold that is open gets its own left column on the glass (`dual_pane`);
-   - **a slab phone reads it in dashboard panel 6 · FLY**, which is where the
-     tap-to-guide gesture lives on a normal phone. The glass's own pane is not
-     drawn in `tall_slab` (`hud3.gd:444-452`), so panel 6 is the page.
-   Both radars get the compass and both lose a peer when `Wmn.peer_gone` fires.
-5. **The doors panel (10)** — the six need lines and the four circuits, each
-   naming the add-on feeding it. With no add-ons every row reads `—`.
+## The one radar
+
+`scripts/brain/fly_calcium_radar_2d.gd` is both the room on FRONT (quiet: no
+wedges, no neuromodulator bars, just disc/needle/north caption/blips) and the
+loud fly panel in DASHBOARD panel 6. Both placements get the compass and both
+lose a peer when `Wmn.peer_gone` fires. There is exactly one radar script; a
+slab phone reads it in the dashboard, a folded phone gets it in its own left
+column.
+
+## The one body writer
+
+`scripts/core/alchemy.gd` is the only place a body line turns. Senses elect
+two trigrams and say how surely; Pacing pours that into the cube and decides
+which line may turn and when; Alchemy owns no state beyond the pacing it
+drives and turns lines with hysteresis (`alchemy_hysteresis_smoke.gd`). The
+coupling is one way: a head cast re-anchors the body, the body never writes
+back to the head.
+
+## Persistence
+
+`scripts/core/store.gd` (`dump()` / `load_dump()`) persists these sections:
+
+| section | holds |
+|---|---|
+| `body` | the six-line body figure (head/body/earth/room live state, not itself a store key) |
+| `path` | the hexagram path the life-timescale journey walks |
+| `entrain` | `Entrain`'s day-phase estimate |
+| `alchemy` | `Alchemy`'s marks and hysteresis state |
+
+## Config
+
+`scripts/core/config.gd`: **31** registered keys across groups `alchemy` (3),
+`creature` (1), `entrain` (2), `hud` (6), `mesh` (2), `pacing` (10), `prior`
+(3), `qwen` (3), `senses` (1). `set_value` clamps to a row's min/max or snaps
+an enum; `register` is the only way a key gets added.
 
 ## Android plugins
 
 | plugin | script seam | `REQUIRES` | aar in `addons/` |
 |---|---|---|---|
-| `ixmnn` | `scripts/brain/mnn_runtime.gd:28` | `ixmnn/2` | debug = `ixmnn/2`, **release = `ixmnn/1` (stale)** |
-| `ixmesh` | `scripts/net/mesh_peer.gd` | `ixmesh/1` | debug and release both `ixmesh/1`, both carry `peer_proximity` |
+| `ixmnn` | `scripts/brain/mnn_runtime.gd:28` | `ixmnn/2` | debug and release both answer `ixmnn/2` |
+| `ixmesh` | `scripts/net/mesh_peer.gd:27` | `ixmesh/1` | debug and release both `ixmesh/1`, both carry `peer_proximity` |
 
 The handshake is `scripts/seam.gd`: at attach the aar's `plugin_version()` is
 compared with the seam's `REQUIRES`, and a mismatch drops the singleton and
-runs the mock with one loud line. **A RELEASE APK MUST NOT BE CUT UNTIL
-`android_plugin/ixmnn` is rebuilt** — `./gradlew exportAllAars` — or MNN falls
-back to the mock on the phone.
+runs the mock with one loud line — the only gate, and it fires once, at
+attach.
 
 Neither plugin is required for the app to boot: no aar means the desktop mock
 and a LAN mesh instead of Nearby.
@@ -81,13 +105,32 @@ and a LAN mesh instead of Nearby.
 
 ## Tests
 
-47 scripts in `tests/`. Run them with
+57 scripts in `tests/`. Run them with
 
 ```
 Godot_v4.7.1-stable_win64_console.exe --headless --path . --import
 Godot_v4.7.1-stable_win64_console.exe --headless --path . -s tests/<name>.gd
 ```
 
+Suites that guard each rule: `test_addon_bus.gd` (add-on off = base
+unchanged), `alchemy_hysteresis_smoke.gd` (the one body writer),
+`entrain_smoke.gd` (day-phase), `journey_smoke.gd` (life-phase chapters),
+`test_circadian_radar_smoke.gd` / `geo_smoke.gd` / `heading_smoke.gd` (the one
+radar), `fabric_smoke.gd` / `mesh_smoke.gd` / `test_mesh_live.gd` (peers
+carrying phase), `plugin_version_smoke.gd` / `ixmnn_seam_smoke.gd` (the
+handshake), `test_config.gd` / `test_config_schema_json.gd` (config), `clock_smoke.gd` (one clock).
+
 Known flake: `tests/device_facts_smoke.gd:72` compares two live
 `ModelStore.free_storage_bytes()` readings and can disagree on a desktop where
 `df` moves between the two calls. It is an environment flake, not a code fault.
+
+## Deliberately open
+
+- The REFUSAL and REWARD journey stages (`scripts/core/iching/journey.gd`)
+  are named but never fire: `Journey` reaches them only if a caller decides,
+  elsewhere, that a CALL was ignored or answered, and nothing in the tree
+  makes that call yet.
+- `hud.status_mode` (`scripts/core/config.gd:159`) is a registered config key
+  with no reader.
+- `scripts/glass/hud3.gd` keeps its own `GlassBubble` instance (the same skin
+  FRONT also instantiates) for dial captions, not one shared status line.
