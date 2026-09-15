@@ -187,8 +187,12 @@ func _process(delta: float) -> void:
 	var time_dict = Time.get_time_dict_from_system()
 	solar_hour = float(time_dict.get("hour", 12)) + float(time_dict.get("minute", 0)) / 60.0
 
-	# ONE BRAIN, ONE STEP, ONCE A TICK.
-	_feed_fly_brain(delta, raw_acc)
+	## W10a -- THE ORACLE IS NO LONGER A HALTERES PRODUCER. It used to publish
+	## its own `accel`/`gyro_yaw_rate` Sense every frame while `HexySenses`
+	## published another from the same two engine calls, so the giant fiber
+	## saw the same motion twice from two clocks. `HexySenses.poll()` is the
+	## one producer now; the oracle keeps only what nothing else measures --
+	## its substrate punishments.
 	_check_substrate_punishments()
 
 	# 2. Coin toss divination
@@ -494,15 +498,44 @@ var _thermal_throttling: bool = false
 var _battery_critical: bool = false
 
 
-## Fires a named reward through the store into the character. Silent when the
-## store is not wired yet, which is every headless test that skips it.
+## W8d/W10a: THE ONE SENSE DOOR THIS FILE PUBLISHES THROUGH, and the only
+## one. Set by whoever wires the bus (`HexyTopic`). There is no fallback: a
+## null topic means the punishment is dropped with a `push_error`, because a
+## second, direct writer into the homeostat is the thing the bus removed.
+##
+## `_reward("cast_confirmed")` therefore no longer reaches the brain at all --
+## it names no line in REWARD_LINE, and a reward with no line is not a tarsi
+## touch. A cast is a glass event; if it should move a line, it needs a line.
+var topic: RefCounted = null
+
+
+## THE SUBSTRATE'S TWO PUNISHMENTS, AS A TARSAL TOUCH. Neither is a line a
+## sensor holds all the time; each is one signed drain on the line it hurts
+## most, the same shape [Character.route_sense] already reads any tarsi
+## touch as -- so this file need not know a KC or a reward exists, only that
+## a touch may drain a line.
+const REWARD_LINE := {
+	"thermal_throttle": 0,  # Character.LINE_BODY -- the substrate itself is hot.
+	"battery_critical": 1,  # Character.LINE_FOOD -- starving for power.
+}
+const REWARD_AMOUNT := -0.5  # Character.TARSI_MAX_STRENGTH, the floor of it.
+
+
+## Fires a named reward, AND THE BUS IS THE ONLY WAY OUT. W10a removed the
+## `topic == null` fallback that called `ch.reward_event()` directly: a second
+## writer into the homeostat is exactly what the bus exists to abolish, and a
+## silent fallback meant the wiring could rot without any test noticing. An
+## unbound topic is now a wiring bug and says so.
 func _reward(kind: String) -> void:
-	if store == null or not store.has_method("get_character"):
+	var line: int = int(REWARD_LINE.get(kind, -1))
+	if line < 0:
 		return
-	var ch: Variant = store.get_character()
-	if ch == null or not ch.has_method("reward_event"):
+	if topic == null:
+		push_error("SensorOracle: no topic bound; the substrate punishment '%s' has nowhere to go" % kind)
 		return
-	ch.reward_event(kind)
+	var t_ns: int = Clock.now_ns()
+	topic.publish("/sense", HexyMsg.sense("tarsi", kind, t_ns,
+		{"line": line, "amount": REWARD_AMOUNT}, {}))
 
 
 ## Edge-detects the two substrate punishments off the last sampled hardware.
@@ -516,15 +549,6 @@ func _check_substrate_punishments() -> void:
 	if starving and not _battery_critical:
 		_reward("battery_critical")
 	_battery_critical = starving
-
-
-func _feed_fly_brain(delta: float, raw_acc: Vector3) -> void:
-	if store == null or not store.has_method("get_character"):
-		return
-	var ch: Variant = store.get_character()
-	if ch == null or not ch.has_method("feed_senses"):
-		return
-	ch.feed_senses(build_brain_sample(raw_acc), delta)
 
 
 func get_moon_phase() -> Dictionary:

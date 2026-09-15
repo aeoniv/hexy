@@ -303,17 +303,41 @@ static func set_prior_weight(w: float) -> void:
 
 
 ## THE MANUAL DOOR ONTO THE PRIOR. Two hands may set the weight and only one at
-## a time: when `prior.follows_stillness` is on, Alchemy drives it from the
-## body's own stillness and tension and this call stands down; when it is off,
-## the number in the drawer IS the weight, clamped to `prior.max` so a slider
-## left at the top cannot deafen the decode loop. HexyConfig calls this on
-## every `prior.*` write.
+## a time: when `prior.follows_stillness` is on, the app's own beat drives it
+## from the body's stillness and the cube's tension (see `prior_weight_for`
+## below) and this call stands down; when it is off, the number in the
+## drawer IS the weight, clamped to `prior.max` so a slider left at the top
+## cannot deafen the decode loop. HexyConfig calls this on every `prior.*`
+## write.
 static func apply_manual_prior(weight: float, ceiling: float,
 		follows_stillness: bool) -> bool:
 	if follows_stillness:
 		return false
 	set_prior_weight(clampf(weight, 0.0, maxf(0.0, ceiling)))
 	return true
+
+
+## THE CEILING `prior_weight_for` NEVER CROSSES. Folded here from the deleted
+## alchemy.gd (W10d), which is also where the shape below is explained.
+const PRIOR_MAX: float = 0.35
+
+
+## HOW LOUDLY THE CUBE MAY SPEAK, given a body and the cube's own spread.
+##
+## The cube speaks to Qwen as loudly as the body holds still; a uniform cube --
+## tension 1, mass smeared evenly over all 64 corners -- has nothing to say, so
+## it says nothing however still the body is. Zero at either end, PRIOR_MAX at
+## the far corner of both, linear between, and clamped on both inputs.
+##
+## THERE IS EXACTLY ONE WRITER OF THE PRIOR under `prior.follows_stillness`,
+## and it is the app's own beat. Mesh peers must never become a second one: a
+## remote body's stillness is not this body's, and two writers racing on a
+## static would make the weight a function of packet order rather than of
+## anything anybody felt. A peer's cube may only ever enter as a bias term
+## inside Pacing._diffuse, where it moves mass and is argued with by the
+## local senses like any other pull.
+static func prior_weight_for(stillness: float, tension: float) -> float:
+	return PRIOR_MAX * clampf(stillness, 0.0, 1.0) * (1.0 - clampf(tension, 0.0, 1.0))
 
 
 ## What the decode loop is currently doing with the cube. 0 on desktop, always:

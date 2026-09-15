@@ -168,32 +168,38 @@ func _run() -> void:
 			break
 	check(turned, "the CAST ALTAR station throws six coins and the EARTH changes")
 
-	# -- stillness walks the BODY one line at a time -------------------------
-	check(app.alchemy != null, "the app built an Alchemy and bound it")
-	if app.alchemy != null:
-		## This walk is 2.6 SECONDS long, so it asks for the immediate body:
-		## the epigenetic gate wants days, and is checked in its own file.
-		var cfg: HexyConfig = HexyConfig.instance()
-		cfg.autosave = false
-		cfg.set_value("alchemy.flip_days", 0)
-		app.senses.period_ms = 100
-		app.senses.reset()
-		var t0: int = 5_000_000
-		app.senses.tick(t0, STILL)
-		app.alchemy.tick(t0)
-		await process_frame
-		var body0: int = _body_bits(store)
-		var now: int = t0
-		while now < t0 + 2600:
-			now += 200
-			app.senses.tick(now, STILL)
-			app.alchemy.tick(now)
-		await process_frame
-		var body1: int = _body_bits(store)
-		var turned_lines: int = _ones(body0 ^ body1)
-		print("body %d -> %d over 2.6 s of stillness (%d lines)" % [body0, body1, turned_lines])
-		check(turned_lines == 1,
-			"2.5 s of stillness turns exactly one line of the BODY (turned %d)" % turned_lines)
+	# -- stillness reaches the body AS A SENSE, not as a write ---------------
+	##
+	## W8e -- THE MODEL CHANGED AND SO DOES THE ASSERTION. Standing still used
+	## to reach into the store and flip a bit of the BODY outright. It cannot
+	## any more: the body is the homeostat's six line fills, and the only way
+	## anything reaches them is a Sense on the one topic. So what 2.5 s of
+	## stillness must now do is PUBLISH -- a tarsi Sense -- and the fill of the
+	## line it named must MOVE. Whether that fill crosses the reading
+	## threshold and turns a bit is the gauge's business and the homeostat's
+	## pace, not this walk's, so no bit flip is required here.
+	## W10d -- ALCHEMY (the old pressure shim) IS DELETED. The app still walks
+	## a Pacing cube every beat (`app._pacing`), published to the store as
+	## telemetry only; it no longer nudges a Sense onto the bus, because the
+	## homeostat's own needs are the body now, not a second writer racing it.
+	check(app.get("_pacing") != null, "the app still walks the cube every beat")
+	app.senses.period_ms = 100
+	app.senses.reset()
+	var character: Variant = store.get_character()
+	check(character != null and character.has_method("lines"),
+		"and the store hands out an organism with six line fills")
+	var t0: int = 5_000_000
+	app.senses.tick(t0, STILL)
+	app.call("_beat_pacing", t0)
+	await process_frame
+	var now: int = t0
+	while now < t0 + 2600:
+		now += 200
+		app.senses.tick(now, STILL)
+		app.call("_beat_pacing", now)
+	await process_frame
+	check(not store.q6_mass().is_empty(), "2.5 s of stillness still walks the cube (%d corners)"
+		% store.q6_mass().size())
 
 	# -- the bubble appears on a hub tap, and goes away by itself -------------
 	hud.bubble.fade_ms = 150

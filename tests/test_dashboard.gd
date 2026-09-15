@@ -175,15 +175,25 @@ func _run() -> void:
 	check(dash.tunable_control("senses.period_ms") != null,
 		"and the registry reached it through the app's own autoload")
 
-	## PANEL 10 ON THE LIVE GLASS. The app builds a loader whether any add-on
-	## is on disk or not, so the doors panel must stand either way -- with six
-	## need rows and four circuit rows, and a dash wherever no door lands.
+	## PANEL 10 ON THE LIVE GLASS. W8e: an add-on declares DOORS and the
+	## TOPICS it writes, not a line of the body, so this panel is two blocks
+	## whose rows are whatever the bus is actually carrying. The app builds a
+	## loader whether any add-on is on disk or not, so the panel must stand
+	## either way -- and on a base app with nothing in addons/ it stands EMPTY,
+	## which is the whole of "add-on off = base unchanged".
 	check(dash.panel("doors") != null and dash.panel("doors").get_parent() == dash.column,
 		"the doors panel stands under the two on the real glass")
 	check(app.addons != null, "the app built an add-on loader")
-	check(String(dash.doors_text()).split("
-").size() == 10,
-		"the doors panel reads six need lines and four circuits")
+	var live_doors: String = String(dash.doors_text())
+	check(live_doors.contains("— DOORS") and live_doors.contains("— WRITERS"),
+		"the doors panel reads a door block and a writer block")
+	var declared: Dictionary = app.addons.doors() as Dictionary
+	for door in declared.keys():
+		check(live_doors.contains(String(door)),
+			"every door an attached add-on declared has a row (%s)" % String(door))
+	if declared.is_empty():
+		check(live_doors.contains(HexyDashboard.DOORS_EMPTY),
+			"and with no add-on on disk it says so in words")
 
 # -- W6: exactly one radar, front or dashboard, never both -------------------
 
@@ -297,8 +307,8 @@ class StubHost extends Node:
 		calls.append("cycle_sense_period")
 		return 3500
 
-	func mesh_broadcast() -> int:
-		calls.append("mesh_broadcast")
+	func mesh_peers() -> int:
+		calls.append("mesh_peers")
 		return 3
 
 	func camera_reset() -> void:
@@ -339,8 +349,24 @@ func _run_widget_panels() -> void:
 	check(String(HexyDashboard.TITLES["controls"]).begins_with("9 ·"), "controls is panel 9")
 	check(dash.panel("doors") != null, "the doors panel stands on the column")
 	check(String(HexyDashboard.TITLES["doors"]).begins_with("10 ·"), "doors is panel 10")
-	check(String(dash.doors_text()).contains("body: —"),
-		"and with no loader bound it draws a dash on every row")
+	check(String(dash.doors_text()).contains(HexyDashboard.DOORS_EMPTY)
+		and String(dash.doors_text()).contains(HexyDashboard.WRITERS_EMPTY),
+		"and with no loader bound both blocks say nothing is held or written")
+
+	## PANEL 8'S ONE GAUGE ROW. A label, not a knob: the gauge is fitted by
+	## the bus, not by a thumb, and the only door onto it from the glass is
+	## HexyGauge.correct.
+	check(dash.has_method("gauge_text"), "panel 8 can say what the gauge is standing on")
+	check(String(dash.gauge_text()) == "gauge —", "with no gauge bound it says so")
+	var g := HexyGauge.new("user://gauge_dashboard_test.json")
+	dash.set_bus(null, g)
+	var grow: String = String(dash.gauge_text())
+	check(grow.contains("offset") and grow.contains("conf") and grow.contains("stage"),
+		"and with one bound it names the offset, the confidence and the stage (got '%s')" % grow)
+	check(dash.correct_gauge("clock_offset_h", 1.5), "a correction the gauge allows is taken")
+	check(String(dash.gauge_text()).contains("+1.50"), "and the row says so at once")
+	check(not dash.correct_gauge("words.line_words", 3),
+		"a correction the gauge refuses is refused here too")
 
 	# -- a control for every key in the schema -------------------------------
 	var missing: Array[String] = []

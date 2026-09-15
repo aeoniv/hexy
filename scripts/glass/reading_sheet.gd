@@ -4,7 +4,7 @@ extends Control
 ## A THIN SHEET ABOUT ONE READING.
 ##
 ## `show_reading` is the one door: a hexagram's bits and the chapter
-## dictionary `Journey.chapter` already computed. The sheet draws the glyph
+## chapter dictionary the front already computed. The sheet draws the glyph
 ## large, the name, the six lines bottom to top, and the chapter's own title
 ## and gloss. Nothing here recomputes a chapter or a name; it reads what it
 ## was handed and King Wen's own tables.
@@ -14,7 +14,6 @@ extends Control
 
 const SKIN := preload("res://scripts/glass/bubble.gd")
 const KingWen := preload("res://scripts/core/iching/king_wen.gd")
-const Journey := preload("res://scripts/core/iching/journey.gd")
 
 const SWIPE_PX: float = 80.0
 const GROUND: Color = Color(0.0588235, 0.0823529, 0.12549, 1.0)
@@ -103,9 +102,10 @@ func _ready() -> void:
 	col.add_child(_gloss_label)
 
 
-## THE ONE DOOR IN. [param bits] the figure; [param chapter] whatever
-## `Journey.chapter(bits, stage)` returned, or {} for a chapter that has
-## never been walked (ORDINARY is shown then, same as Journey's own stage 0).
+## THE ONE DOOR IN. [param bits] the figure; [param chapter] whatever the
+## front's own `current_chapter()` returned -- title, stage name and gloss,
+## every one of them off the gauge -- or {} for a chapter that has never been
+## walked, in which case stage 0's own words are shown.
 func show_reading(bits: int, chapter: Dictionary) -> void:
 	var b: int = bits & 63
 	_glyph_label.text = KingWen.glyph(b)
@@ -122,9 +122,9 @@ func show_reading(bits: int, chapter: Dictionary) -> void:
 	# reversed array above puts line 6 (top) first in the box and line 1
 	# (bottom) last -- which draws bottom to top on the screen.
 
-	var ch: Dictionary = chapter if not chapter.is_empty() else Journey.chapter(b, Journey.Stage.ORDINARY)
-	_chapter_label.text = String(ch.get("title", "Ordinary World · %s" % KingWen.name(b)))
-	_gloss_label.text = String(ch.get("gloss", Journey.STAGE_GLOSS[Journey.Stage.ORDINARY]))
+	var ch: Dictionary = chapter if not chapter.is_empty() else _cold_chapter(b)
+	_chapter_label.text = String(ch.get("title", "%s · %s" % [_stage_name(0), KingWen.name(b)]))
+	_gloss_label.text = String(ch.get("gloss", _stage_gloss(0)))
 
 	visible = true
 
@@ -192,3 +192,38 @@ static func _press_at(event: InputEvent) -> Variant:
 		if st.pressed:
 			return st.position
 	return null
+
+
+## W8e -- STAGE 0'S OWN WORDS, off the gauge when one is bound. A sheet with
+## no gauge and no chapter handed in still names the figure, because a reading
+## with an empty caption looks broken and a reading with a plain one does not.
+var _gauge: RefCounted = null
+
+
+func set_gauge(gauge: RefCounted) -> void:
+	_gauge = gauge
+
+
+func _stage_name(stage: int) -> String:
+	if _gauge == null:
+		return "Ordinary World"
+	var name: String = String(_gauge.call("stage_name", stage))
+	return name if name != "" else "Ordinary World"
+
+
+func _stage_gloss(stage: int) -> String:
+	if _gauge == null:
+		return "Nothing moving. Life as usual."
+	var g: String = String(_gauge.call("stage_gloss", stage))
+	return g if g != "" else "Nothing moving. Life as usual."
+
+
+func _cold_chapter(bits: int) -> Dictionary:
+	return {
+		"stage": 0,
+		"stage_name": _stage_name(0),
+		"gloss": _stage_gloss(0),
+		"hexagram_no": KingWen.number(bits),
+		"hexagram_name": KingWen.name(bits),
+		"title": "%s · %s" % [_stage_name(0), KingWen.name(bits)],
+	}

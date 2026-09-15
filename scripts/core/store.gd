@@ -20,8 +20,9 @@ signal human_changed(h: Dictionary)
 signal room_changed(r: Dictionary)
 signal answer_changed(a: String)
 ## A CAST LANDED AND IS MEANT FOR THE BODY. The glass announces the gesture
-## here and never writes the body itself; Alchemy alone hears this and injects
-## it, so pacing re-anchors instead of being overwritten behind its back.
+## here and never writes the body itself; the app alone hears this and
+## re-anchors the cube on it, so pacing re-anchors instead of being
+## overwritten behind its back.
 signal cast_landed(c: Dictionary)
 
 ## THE ONE BUS FOR ALL THREE SEATS. A gesture is announced here and the seat's
@@ -38,17 +39,17 @@ signal restored()
 ## moon over sun over altar, and the numbers are wire-stable.
 enum Seat { HEAD = 0, BODY = 1, EARTH = 2 }
 
-## The last 64-corner cube mass Alchemy published. Empty until a first tick.
+## The last 64-corner cube mass the app published. Empty until a first tick.
 var _q6_mass: PackedFloat32Array = PackedFloat32Array()
 
-## THE CUBE, AS ALCHEMY LAST PUBLISHED IT, so a dump carries the pacing that
+## THE CUBE, AS THE APP LAST PUBLISHED IT, so a dump carries the pacing that
 ## the body was standing on and a restore can put it back. Publish only: the
 ## store never computes these, it only remembers and persists them.
 var _pacing_bits: int = 0
 var _journal_tail: Dictionary = {}
 
-## TRUE ONCE ALCHEMY HAS CLAIMED THE BODY. With a claim, `note_seat(BODY, ...)`
-## only announces and Alchemy alone writes, so pacing re-anchors instead of
+## TRUE ONCE THE APP HAS CLAIMED THE BODY. With a claim, `note_seat(BODY, ...)`
+## only announces and the app alone writes, so pacing re-anchors instead of
 ## being overwritten behind its back. Without one -- a bare store in a test, a
 ## headless tool, the glass with no core behind it -- the announcement still
 ## has to land somewhere, so the store writes the body itself. One writer
@@ -113,16 +114,6 @@ var _path: Array[int] = ([] as Array[int])
 ## more than that is enough for it and small enough to carry in a dump.
 const PATH_MAX: int = 32
 
-## THE USER'S OWN CLOCK, as [Entrain.to_dict] left it. Publish only, like the
-## pacing cube: Front owns the Entrain instance and hands the dictionary here
-## so a dump carries it. The store never estimates anything.
-var _entrain_state: Dictionary = {}
-
-## ALCHEMY'S STANDING PRESSURE, as [method Alchemy.pressure_dict] left it.
-## Publish only, and the same bargain: Alchemy is the one writer, the store is
-## the one thing that persists.
-var _alchemy_state: Dictionary = {}
-
 ## Biological Fruit Fly Character Homeostat
 var character: RefCounted = null
 
@@ -166,28 +157,34 @@ func get_character() -> RefCounted:
 
 
 ## A CAST LANDED. The glass owns the cast gestures, so the glass must say so:
-## call this the moment a cast is confirmed and committed, and the mushroom
-## body gets its dopamine for the context that was live when it happened.
-## Any name from FlyBrain.REWARDS works; the default is the cast.
+## call this the moment a cast is confirmed and committed.
 ##
-## Hand it the cast itself and it is also ANNOUNCED on cast_landed, so Alchemy
-## can inject it into the body. An empty `c` is a reward and nothing more.
+## W8e -- THE CAST IS A SENSE NOW, NOT A WRITE. This used to reach straight
+## into the organism and hand the mushroom body its dopamine, which made the
+## glass a writer of brain state. It no longer does: the cast is recorded
+## (the seat bus still carries it) and then published on "/sense" as a words
+## door "cast" message, exactly like a spoken utterance. Whatever the brain
+## decides that is worth is the brain's business.
+##
+## Returns 1.0 when the Sense went out on a bus, 0.0 when there is no bus to
+## put it on -- the same "did anything happen" shape the old return had.
 func note_cast(kind: String = "cast_confirmed", c: Dictionary = {}) -> float:
 	if not c.is_empty():
 		note_seat(Seat.BODY, c)
-	var ch: RefCounted = get_character()
-	if ch == null or not ch.has_method("reward_event"):
+	if _bus == null:
 		return 0.0
-	return float(ch.reward_event(kind))
+	var ok: bool = bool(_bus.publish("/sense", HexyMsg.sense("words", "cast",
+		Time.get_ticks_usec() * 1000, 1.0, {"kind": kind})))
+	return 1.0 if ok else 0.0
 
 
 ## A FIGURE LANDED IN A SEAT. The glass owns the gestures and says so here; it
 ## never writes a seat itself, so every seat has one event shape and one writer:
 ##
 ##   HEAD  -> the store, straight through set_head (no cube; the head is free).
-##   BODY  -> Alchemy, through inject, so pacing re-anchors on it. With no
-##            Alchemy bound the store writes it, so an announcement never falls
-##            on the floor.
+##   BODY  -> the app, through inject, so pacing re-anchors on it. With no
+##            app listening the store writes it, so an announcement never
+##            falls on the floor.
 ##   EARTH -> the store, straight through set_earth (the altar, not the body).
 func note_seat(seat: int, c: Dictionary) -> void:
 	var is_head: bool = seat != Seat.BODY
@@ -200,18 +197,23 @@ func note_seat(seat: int, c: Dictionary) -> void:
 			set_earth(n)
 		_:
 			## The old name of this same announcement, for readers written
-			## before the bus was general. Alchemy listens on ONE of the two.
+			## before the bus was general. The app listens on ONE of the two.
 			cast_landed.emit(n)
+			## A CAST MAKES A WARM CHAT STALE. Folded from the deleted
+			## alchemy.gd (W10d): the figure the decode loop was leaning on
+			## is not the figure the body stands on the moment a seat lands,
+			## even before the body bits themselves are written below.
+			Q6Core.bump_cast_version()
 			if not _body_claimed or c.get("source", "") in ["tap", "wheel", "manual"]:
 				set_body(n)
 
 
-## Alchemy says "the body is mine" here, once, at bind. Nothing else may.
+## The app says "the body is mine" here, once, at bind. Nothing else may.
 func claim_body(claimed: bool = true) -> void:
 	_body_claimed = claimed
 
 
-## PUBLISH ONLY, from Alchemy, so `dump` can carry the cube the body stood on.
+## PUBLISH ONLY, from the app, so `dump` can carry the cube the body stood on.
 func set_pacing_state(bits: int, journal_tail: Dictionary = {}) -> void:
 	_pacing_bits = bits & 63
 	_journal_tail = journal_tail.duplicate(true)
@@ -250,10 +252,106 @@ static func _empty_room() -> Dictionary:
 	return {"bits": 0, "moving": 0, "peers": 0}
 
 
+# --- the body comes off the bus ---------------------------------------------
+
+## W8c -- THE BODY IS DERIVED, AND THE HOMEOSTAT DERIVES IT.
+##
+## `store.body["bits"]` used to have four writers: the old alchemy shim (its own hysteresis
+## over the senses), the seat bus, a restore, and a reset. Only the last three
+## were ever about THIS store; the first was a second brain living in the core.
+## Now the bits are a READOUT of the homeostat's six line fills, published by
+## scripts/brain as a Body message, and this subscriber is the only way one
+## reaches the store from outside it. `set_body` stays -- a restore and a reset
+## and the seat bus still need it -- but it is INTERNAL to this file: nothing
+## under scripts/ outside store.gd and scripts/brain may call it, and
+## tests/test_gauge_wall.gd fails the moment something does.
+var _bus: RefCounted = null
+var _bus_sub: int = -1
+var _seat_sub: int = -1
+
+## THE DOOR A GESTURE ON THE GLASS ARRIVES THROUGH. W10c -- every page is a
+## subscriber and none is a writer, so a dial no longer calls note_seat: it
+## publishes a tarsi Sense at this door and the store, the one writer of seat
+## state, applies it here.
+const DOOR_SEAT: String = "earth_seat"
+
+
+## Subscribe this store to a topic bus. From here the body follows the brain.
+func attach_bus(topic: RefCounted) -> void:
+	if topic == null:
+		return
+	detach_bus()
+	_bus = topic
+	_bus_sub = int(topic.subscribe("/body", Callable(self, "_on_body_msg")))
+	_seat_sub = int(topic.subscribe("/sense/%s" % DOOR_SEAT,
+		Callable(self, "_on_seat_sense")))
+	## A LATCHED BODY IS STILL A BODY. The bus retains the last message on
+	## every topic, so a store attached after the brain has already spoken
+	## stands on the figure that is live rather than on an empty one.
+	var latched: Dictionary = topic.last("/body")
+	if not latched.is_empty():
+		_on_body_msg(latched)
+
+
+func detach_bus() -> void:
+	if _bus != null and _bus_sub >= 0:
+		_bus.unsubscribe(_bus_sub)
+	if _bus != null and _seat_sub >= 0:
+		_bus.unsubscribe(_seat_sub)
+	_bus = null
+	_bus_sub = -1
+	_seat_sub = -1
+
+
+## A GESTURE LANDED IN A SEAT, SAID AS A SENSE. The value is the figure the
+## finger picked plus the seat it picked it in; "cast" in the value names the
+## note_cast kind an altar throw also deserves, and is empty for a plain walk.
+## The glass only says this; the applying is here, so a seat keeps one writer.
+func _on_seat_sense(msg: Dictionary) -> void:
+	if typeof(msg) != TYPE_DICTIONARY or String(msg.get("kind", "")) != "sense":
+		return
+	if String(msg.get("door", "")) != DOOR_SEAT:
+		return
+	var v: Variant = msg.get("value", null)
+	if typeof(v) != TYPE_DICTIONARY:
+		return
+	var value: Dictionary = (v as Dictionary).duplicate(true)
+	var seat: int = int(value.get("seat", Seat.BODY))
+	var cast_kind: String = String(value.get("cast", ""))
+	value.erase("seat")
+	value.erase("cast")
+	note_seat(seat, value)
+	if cast_kind != "":
+		## One arg on purpose: the reward only. The figure has already been
+		## seated above and must not be announced on the BODY seat again.
+		note_cast(cast_kind)
+
+
+## THE ONE BODY-BITS WRITER FROM OUTSIDE THIS FILE. A Body message carries the
+## whole organism; the store keeps the figure half of it, because that is the
+## half it has always persisted.
+func _on_body_msg(msg: Dictionary) -> void:
+	if typeof(msg) != TYPE_DICTIONARY or String(msg.get("kind", "")) != "body":
+		return
+	var bits: int = int(msg.get("bits", 0)) & 63
+	if bits == body_bits():
+		return
+	set_body({
+		"bits": bits,
+		"moving": bits ^ body_bits(),
+		"when": int(msg.get("t_ns", 0)) / 1_000_000,
+		"who": "",
+		"source": "brain",
+		"seq_index": seq_index_of(bits, false),
+	})
+
+
 # --- the two figures --------------------------------------------------------
 
 ## The body moved. Emits body_changed, then hexagram_changed, because the
 ## hexagram IS the body and the old signal must keep its old meaning.
+##
+## INTERNAL TO THIS FILE AND TO scripts/brain since W8c -- see attach_bus.
 func set_body(b: Dictionary) -> bool:
 	var next: Dictionary = _normalise_hexagram(b, false)
 	if _same(next, body):
@@ -278,24 +376,6 @@ func _note_path(bits: int) -> void:
 ## THE WALK SO FAR, newest last, for [method Journey.stage_of_path].
 func body_path() -> Array[int]:
 	return _path.duplicate() as Array[int]
-
-
-## PUBLISH ONLY, from Front: the entrain state a dump should carry.
-func set_entrain_state(d: Dictionary) -> void:
-	_entrain_state = d.duplicate(true)
-
-
-func entrain_state() -> Dictionary:
-	return _entrain_state.duplicate(true)
-
-
-## PUBLISH ONLY, from Alchemy: the six marks and their runs of days.
-func set_alchemy_state(d: Dictionary) -> void:
-	_alchemy_state = d.duplicate(true)
-
-
-func alchemy_state() -> Dictionary:
-	return _alchemy_state.duplicate(true)
 
 
 ## The old name. It always meant the body; it still does -- and like every
@@ -329,7 +409,7 @@ func set_last_flip(f: Dictionary) -> bool:
 	return true
 
 
-## THE 64-CORNER Q6 MASS, AS THE STORE LAST HEARD IT. Alchemy.tick publishes
+## THE 64-CORNER Q6 MASS, AS THE STORE LAST HEARD IT. The app's own beat publishes
 ## `pacing.cube.state()` here every beat and Wmn reads it for the bio pulse.
 ##
 ## PUBLISH ONLY, in both directions that matter: nothing in the store writes
@@ -339,7 +419,7 @@ func q6_mass() -> PackedFloat32Array:
 	return _q6_mass
 
 
-## Called by Alchemy and nobody else. Widened to float32 on the way in, because
+## Called by the app and nobody else. Widened to float32 on the way in, because
 ## that is what goes on the wire and a second precision would be a second copy.
 func set_q6_mass(mass: Variant) -> void:
 	var out := PackedFloat32Array()
@@ -486,8 +566,6 @@ func dump() -> Dictionary:
 		"pacing_bits": _pacing_bits,
 		"journal_tail": _journal_tail.duplicate(true),
 		"path": _path.duplicate(),
-		"entrain": _entrain_state.duplicate(true),
-		"alchemy": _alchemy_state.duplicate(true),
 	}
 
 
@@ -495,8 +573,9 @@ func load_dump(d: Dictionary) -> void:
 	if d.has("head") and d["head"] is Dictionary:
 		set_head(d["head"] as Dictionary)
 	## A restore writes the body DIRECTLY, not down the bus: the figure is not
-	## a gesture and Alchemy re-anchors the cube on `restored` below, once, when
-	## every seat is back -- rather than once per seat on the way in.
+	## a gesture, and the app's own beat re-anchors the cube on `restored`
+	## below, once, when every seat is back -- rather than once per seat on
+	## the way in.
 	if d.has("body") and d["body"] is Dictionary:
 		set_body(d["body"] as Dictionary)
 	elif d.has("hexagram") and d["hexagram"] is Dictionary:
@@ -519,9 +598,9 @@ func load_dump(d: Dictionary) -> void:
 		set_room(d["room"] as Dictionary)
 	if d.has("answer"):
 		set_answer(String(d["answer"]))
-	## THE THREE CARRIED SECTIONS ARE PUT BACK BEFORE `restored` FIRES, because
-	## Alchemy re-reads its own marks off this store the moment it hears that
-	## signal -- a section loaded after it would arrive one restore too late.
+	## THE WALKED PATH IS PUT BACK BEFORE `restored` FIRES, because whatever
+	## re-reads it off this store on that signal must not arrive one restore
+	## too late.
 	if d.has("path") and d["path"] is Array:
 		var walked: Array[int] = ([] as Array[int])
 		for b in (d["path"] as Array):
@@ -529,10 +608,9 @@ func load_dump(d: Dictionary) -> void:
 		while walked.size() > PATH_MAX:
 			walked.remove_at(0)
 		_path = walked
-	if d.has("entrain") and d["entrain"] is Dictionary:
-		_entrain_state = (d["entrain"] as Dictionary).duplicate(true)
-	if d.has("alchemy") and d["alchemy"] is Dictionary:
-		_alchemy_state = (d["alchemy"] as Dictionary).duplicate(true)
+	## A RESTORE MAKES A WARM CHAT STALE TOO: the figure the decode loop was
+	## leaning on is not the one this store now stands on.
+	Q6Core.bump_cast_version()
 	restored.emit()
 
 
@@ -548,8 +626,7 @@ func reset() -> void:
 	_pacing_bits = 0
 	_journal_tail = {}
 	_path = ([] as Array[int])
-	_entrain_state = {}
-	_alchemy_state = {}
+	Q6Core.bump_cast_version()
 	restored.emit()
 
 

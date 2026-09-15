@@ -22,8 +22,8 @@ extends RefCounted
 ## sentence hands in the dictionaries it already has, in the shapes the rest
 ## of the core already speaks: `cast` is a last-cast dict, `peers` is
 ## `Wmn.peers()`, `day` is `FlyCircadianClock.get_circadian_modifiers()`
-## folded together with `Entrain.estimate()`, `marks` is `Alchemy.marks()`,
-## `chapter` is `Journey.chapter()`.
+## folded together with the gauge's own phase estimate, `marks` is the
+## gauge's line lean, `chapter` is `Journey.chapter()`.
 
 const MAX_LEN: int = 48
 const CLAUSE_SEP: String = " · "
@@ -96,7 +96,7 @@ static func room_phrase(peers: Array) -> String:
 
 ## THE DAY, SHORTENED TO ONE WORD. `day` is duck-typed against whatever a
 ## host folds `FlyCircadianClock.get_circadian_modifiers()` and
-## `Entrain.estimate()` into -- only `phase_name` is read, and a missing or
+## the gauge's own phase estimate into -- only `phase_name` is read, and a missing or
 ## unrecognised one reads as plain "day" rather than guessing.
 static func _day_word(day: Dictionary) -> String:
 	var raw_phase: Variant = day.get("phase_name", "")
@@ -109,7 +109,7 @@ static func _day_word(day: Dictionary) -> String:
 		return "night"
 	if phase.find("siesta") >= 0:
 		return "siesta"
-	## The seven bands [Entrain.phase_name] hands out, matched whole so a
+	## The seven bands the gauge's `phase_name` hands out, matched whole so a
 	## host that spells its own phase differently still falls through to
 	## "day" rather than being guessed at.
 	for w in ["morning", "midday", "afternoon", "evening"]:
@@ -138,8 +138,17 @@ static func _dominant_line(marks: Array) -> int:
 ## every one of them may be short, empty, or missing keys, and none of that
 ## may throw -- a sentence with nothing to say about the room or the day
 ## still says something about the body.
+## W8e -- THE GAUGE, WHEN THERE IS ONE. `gauge` is a HexyGauge (or anything
+## carrying the same five methods); handed in, every word table, phrase and
+## threshold below comes off the gauge's own data file instead of the const
+## blocks in this file, so a second interpretation of the same body is a
+## second gauge.json and not a second build. Left null, this file behaves
+## exactly as it always has.
 static func of(body_bits: int, cast: Dictionary, peers: Array, day: Dictionary,
-		marks: Array = [], chapter: Dictionary = {}, advice: String = "") -> String:
+		marks: Array = [], chapter: Dictionary = {}, advice: String = "",
+		gauge: Object = null) -> String:
+	if gauge != null:
+		return _of_gauge(body_bits, peers, day, marks, chapter, advice, gauge)
 	var bits: int = body_bits & 63
 	## `cast` carries only `bits`/`source` today; a cast with its own bits
 	## does not override the body -- the body is what the glass shows -- but
@@ -191,3 +200,27 @@ static func _compose(clauses: Array) -> String:
 	if out.length() > MAX_LEN:
 		out = out.substr(0, MAX_LEN)
 	return out.to_lower()
+
+
+## THE SAME THREE CLAUSES, EVERY WORD OFF THE GAUGE. Same order, same joiner,
+## same trimming -- only the tables move.
+static func _of_gauge(body_bits: int, peers: Array, day: Dictionary, marks: Array,
+		chapter: Dictionary, advice: String, gauge: Object) -> String:
+	var bits: int = body_bits & 63
+	var line: int = int(gauge.call("dominant_line", marks))
+	var value: int = (bits >> line) & 1
+	var leaning: float = float(marks[line]) if line < marks.size() else 0.0
+	var body_word: String = String(gauge.call("word_for_line", line, value, leaning))
+	var room_word: String = String(gauge.call("room_phrase", peers))
+	var raw_phase: Variant = day.get("phase_name", "")
+	var raw_stage: Variant = chapter.get("stage_name", "") if chapter is Dictionary else ""
+	var day_word: String = String(gauge.call("day_clause",
+		String(raw_phase) if raw_phase != null else "",
+		String(raw_stage) if raw_stage != null else ""))
+	var clue: String = advice.strip_edges().to_lower()
+	if clue != "":
+		var full: String = _compose([body_word, room_word, day_word, clue])
+		if full.length() <= MAX_LEN and full.find(clue) >= 0:
+			return full
+		return _compose([body_word, day_word, clue])
+	return _compose([body_word, room_word, day_word])

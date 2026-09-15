@@ -64,6 +64,8 @@ func _init() -> void:
 	circadian_clock = FlyCircadianClockScript.new()
 	last_senses.resize(SENSE_COUNT)
 	last_senses.fill(0.0)
+	_pending.resize(SENSE_COUNT)
+	_pending.fill(0.0)
 	giant_fiber.startled.connect(_on_startled)
 	circadian_clock.update(12.0)
 
@@ -176,3 +178,221 @@ func state() -> Dictionary:
 		"kc_count": kcs.size(),
 		"peers": peers,
 	}
+
+
+## ============================== W8c -- THE BUS ==============================
+##
+## SENSES COME IN AS MESSAGES, AND ONLY AS MESSAGES. Before W8c four different
+## outsiders reached into this brain and wrote parts of it (the glass through
+## Character.feed, Alchemy through the store's body bits, Entrain through a
+## phase estimate, wmn through peer effects). Now there is one door: a HexyMsg
+## Sense published on a HexyTopic. The brain subscribes, routes by ORGAN, and
+## publishes one Body and one Phase back. Nothing outside scripts/brain writes
+## a line, and this file preloads nothing outside scripts/brain.
+##
+## ROUTING TABLE (organ -> circuit):
+##   ocelli       -> circadian clock            (lux, measured; see update_lux)
+##   halteres     -> central complex + giant fiber
+##   compound_eye -> central complex + mushroom body
+##   antenna      -> mushroom body + central complex
+##   pheromone    -> circadian clock (social zeitgeber) + mushroom body
+##   tarsi        -> the homeostat (Character; not this file's circuits)
+##   words        -> mushroom body
+##
+## WHERE EACH ORGAN SITS IN THE 16-INPUT VECTOR the mushroom body projects.
+## Fixed slots, so a pattern learnt from an antenna is not recalled from a
+## word: the KC code IS the address.
+const SLOT_COMPOUND_EYE := 0   # 0..7, the eight trigram scores
+const SLOT_ANTENNA := 8        # 8..10
+const SLOT_WORDS := 11         # 11..13
+const SLOT_PHEROMONE := 14
+const SLOT_OCELLI := 15
+
+## The organs this brain answers to. Anything else published on "/sense" is
+## ignored in silence -- an unknown organ is not an error, it is an organ this
+## body does not have.
+const BUS_ORGANS := ["ocelli", "halteres", "compound_eye", "antenna", "pheromone", "words"]
+
+## The bus, when one is attached. Untyped on purpose: this file names no class
+## outside scripts/brain, and a topic is duck-typed through publish/subscribe
+## like everything else here.
+var bus: RefCounted = null
+var _bus_sub: int = -1
+
+## THE PENDING SAMPLE. Sense messages land here between ticks; `bus_tick`
+## spends them through feed(), so the step order at the top of this file is the
+## same whether a caller feeds a sample directly or publishes messages.
+var _pending: PackedFloat32Array = PackedFloat32Array()
+var _accel: Vector3 = Vector3(0.0, -9.8, 0.0)
+var _yaw_rate: float = 0.0
+var _heading_deg: float = NAN
+## How many sense messages have been routed since the last tick, so a caller
+## can tell a quiet bus from a broken one.
+var routed: int = 0
+
+
+## Subscribe to a topic bus. Every "/sense" message is routed by organ; the
+## per-door topics are fanned out from "/sense" by the bus itself, so one
+## subscription hears them all.
+func attach_bus(topic: RefCounted) -> void:
+	if topic == null:
+		return
+	detach_bus()
+	bus = topic
+	_bus_sub = int(topic.subscribe("/sense", Callable(self, "_on_sense")))
+
+
+func detach_bus() -> void:
+	if bus != null and _bus_sub >= 0:
+		bus.unsubscribe(_bus_sub)
+	bus = null
+	_bus_sub = -1
+
+
+func _on_sense(msg: Dictionary) -> void:
+	route_sense(msg)
+
+
+## ONE SENSE MESSAGE INTO ONE SET OF CIRCUITS. Returns the organ that took it,
+## or "" when nothing did -- a bogus organ, a malformed message, a sense this
+## body has no organ for.
+func route_sense(msg: Dictionary) -> String:
+	if typeof(msg) != TYPE_DICTIONARY:
+		return ""
+	if String(msg.get("kind", "")) != "sense":
+		return ""
+	var organ: String = String(msg.get("organ", ""))
+	if not BUS_ORGANS.has(organ):
+		return ""
+	var value: Variant = msg.get("value", null)
+	if _pending.size() != SENSE_COUNT:
+		_pending.resize(SENSE_COUNT)
+	match organ:
+		"ocelli":
+			## THE REAL MEASUREMENT, not a guess from the hour. A dict may also
+			## carry the solar hour when the host happens to know it.
+			var lux: float = _num(value, "lux", -1.0)
+			if lux >= 0.0:
+				circadian_clock.update_lux(lux)
+				_pending[SLOT_OCELLI] = circadian_clock.light_drive
+			var hour: float = _num(value, "solar_hour", NAN)
+			if not is_nan(hour):
+				circadian_clock.update(hour)
+		"halteres":
+			## The fly's gyroscopes. The giant fiber reads the raw acceleration
+			## and the central complex reads the yaw rate; both are spent on
+			## the next tick, in the step order at the top of this file.
+			_accel = _vec3(value, _accel)
+			_yaw_rate = _num(value, "gyro_yaw_rate", _yaw_rate)
+			var hd: float = _num(value, "heading_deg", NAN)
+			if not is_nan(hd):
+				_heading_deg = hd
+		"compound_eye":
+			## Eight trigram scores, straight into the ring attractor as a
+			## stimulus, and into the first eight projection slots.
+			var scores: Array = _floats(value, 8)
+			central_complex.inject_stimulus(scores, 1.0)
+			for i in range(8):
+				_pending[SLOT_COMPOUND_EYE + i] = float(scores[i])
+		"antenna":
+			var odour: Array = _floats(value, 3)
+			for i in range(3):
+				_pending[SLOT_ANTENNA + i] = float(odour[i])
+			## An odour plume has a direction as surely as a light does, so the
+			## antennae lean the ring attractor as well as feeding the KCs.
+			central_complex.inject_stimulus(_floats(value, 8), 0.35)
+		"pheromone":
+			## A CONSPECIFIC IS A CLOCK. Flies entrain to each other: a peer
+			## that says what hour it is on pulls this pacemaker a little way
+			## toward it, never all the way -- a social zeitgeber, not a reset.
+			var peer_hour: float = _num(value, "solar_hour", NAN)
+			if not is_nan(peer_hour):
+				var here: float = circadian_clock.solar_hour
+				var diff: float = fposmod(peer_hour - here + 12.0, 24.0) - 12.0
+				circadian_clock.update(fposmod(here + diff * 0.1, 24.0))
+			_pending[SLOT_PHEROMONE] = clampf(_num(value, "strength", 1.0), 0.0, 1.0)
+		"words":
+			var w: Array = _floats(value, 3)
+			for i in range(3):
+				_pending[SLOT_WORDS + i] = float(w[i])
+	routed += 1
+	return organ
+
+
+## ONE TICK OF THE BUS. Everything routed since the last call is spent here,
+## through the same feed() a direct caller uses, so there is one step order and
+## not two.
+func bus_tick(dt_sec: float) -> void:
+	if _pending.size() != SENSE_COUNT:
+		_pending.resize(SENSE_COUNT)
+	var senses: Array = []
+	for f in _pending:
+		senses.append(float(f))
+	var sample: Dictionary = {
+		"accel": _accel,
+		"gyro_yaw_rate": _yaw_rate,
+		"senses": senses,
+	}
+	if not is_nan(_heading_deg):
+		sample["heading_deg"] = _heading_deg
+	feed(sample, dt_sec)
+	routed = 0
+
+
+## THE CIRCADIAN PHASE, as a Phase message's two live fields. `weeks` and
+## `life` are left at 0.0 and "" on purpose: this brain knows the day it is in
+## and nothing longer, and a gauge fills the rest in W8e.
+func phase_fields() -> Dictionary:
+	var hour: float = float(circadian_clock.solar_hour)
+	return {
+		"seconds": fposmod(hour * 3600.0, 60.0) / 60.0,
+		"day": clampf(hour / 24.0, 0.0, 1.0),
+		"weeks": 0.0,
+		"life": "",
+	}
+
+
+# -- reading a message's value, whatever shape it came in ---------------------
+
+## A number out of a value that may be a bare float, or a dict with that key.
+static func _num(value: Variant, key: String, fallback: float) -> float:
+	if typeof(value) == TYPE_DICTIONARY and (value as Dictionary).has(key):
+		return float((value as Dictionary)[key])
+	if typeof(value) in [TYPE_INT, TYPE_FLOAT]:
+		return float(value)
+	return fallback
+
+
+## `n` floats out of a value that may be an Array, a bare number (which fills
+## the first slot) or a dict carrying one under "v".
+static func _floats(value: Variant, n: int) -> Array:
+	var out: Array = []
+	out.resize(n)
+	out.fill(0.0)
+	var src: Variant = value
+	if typeof(src) == TYPE_DICTIONARY and (src as Dictionary).has("v"):
+		src = (src as Dictionary)["v"]
+	if typeof(src) in [TYPE_ARRAY, TYPE_PACKED_FLOAT32_ARRAY, TYPE_PACKED_FLOAT64_ARRAY]:
+		var i: int = 0
+		for f in src:
+			if i >= n:
+				break
+			out[i] = float(f)
+			i += 1
+	elif typeof(src) in [TYPE_INT, TYPE_FLOAT]:
+		out[0] = float(src)
+	return out
+
+
+static func _vec3(value: Variant, fallback: Vector3) -> Vector3:
+	if typeof(value) == TYPE_VECTOR3:
+		return value as Vector3
+	if typeof(value) == TYPE_DICTIONARY:
+		var d: Dictionary = value
+		if d.has("accel"):
+			return _vec3(d["accel"], fallback)
+		if d.has("x") and d.has("y") and d.has("z"):
+			return Vector3(float(d["x"]), float(d["y"]), float(d["z"]))
+	if typeof(value) in [TYPE_ARRAY, TYPE_PACKED_FLOAT32_ARRAY, TYPE_PACKED_FLOAT64_ARRAY] and value.size() >= 3:
+		return Vector3(float(value[0]), float(value[1]), float(value[2]))
+	return fallback

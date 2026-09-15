@@ -40,23 +40,18 @@ const DIALS := preload("res://scripts/glass/hud3.gd")
 ## swipe asks for it.
 const DASHBOARD := preload("res://scripts/glass/dashboard.gd")
 
-## How often [method Entrain.estimate] is actually run, in milliseconds. The
-## beat is four times a second and the estimate walks a week of samples; the
-## number it produces moves in hours.
-const ESTIMATE_EVERY_MS: int = 60_000
-
-## The two entrain knobs, by the names [method Entrain.default_config] gives
-## them and [HexyConfig] registers.
-const CFG_ENTRAIN_DAYS: String = "entrain.days"
-const CFG_ENTRAIN_MIN_SAMPLES: String = "entrain.min_samples"
+## How often the gauge's own estimate is actually read back, in milliseconds.
+## The beat is four times a second and the estimate walks a week of samples;
+## the number it produces moves in hours.
+const GAUGE_READ_EVERY_MS: int = 60_000
 
 ## THE TWO THIN SHEETS, preloaded and never built until a finger asks for one
 ## -- the same bargain the dials strike above.
 const PEER_SHEET := preload("res://scripts/glass/peer_sheet.gd")
 const READING_SHEET := preload("res://scripts/glass/reading_sheet.gd")
 
-## THE SENTENCE, LOADED RATHER THAN NAMED, exactly as the app loads the
-## alchemy: it belongs to the core and the core may land after the glass does.
+## THE SENTENCE, LOADED RATHER THAN NAMED: it belongs to the core and the core
+## may land after the glass does.
 ## When it is on disk the bar is its words; when it is not, the bar still says
 ## which figure is standing, because a glass with an empty top line is a glass
 ## that looks broken.
@@ -88,7 +83,7 @@ const SWIPE_PX: float = 80.0
 ## is the rate the third glass composed its strip at.
 const BEAT_S: float = 0.25
 
-## A day, in milliseconds and in seconds, for counting the journey's own days.
+## A day, in seconds, for counting how long a figure has stood still.
 const DAY_S: int = 86400
 
 ## The mic's two words, kept the same as the third glass's.
@@ -157,7 +152,6 @@ var _store: Node = null
 var _mnn: Node = null
 var _wmn: Node = null
 var _senses: Node = null
-var _alchemy: Node = null
 var _qwen: Node = null
 var _heading: Node = null
 var _mic: Node = null
@@ -169,33 +163,42 @@ var _stream: String = ""
 var _awaiting: bool = false
 var _mic_listening: bool = false
 
-## The clock that learns when this person's day actually is. Fed one sample a
-## beat out of whatever is available with no device attached: the wall hour,
-## the senses' own excitation, the screen, and whether a question was asked.
-var _entrain: Entrain = null
+## W8e -- THE BUS AND THE GAUGE. The front SUBSCRIBES and it READS: "/body"
+## for the radar and the figure, "/phase" for the four timescales, and the
+## gauge for every word, band, chapter and threshold it puts on the glass.
+## Neither is ever written from this file.
+var _topic: RefCounted = null
+var _gauge: RefCounted = null
+var _body_sub: int = -1
+var _phase_sub: int = -1
+## The last Body and the last Phase off the bus, retained here so a beat that
+## arrives between two publishes still draws the live figure.
+var _body: Dictionary = {}
+var _phase_msg: Dictionary = {}
+
 ## Whether a question left the composer since the last beat.
 var _spoke: bool = false
 ## The last light reading anybody handed in. -1 is "no light sensor here".
+## PUBLISHED, NOT KEPT: see [method set_lux].
 var _lux: float = -1.0
 
-## The journey, tracked from the store's body changes: where the figure came
+## The walk, tracked from the store's body changes: where the figure came
 ## from, and how many days it has been sitting where it is.
 var _prev_body: int = -1
 var _cur_body: int = -1
 var _still_since_day: int = -1
 var _stage: int = -1
 var _phase: float = -1.0
-## The last [method Entrain.estimate] result, refreshed at most once a minute
-## -- the estimate walks the whole ring buffer and a beat is four times a
-## second, which would be a week of arithmetic for a number that moves in
-## hours.
+## The last gauge estimate, read back at most once a minute -- it walks the
+## whole ring buffer and a beat is four times a second, which would be a week
+## of arithmetic for a number that moves in hours.
 var _phase_est: Dictionary = {}
 ## Wall-clock ms the estimate was last taken, so the throttle needs no timer.
 var _est_at_ms: int = 0
 ## A FINGER ON THE EARTH RING, as a share of the day, or -1 for no finger.
 ## A PREVIEW ONLY: it colours the sentence's day word and the radar's own
 ## phase while it is held and is forgotten on release. Nothing here ever
-## reaches [Entrain] -- a scrub is a question, not an observation.
+## reaches the gauge -- a scrub is a question, not an observation.
 var _scrub_phase: float = -1.0
 
 var _sentence_script: Script = null
@@ -208,7 +211,6 @@ var _last_sentence: String = ""
 func _ready() -> void:
 	if ResourceLoader.exists(SENTENCE_PATH):
 		_sentence_script = load(SENTENCE_PATH) as Script
-	_entrain = Entrain.new()
 
 	layer = CanvasLayer.new()
 	layer.name = "FrontGlass"
@@ -488,13 +490,21 @@ func _light_the_stage() -> void:
 ## THE SAME SIX OBJECTS THE THIRD GLASS IS HANDED, in the order a front reads
 ## them: what is true, what thinks, who else is here, what is sensed, what is
 ## turning, and what answers.
-func bind(store: Node, mnn: Node, wmn: Node, senses: Node, alchemy: Node, qwen: Node) -> void:
+## W8e -- `pressure` is the dead fifth slot (it used to be the core object
+## that turned a line of the body when a person stood still; nothing on the
+## glass may hold a writer of organism state any more), and `topic`/`gauge`
+## are the two new ones. Both trail the old six so a caller that binds
+## positionally, as the tests do, keeps working unchanged.
+func bind(store: Node, mnn: Node, wmn: Node, senses: Node, pressure: Node = null,
+		qwen: Node = null, topic: RefCounted = null, gauge: RefCounted = null) -> void:
 	_store = store
 	_mnn = mnn
 	_wmn = wmn
 	_senses = senses
-	_alchemy = alchemy
 	_qwen = qwen
+	var _dead: Node = pressure
+	if topic != null or gauge != null:
+		set_bus(topic, gauge)
 	if _store != null:
 		_join(_store, "body_changed", _on_body_changed)
 		if not _store.has_signal("body_changed"):
@@ -503,10 +513,6 @@ func bind(store: Node, mnn: Node, wmn: Node, senses: Node, alchemy: Node, qwen: 
 		_cur_body = _body_bits()
 		_prev_body = _cur_body
 		_still_since_day = _today()
-		## THE CLOCK THIS PHONE WENT TO SLEEP WITH. Loaded before the first
-		## beat, so the very first sentence is already on the user's own hour.
-		_load_entrain()
-		_join(_store, "restored", _load_entrain)
 	_join(_mnn, "token", _on_token)
 	## A PEER THAT STOPS SHOUTING LEAVES THE DISC. The fabric's own timeout is
 	## the authority; the front only forwards the word.
@@ -536,12 +542,53 @@ func set_creature(creature: Node) -> void:
 	_layout_room()
 
 
-func set_alchemy(alchemy: Node) -> void:
-	_alchemy = alchemy
+## THE BUS, SUBSCRIBED, AND THE GAUGE, HELD. Two subscriptions and no
+## publishes: "/body" is the figure and the room's own needle, "/phase" is
+## the four timescales. Both are LATCHED by the bus, so a front attached
+## after the organism has already spoken stands on what is live rather than
+## on an empty room.
+func set_bus(topic: RefCounted, gauge: RefCounted) -> void:
+	_gauge = gauge
+	if _topic != null:
+		if _body_sub >= 0:
+			_topic.unsubscribe(_body_sub)
+		if _phase_sub >= 0:
+			_topic.unsubscribe(_phase_sub)
+	_body_sub = -1
+	_phase_sub = -1
+	_topic = topic
+	if _topic == null:
+		return
+	_body_sub = int(_topic.subscribe(HexyTopic.TOPIC_BODY, Callable(self, "_on_body_msg")))
+	_phase_sub = int(_topic.subscribe(HexyTopic.TOPIC_PHASE, Callable(self, "_on_phase_msg")))
+	var b: Dictionary = _topic.last(HexyTopic.TOPIC_BODY)
+	if not b.is_empty():
+		_on_body_msg(b)
+	var p: Dictionary = _topic.last(HexyTopic.TOPIC_PHASE)
+	if not p.is_empty():
+		_on_phase_msg(p)
+	if dials != null and dials.has_method("set_bus"):
+		dials.set_bus(_topic, _gauge)
+	if dashboard != null and dashboard.has_method("set_bus"):
+		dashboard.set_bus(_topic, _gauge)
 
 
-func alchemy() -> Node:
-	return _alchemy
+func gauge() -> RefCounted:
+	return _gauge
+
+
+func topic() -> RefCounted:
+	return _topic
+
+
+## THE BODY, OFF THE BUS. Kept whole; the radar wants it as a radar state and
+## the glyph band wants only its bits, and both are taken from this one copy.
+func _on_body_msg(msg: Dictionary) -> void:
+	_body = msg.duplicate()
+
+
+func _on_phase_msg(msg: Dictionary) -> void:
+	_phase_msg = msg.duplicate()
 
 
 func set_addons(addons: Node) -> void:
@@ -612,20 +659,23 @@ func beat() -> void:
 func _feed_dashboard() -> void:
 	if dashboard == null or not dashboard.has_method("set_phase_snapshot"):
 		return
-	var bits: int = _body_bits()
-	var ch: Dictionary = Journey.chapter(bits, maxi(_stage, 0))
+	var ch: Dictionary = current_chapter()
 	var est: Dictionary = phase_estimate()
-	var days: Array = []
-	if _alchemy != null and _alchemy.has_method("days_toward"):
-		days = _alchemy.days_toward() as Array
+	## THE SECONDS ROW IS THE PHASE MESSAGE'S OWN when the organism has
+	## published one; the radar's calcium phase is the fallback for a front
+	## with no bus attached.
+	var seconds: float = float(_phase_msg.get("seconds", own_phase()))
 	dashboard.set_phase_snapshot({
 		"radar_phase": own_phase(),
-		"seconds": "calcium %.3f  %s" % [own_phase(), String(est.get("phase_name", ""))],
+		"seconds": "calcium %.3f  %s" % [seconds, String(est.get("phase_name", ""))],
 		"internal_hour": float(est.get("internal_hour", 0.0)),
 		"offset_h": float(est.get("offset_h", 0.0)),
 		"confidence": float(est.get("confidence", 0.0)),
+		## THE WEEKS ARE THE GAUGE'S SIX LEANS -- the reading layer's standing
+		## thumb on each line, which is what "pressure" now means -- with the
+		## organism's own weeks count beside them.
 		"marks": _marks(),
-		"days_toward": days,
+		"days_toward": [int(float(_phase_msg.get("weeks", 0.0)) * 7.0)],
 		"chapter_title": String(ch.get("title", "")),
 		"stage_name": String(ch.get("stage_name", "")),
 	})
@@ -637,7 +687,18 @@ func _feed_dashboard() -> void:
 func _feed_radar() -> void:
 	if radar == null:
 		return
-	if _store != null and _store.has_method("get_character"):
+	## THE ROOM'S NEEDLE COMES OFF "/body". Two keys the Body does not carry
+	## -- acetylcholine (LINE_FOCUS has no Body slot) and is_startled -- are a
+	## DOCUMENTED GAP in HexyMsg.body_to_radar_state, so they are still polled
+	## off get_fly_state() and merged over the top, and nothing else is.
+	if not _body.is_empty():
+		var state: Dictionary = HexyMsg.body_to_radar_state(_body)
+		var gap: Dictionary = _fly_gap()
+		for k in ["acetylcholine", "is_startled"]:
+			if gap.has(k):
+				state[k] = gap[k]
+		radar.set_state(state)
+	elif _store != null and _store.has_method("get_character"):
 		var ch: Variant = _store.get_character()
 		if ch != null and ch.has_method("get_fly_state"):
 			radar.set_state(ch.get_fly_state() as Dictionary)
@@ -665,40 +726,33 @@ func _feed_radar() -> void:
 
 ## WHERE THIS PERSON IS IN THEIR OWN DAY, AND IN THEIR OWN STORY.
 ##
-## One [Entrain] sample a beat out of what a phone with nothing attached can
-## still honestly say: the wall hour, the senses' excitation as motion, the
-## screen, and whether a question was asked. Light is -1 -- unknown -- because
-## the front has no lux and a zero would read as pitch dark. The internal hour
-## that falls out becomes the phase every other phone in the room compares
-## itself against, and the chapter comes from the journey's own rule.
+## W8e -- READ, NOT SAMPLED. The front used to fold a light, a motion, a
+## screen flag and a spoken word into a clock of its own every beat. It does
+## not any more: all four reach the gauge as Sense messages and this file only
+## asks the gauge what hour it thinks it is. The internal hour that falls out
+## is still the phase every other phone in the room compares itself against,
+## and the chapter still comes from a rule table -- the gauge's own.
 func _feed_clock() -> void:
 	var day: int = _today()
 	var wall: float = _wall_hour()
-	_entrain.sample(day, wall, -1.0, _motion(), _screen_on(), _spoke)
-	_entrain.trim(day, _entrain_days())
-	## THE ESTIMATE, ONCE A MINUTE. It is the only thing that moves
-	## `phase_offset_h`, so without this call `internal_hour` is the sun's hour
-	## wearing the user's name -- which is what the audit found.
+	## THE ESTIMATE, READ BACK ONCE A MINUTE. The front no longer SAMPLES
+	## anything: the light, the motion, the screen and the spoken word all
+	## reach the gauge as Sense messages, and this file only asks it what it
+	## has made of them.
 	var now_ms: int = Clock.now_ms()
-	if _est_at_ms <= 0 or now_ms - _est_at_ms >= ESTIMATE_EVERY_MS:
+	if _est_at_ms <= 0 or now_ms - _est_at_ms >= GAUGE_READ_EVERY_MS:
 		_est_at_ms = now_ms
-		_phase_est = _entrain.estimate()
-		_save_entrain()
-	_phase = fposmod(_entrain.internal_hour(wall), 24.0) / 24.0
+		_phase_est = (_gauge.call("estimate") as Dictionary) if _gauge != null else {}
+	_phase = fposmod(_internal_hour(wall), 24.0) / 24.0
 	var days_still: int = maxi(0, day - _still_since_day)
 	var now_bits: int = _body_bits()
 	if _cur_body < 0:
 		_cur_body = now_bits
 		_prev_body = now_bits
-	## THE WHOLE WALK, NOT ONE STEP. `stage_of` can never return ROAD_BACK --
-	## it has no memory to recognise old ground with -- so the store's own path
-	## is handed over when there is enough of it, and the single step stays as
-	## the fallback for a store that has only just started walking.
-	var walked: Array[int] = _body_path()
-	if walked.size() >= 3:
-		_stage = Journey.stage_of_path(walked, days_still)
-	else:
-		_stage = Journey.stage_of(_prev_body, now_bits, days_still)
+	## THE WHOLE WALK, NOT ONE STEP, and the rules are the gauge's own data
+	## table rather than a const block: a second interpretation of the same
+	## walk is a second gauge.json, not a second build.
+	_stage = _stage_of(_body_path(), days_still)
 	var shown: float = own_phase()
 	if _wmn != null and _wmn.has_method("set_own_phase"):
 		_wmn.set_own_phase(shown, _stage)
@@ -712,43 +766,63 @@ func own_phase() -> float:
 	return _scrub_phase if _scrub_phase >= 0.0 else _phase
 
 
-## THE LAST ESTIMATE, as a dictionary a dashboard or a test can read: offset_h,
-## confidence, wake_h, sleep_h, plus the internal hour and its band name.
+## WHAT THE GAUGE HAS MADE OF THE SENSES, as a dictionary a dashboard or a
+## test can read: offset_h, confidence, wake_h, sleep_h, plus the internal
+## hour and its band name. A PURE READ -- nothing here writes the gauge, and
+## a front with no gauge answers an honest zeroed clock rather than guessing.
 func phase_estimate() -> Dictionary:
 	var out: Dictionary = _phase_est.duplicate(true)
-	var ih: float = _entrain.internal_hour(_wall_hour())
+	var ih: float = _internal_hour(_wall_hour())
 	out["internal_hour"] = ih
-	out["phase_name"] = Entrain.phase_name(ih)
+	out["phase_name"] = _phase_name(ih)
 	out["phase"] = own_phase()
-	out["confidence"] = _entrain.confidence
-	out["offset_h"] = _entrain.phase_offset_h
+	if _gauge != null:
+		out["confidence"] = float(_gauge.call("get_field", "confidence", 0.0))
+		out["offset_h"] = float(_gauge.call("get_field", "clock_offset_h", 0.0))
+	else:
+		out["confidence"] = float(out.get("confidence", 0.0))
+		out["offset_h"] = float(out.get("offset_h", 0.0))
+	if not out.has("wake_h"):
+		out["wake_h"] = 7.0
+	if not out.has("sleep_h"):
+		out["sleep_h"] = 23.0
 	return out
 
 
-## How many days of samples the ring keeps, from HexyConfig when there is one.
-func _entrain_days() -> int:
-	var cfg: HexyConfig = HexyConfig.peek()
-	if cfg != null and cfg.keys().has(CFG_ENTRAIN_DAYS):
-		return maxi(1, int(cfg.get_value(CFG_ENTRAIN_DAYS)))
-	return int(Entrain.default_config()[CFG_ENTRAIN_DAYS])
+## THE HOUR THE FLY SHOULD BELIEVE, off the gauge's own clock offset.
+func _internal_hour(wall: float) -> float:
+	if _gauge == null:
+		return fposmod(wall, 24.0)
+	return float(_gauge.call("internal_hour", wall))
 
 
-## THE ENTRAIN STATE, HANDED TO THE STORE so a dump carries it. Publish only.
-func _save_entrain() -> void:
-	if _store != null and _store.has_method("set_entrain_state"):
-		_store.set_entrain_state(_entrain.to_dict())
+## WHICH BAND AN INTERNAL HOUR FALLS IN, off the gauge's own band table.
+func _phase_name(internal_h: float) -> String:
+	if _gauge == null:
+		return ""
+	return String(_gauge.call("phase_name", internal_h))
 
 
-## THE INVERSE, at bind: a store that came back with an entrain section gives
-## this front the clock it went to sleep with instead of a cold one.
-func _load_entrain() -> void:
-	if _store == null or not _store.has_method("entrain_state"):
-		return
-	var d: Dictionary = _store.entrain_state() as Dictionary
-	if d.is_empty():
-		return
-	_entrain = Entrain.from_dict(d)
-	_phase_est = _entrain.estimate()
+## THE CHAPTER A WALK IS IN, off the gauge's own rule table.
+func _stage_of(walked: Array, days_still: int) -> int:
+	if _gauge == null or walked.is_empty():
+		return maxi(_stage, 0)
+	return int(_gauge.call("stage_of", walked, days_still))
+
+
+## THE TWO KEYS A Body MESSAGE DOES NOT CARRY. Documented in HexyMsg as a
+## gap, so they are polled -- and ONLY they are polled.
+func _fly_gap() -> Dictionary:
+	if _store == null or not _store.has_method("get_character"):
+		return {}
+	var ch: Variant = _store.get_character()
+	if ch == null or not ch.has_method("get_fly_state"):
+		return {}
+	var fs: Dictionary = ch.get_fly_state() as Dictionary
+	return {
+		"acetylcholine": float(fs.get("acetylcholine", 0.0)),
+		"is_startled": bool(fs.get("is_startled", false)),
+	}
 
 
 ## A FINGER SCRUBBED THE EARTH RING. Preview only; released below.
@@ -786,9 +860,12 @@ func _refresh_sentence() -> void:
 func _compose_sentence() -> String:
 	var bits: int = _body_bits()
 	if _sentence_script != null:
+		## THE GAUGE IS HANDED IN when there is one, and every word table,
+		## phrase and threshold in the line then comes off gauge.json rather
+		## than off a const block in the core.
 		var out: Variant = _sentence_script.call("of", bits, _cast_dict(), _peer_rows(),
-			_day_dict(), _marks(), Journey.chapter(bits, maxi(_stage, 0)),
-			_advice_clause())
+			_day_dict(), _marks(), current_chapter(),
+			_advice_clause(), _gauge)
 		if out != null:
 			return String(out)
 	return "#%d %s" % [KingWen.number(bits), KingWen.name(bits)]
@@ -816,51 +893,77 @@ func _day_dict() -> Dictionary:
 	return {
 		"day": _today(),
 		"hour": _wall_hour(),
-		"internal_hour": _entrain.internal_hour(_wall_hour()),
-		## THE BAND, NAMED. Sentence._day_word reads this and nothing else, so
-		## without it every sentence this front ever composed said "day".
-		## Derived from the INTERNAL hour, so a night owl's "morning" is theirs
-		## -- and from the scrub's hour instead while a finger is holding the
-		## earth ring, which is the whole point of a preview.
-		"phase_name": Entrain.phase_name(
+		"internal_hour": _internal_hour(_wall_hour()),
+		## THE BAND, NAMED, off the gauge's own band table. Derived from the
+		## INTERNAL hour, so a night owl's "morning" is theirs -- and from the
+		## scrub's hour instead while a finger is holding the earth ring,
+		## which is the whole point of a preview.
+		"phase_name": _phase_name(
 			own_phase() * 24.0 if _scrub_phase >= 0.0
-			else _entrain.internal_hour(_wall_hour())),
+			else _internal_hour(_wall_hour())),
 		"phase": own_phase(),
 		"stage": _stage,
-		"confidence": _entrain.confidence,
+		"confidence": float(_gauge.call("get_field", "confidence", 0.0)) if _gauge != null else 0.0,
 		"days_still": maxi(0, _today() - _still_since_day),
 	}
 
 
-## WHAT THE LIGHT IS DOING TO THE CLOCK, as one lowercase clause or "". The
-## front has no lux of its own, so this is only ever non-empty when something
-## upstream pushed one in through [method set_lux].
+## WHAT THE LIGHT IS DOING TO THE CLOCK, as one lowercase clause or "". Every
+## number in it is the gauge's own -- the brightness that counts as bright,
+## the window either side of wake and sleep, the words themselves.
 func _advice_clause() -> String:
-	if _lux < Entrain.BRIGHT_LUX:
+	if _gauge == null:
 		return ""
-	var a: Dictionary = _entrain.advice(_wall_hour(), _lux)
-	return Entrain.advice_clause(String(a.get("key", "none")))
+	if _lux < float(_gauge.call("get_field", "bright_lux", 50.0)):
+		return ""
+	var est: Dictionary = phase_estimate()
+	var a: Dictionary = _gauge.call("advice", _wall_hour(), _lux,
+		float(est.get("wake_h", 7.0)), float(est.get("sleep_h", 23.0)))
+	return String(_gauge.call("advice_clause", String(a.get("key", "none"))))
 
 
-## THE ONE LIGHT READING, pushed in by whoever has a light sensor. -1 is
-## "unknown", which is what a phone with nothing attached honestly reports.
+## THE ONE LIGHT READING, PUBLISHED, NOT KEPT. W8e: a lux sample is a Sense
+## like any other, so whoever has a light sensor pushes it in here and it goes
+## straight out on "/sense" as an ocelli message -- the organism routes it to
+## its circadian clock and the gauge fits its own hour against it. The copy
+## kept here is only what the advisory clause above reads back.
 func set_lux(lux: float) -> void:
 	_lux = lux
+	if _topic == null or lux < 0.0:
+		return
+	_topic.publish(HexyTopic.TOPIC_SENSE, HexyMsg.sense("ocelli", "lux",
+		Time.get_ticks_usec() * 1000, lux,
+		{"wall_hour": _wall_hour(), "day": _today(), "screen_on": _screen_on()}))
 
 
-## The six standing marks, when there is an alchemy to ask.
+## THE SIX STANDING LEANS, off the gauge. This is the reading layer's thumb
+## on each line -- what the sentence calls a mark and the dashboard calls the
+## weeks -- and it is data in one file, not a second body.
 func _marks() -> Array:
-	if _alchemy != null and _alchemy.has_method("marks"):
-		return _alchemy.marks() as Array
-	return []
+	if _gauge == null:
+		return []
+	return (_gauge.call("get_field", "line_lean", []) as Array)
 
 
-## THE CHAPTER THIS FIGURE IS STANDING IN, as the beat already worked it out.
-## `_stage` is -1 until the first beat; a caller asking before then gets
-## ORDINARY for whatever figure is standing, which is the honest chapter for
-## a figure nobody has watched move yet.
+## THE CHAPTER THIS FIGURE IS STANDING IN, as the beat already worked it out,
+## with every name and gloss off the gauge's own stage table. `_stage` is -1
+## until the first beat; a caller asking before then gets stage 0 for
+## whatever figure is standing, which is the honest chapter for a figure
+## nobody has watched move yet.
 func current_chapter() -> Dictionary:
-	return Journey.chapter(_body_bits(), maxi(_stage, 0))
+	var bits: int = _body_bits()
+	var s: int = maxi(_stage, 0)
+	var stage_name: String = String(_gauge.call("stage_name", s)) if _gauge != null else ""
+	var gloss: String = String(_gauge.call("stage_gloss", s)) if _gauge != null else ""
+	var hexagram_name: String = KingWen.name(bits)
+	return {
+		"stage": s,
+		"stage_name": stage_name,
+		"gloss": gloss,
+		"hexagram_no": KingWen.number(bits),
+		"hexagram_name": hexagram_name,
+		"title": "%s · %s" % [stage_name, hexagram_name],
+	}
 
 
 func _refresh_glyph() -> void:
@@ -1063,8 +1166,8 @@ func open_dials() -> Node:
 			dials.bind(_store, _qwen, _mnn, _wmn)
 		if dials.has_method("set_senses"):
 			dials.set_senses(_senses)
-		if dials.has_method("set_alchemy"):
-			dials.set_alchemy(_alchemy)
+		if dials.has_method("set_bus"):
+			dials.set_bus(_topic, _gauge)
 		if dials.has_method("set_mic"):
 			dials.set_mic(_mic)
 		if dials.has_method("set_heading"):
@@ -1227,7 +1330,9 @@ func open_dashboard() -> Node:
 			if dashboard.has_method("set_host"):
 				dashboard.set_host(self)
 			if dashboard.has_method("bind"):
-				dashboard.bind(_store, _mnn, _wmn, _senses, _alchemy, _qwen)
+				dashboard.bind(_store, _mnn, _wmn, _senses, null, _qwen)
+			if dashboard.has_method("set_bus"):
+				dashboard.set_bus(_topic, _gauge)
 			if dashboard.has_method("set_addons"):
 				dashboard.set_addons(_addons)
 			if dashboard.has_method("set_heading"):
@@ -1291,6 +1396,7 @@ func _open_peer_sheet(who: String) -> void:
 		peer_sheet.guide_requested.connect(_on_guide_requested)
 		peer_sheet.guide_cleared.connect(_on_guide_cleared)
 		peer_sheet.closed.connect(close_peer_sheet)
+		peer_sheet.set_gauge(_gauge)
 	var row: Dictionary = _peer_row(who)
 	var plot: Dictionary = _peer_plot(who)
 	peer_sheet.show_peer(row, plot)
@@ -1338,8 +1444,9 @@ func _on_guide_cleared() -> void:
 
 
 ## A READING, LAZILY BUILT AND SHOWN. The chapter is the front's own tracked
-## journey state -- `current_chapter()` -- because the sheet does not know
-## what a stage or a body's path is; it only draws what it is handed.
+## walk -- `current_chapter()`, every caption in it off the gauge -- because
+## the sheet does not know what a stage or a body's path is; it only draws
+## what it is handed.
 func _open_reading_sheet(bits: int) -> void:
 	close_peer_sheet()
 	close_dials()
@@ -1352,6 +1459,7 @@ func _open_reading_sheet(bits: int) -> void:
 		add_child(_reading_sheet_layer)
 		_reading_sheet_layer.add_child(reading_sheet)
 		reading_sheet.closed.connect(close_reading_sheet)
+		reading_sheet.set_gauge(_gauge)
 	reading_sheet.show_reading(bits, current_chapter())
 	_reading_sheet_layer.visible = true
 	if composer != null:

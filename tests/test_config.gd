@@ -72,7 +72,7 @@ const TYPES: Array[String] = ["float", "int", "bool", "enum"]
 func _test_schema_is_complete() -> void:
 	var cfg: HexyConfig = _fresh()
 	var rows: Array[Dictionary] = cfg.schema()
-	check(rows.size() >= 26, "schema carries every registered key (%d)" % rows.size())
+	check(rows.size() >= 25, "schema carries every registered key (%d)" % rows.size())
 
 	var seen: Dictionary = {}
 	var ok_shape: bool = true
@@ -103,7 +103,7 @@ func _test_schema_is_complete() -> void:
 		"qwen.max_sentences", "qwen.max_tokens", "qwen.one_line_only",
 		"senses.period_ms",
 		"hud.dwell_ring", "hud.line_flash", "hud.earth_mode", "hud.bubble_ttl_s",
-		"hud.status_mode", "hud.room_highlight",
+		"hud.room_highlight",
 		"mesh.q6_on_wire", "mesh.q6_topk",
 		"creature.breathe_with_dwell",
 	]
@@ -223,7 +223,7 @@ func _test_no_signal_on_a_write_that_changes_nothing() -> void:
 func _test_round_trip() -> void:
 	var cfg: HexyConfig = _fresh()
 	cfg.set_value("pacing.civil_fire_s", 7.5)
-	cfg.set_value("hud.status_mode", "telemetry")
+	cfg.set_value("hud.earth_mode", "stations")
 	cfg.set_value("mesh.q6_on_wire", false)
 	cfg.set_value("qwen.max_tokens", 160)
 	var text: String = cfg.to_json()

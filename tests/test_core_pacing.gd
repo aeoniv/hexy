@@ -229,15 +229,11 @@ func _test_alchemy() -> void:
 	var store: HexyStore = HexyStoreScript.new() as HexyStore
 	var rig: Senses = Senses.new()
 	rig.bind(store)
-	## THE OLD BODY, ASKED FOR OUT LOUD. Alchemy now holds a line back until the
-	## same pressure has come back on `alchemy.flip_days` separate days; this
-	## file drives sixty SECONDS, so it says plainly that it wants the immediate
-	## body. tests/alchemy_hysteresis_smoke.gd is where the days are checked.
-	var cfg: HexyConfig = HexyConfig.instance()
-	cfg.autosave = false
-	cfg.set_value("alchemy.flip_days", 0)
-	var al: Alchemy = Alchemy.new()
-	al.bind(store, rig)
+	## THE CUBE, ASKED FOR OUT LOUD. Pacing turns a line the beat the senses ask
+	## for it -- alchemy.gd (the old hysteresis shim) is gone; W10d folded what
+	## it still did into the store and deleted the rest.
+	var p: Pacing = Pacing.new()
+	p.reset(0)
 
 	# Drive the senses until they settle on a target, keeping the phone still.
 	var quiet: Dictionary = {"battery_pct": 8.0, "face_on": true, "touch_rate": 2.0,
@@ -248,29 +244,35 @@ func _test_alchemy() -> void:
 	check(rig.target_bits() == 42, "the senses ask for 42")
 
 	var flips: Array[Dictionary] = []
-	al.line_flipped.connect(func(f: Dictionary) -> void: flips.append(f))
 	var t: int = 4000
 	while t <= 60000:
 		rig.tick(t, quiet)
-		al.tick(t)
+		var out: Dictionary = p.tick(t, rig.target_bits(), rig.stillness(),
+			rig.excitation(), rig.machine_margin(), rig.human_margin())
+		if not out.is_empty():
+			flips.append(out)
 		t += 200
 	check(not flips.is_empty(), "the body turns lines toward the target")
-	check(store.body_bits() == 42, "and arrives at 42 (got %d)" % store.body_bits())
-	check(String(store.body["source"]) == "senses", "the body's source is the senses")
+	## W8c -- THE CUBE ARRIVES, THE BODY IS NOT WRITTEN. Pacing walks the
+	## 64-corner cube to the figure the senses ask for; it does not write that
+	## figure into the store. The homeostat in scripts/brain is what a line
+	## fill -- and therefore the body -- is made of now.
+	check(p.bits == 42, "and the cube arrives at 42 (got %d)" % p.bits)
+	check(store.body_bits() == 0,
+		"while the store's body was never written from here (got %d)" % store.body_bits())
 	check(store.head_bits() == 0, "the head never moved")
-	check(String(store.last_flip["reason"]) != "", "the store remembers why the last line turned")
-	check(int(store.last_flip["when"]) > 0, "and when")
+	check(String(flips[flips.size() - 1].get("reason", "")) != "",
+		"every turned line still says why")
+	check(int(flips[flips.size() - 1].get("line", -1)) >= 0, "and which line it was")
 
-	# An injected cast lands in the body whole, and the fire goes quiet.
-	al.inject(0b111000, 70000, "tap")
-	check(store.body_bits() == 0b111000, "an explicit cast is injected into the body")
-	check(String(store.body["source"]) == "tap", "and the body says a person did it")
-	check(al.pacing.bits == 0b111000, "the pacing re-anchored on the cast")
-	check(al.tick(71000).is_empty(), "and both fires are locked out for 2.5 s")
+	# An injected cast re-anchors the cube; the figure itself is the body's own.
+	p.inject(0b111000, 70000)
+	check(store.body_bits() == 0, "an explicit cast writes no body here either")
+	check(p.bits == 0b111000, "the pacing re-anchored on the cast")
+	check(p.tick(71000, 0b111000, 1.0, 0.0).is_empty(), "and both fires are locked out for 2.5 s")
 
 	store.free()
 	rig.free()
-	al.free()
 
 
 # -- 8. the large-beta limit IS the owner's old rule --------------------------

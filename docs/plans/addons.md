@@ -1,77 +1,95 @@
-# Add-on Plan — base + four hardware add-ons
+# Add-on Plan -- base + four hardware add-ons
 
 Survey 2026-09-15. Origin `D:\GitHub\ix64-hexy` (v8.4). Base `apps/hexy`.
 Rule: an add-on exists only if it opens a hardware door AND drives a fly circuit
 or one of the six need lines (Character LINE_BODY..LINE_CONNECTION).
 
-## 1. Map
+## How to write one
 
-| plugin | door | feeds | clock | writes through |
-|---|---|---|---|---|
-| eye | front camera (ixbody aar) | posture → LINE_BODY | weeks | alchemy.nudge |
-| voice | mic + speaker (ixvoice aar) | words → mushroom body | seconds | Character.feed |
-| lens | ARCore (ixlens aar) | gaze → compass circuit | seconds | Character.feed |
-| nav | GPS (ixloc aar) | place → circadian circuit | day | Entrain.sample |
-| base | touch, IMU, lux, clock, radio (ixmnn, ixmesh) | all | — | inside already |
+Extend `HexyAddon` (`scripts/core/addon.gd`) in `addons/hexy_<name>/addon.gd`.
+Override the four contract methods:
 
-Folder names: `addons/hexy_eye`, `addons/hexy_voice`, `addons/hexy_lens`,
-`addons/hexy_nav`.
+- `doors() -> PackedStringArray` -- every broker door this add-on may ever
+  `acquire()`. Anything not listed here is refused by the `GuardedBroker`
+  the loader wraps around the real broker.
+- `reads() -> PackedStringArray` -- topics subscribed to. Advisory only (the
+  loader does not enforce a subscribe), but a manifest that lies here draws a
+  wrong panel.
+- `writes() -> PackedStringArray` -- topics published on. Only `/sense`,
+  `/sense/<door>` and `/act` are ever valid; anything else fails
+  `writes_valid()` and the add-on is refused at attach.
+- `view() -> Control` -- optional dashboard face, or `null`.
+- `attach(bus: Dictionary) -> void` / `detach() -> void` -- take/release the bus.
+  `bus` is `{topic: HexyTopic, broker: Broker (wrapped), gauge: HexyGauge,
+  consents: Consents, store: HexyStore (read only)}`.
 
-**Rule:** a need-line write goes through the bus's alchemy (marks +
-hysteresis); a circuit write goes through Character. peers, presence, phase
-and stage are base, not an add-on — they live in `wmn` (W0/W5), and
-`hexy_connection` does not exist.
+`addon_name()` defaults to the folder name (`hexy_<name>` -> `<name>`); base
+never learns an add-on's name any other way. `version()` returns a version
+string for a loud mismatch. `manifest()` bundles all four so it can never
+drift from what `attach()` actually does.
 
-## 2. Cut
+## The four planned functions
 
-| origin feature | reason |
-|---|---|
-| oracle surface, signed cast | touch already lands via tap_cast; signature has no circuit |
-| mandala, mandala_words | drawing only; hud3 dials show the state |
-| agent_loop, notes, tools | no door; turn_machine → base qwen, notes → FlyRecall |
-| hexcam, chirp clock, takes, splat | capture tooling, stays in ix64-hexy |
-| tangle, ledger receipts | only peer_minds + receipt-as-reward_event survive, folded into base wmn |
-| `NEEDS` handshake name | collides with need lines → `REQUIRES := "ixmnn/2"` |
-| refusal.gd | Character.refused exists |
+| add-on | doors | reads | writes | view |
+| --- | --- | --- | --- | --- |
+| rig camera | camera, IMU | -- | `/sense` (posture, light -> senses) | capture files, not a take strip |
+| mesh dj | speaker, radio | peers' phase | `/act` (wing song / tempo) | none |
+| eco location | GPS, baro | `/body` (sunrise -> circadian) | `/sense` (place) | place on radar; peer sheet gains place |
+| csi sensors | wifi CSI | `/body` | `/sense/wifi` (presence, breathing -> homeostat) | dashboard row |
 
-## 3. Base plumbing (M1)
+None of the four are implemented in `addons/` today -- only the origin ports
+named in `plugin.cfg`/`bin/VERSION` under `ixbody`, `ixlens`, `ixloc`, `ixmesh`,
+`ixmnn`, `ixvoice` exist as base singletons, and `addons/hexy_example` (below)
+is the one worked contract example.
 
-clock.gd (ns canonical), device_facts.gd (RAM, i8mm, thermal → rest line),
-broker.gd (camera/mic/speaker arbitration), consents.gd (permission = door),
-MnnRuntime: sampling, history, tokenize, perf, apply_template; `REQUIRES`.
+## What the loader refuses
 
-## 4. Contract (M2)
+`HexyAddons.load_all()` scans `res://addons/hexy_*/addon.gd` and, per add-on:
 
-`scripts/core/addon.gd` HexyAddon: `door() -> String` (plugin), `line() -> int`
-(need index or circuit id), `attach(store, config, bus)`, `detach()`,
-`config_keys()`, `panel()`. HexyApp loads `addons/hexy_*/addon.gd`.
-Dashboard panel 10: six lines × which door feeds each.
-`test_addon_bus`: attach/detach leaves `store.dump()` equal; no door or no line = fail.
+1. `addon.valid()` false -> refused. That means: no name (`addon_name()` empty),
+   or neither a door nor a write declared (a folder that touches nothing), or
+   `writes_valid()` false (a write topic outside `/sense`, `/sense/<door>`,
+   `/act`).
+2. Same `addon_name()` as one already attached -> refused, second one freed.
+3. A declared door already held by a live organ or an earlier add-on
+   (`_broker.holder(door)` non-empty and not this add-on) -> refused up front,
+   before the add-on ever calls `acquire()`.
+4. At runtime, `GuardedBroker.acquire()` on a door not in this add-on's own
+   `doors()` list -> refused and pushed loudly (`push_warning`), same failure
+   mode as an undeclared write.
 
-## 5. Milestones
+A refused add-on is `queue_free()`d and never reaches `attach()`.
 
-| M | move | proof | state |
-|---|---|---|---|
-| M1 | base plumbing + REQUIRES | suites + plugin_version_smoke | done (5e2fb7a) |
-| M2 | HexyAddon contract | test_addon_bus | done (5e2fb7a) |
-| M2b | the one radar: north-up compass, presence rows, geo math | test_circadian_radar_smoke, geo_smoke, heading_smoke | radar complete (44f8c9e) |
-| M2c | phase spine (W0–W7a) | entrain_smoke, alchemy_hysteresis_smoke, journey_smoke, fabric_smoke | done |
-| M4 | hexy_voice: voice_sense, stage_voice → mushroom body | voice_smoke | |
-| M5 | hexy_eye: pose_sense, kp_live → LINE_BODY | body_smoke | |
-| M6 | hexy_lens: lens_sense, gaze → compass circuit | find_smoke | |
-| M7 | hexy_nav: geo, place sense → circadian circuit | nav_smoke | |
+## dump() invariant
 
-## 6. Invariants
+`store.dump()` must be byte-identical before an add-on's `attach()` and after
+its matching `detach()` -- `tests/test_addon_bus.gd` asserts this directly.
+This is enforceable because an add-on never touches the store: everything it
+does crosses the bus as a Sense or an Act, and store state changes only
+through `store.set_body`/`attach_bus`'s own `/body` subscriber. "Off means base
+unchanged" is not a convention here, it is what the contract makes impossible
+to violate silently.
 
-- add-on → base only; graphify gate: 0 cycles, no addon→addon edge
-- one state: write via note_seat / Character.feed / Config.set_value
-- one clock; one door per plugin; missing aar = loud fallback
-- add-on off = base unchanged
-- add-on feeds exactly one clock
+## hexy_example walkthrough
 
-## 7. Provenance
+`addons/hexy_example/addon.gd` -- a tiny "csi sensors"-style mock, and the
+add-on `tests/test_addon_bus.gd` drives end to end:
 
-AARs are built in `D:\GitHub\ix64-hexy\android_plugin` (`./gradlew
-exportAllAars`) and copied into `addons/<ix*>/bin`. Each seam carries
-`REQUIRES` (see `scripts/seam.gd`); a version mismatch at attach drops the
-singleton and runs the mock with one loud line.
+- `doors()` -> `["wifi"]`.
+- `reads()` -> `["/body"]` (keeps `_last_body` so a real add-on could shape its
+  guess around what the body is already doing; unused by the mock reading).
+- `writes()` -> `["/sense/wifi"]`.
+- `attach(bus)` acquires `wifi` from the broker under its own `addon_name()`
+  and subscribes `/body`.
+- `sample(t_ns, crowding)` publishes one antenna-organ Sense on `/sense` with
+  door `"wifi"` and a made-up 0..1 "how crowded the wifi looks" number -- the
+  mushroom body listens to antenna, so this is what a test sees reach the
+  brain and change a Body on `/body`.
+- `detach()` unsubscribes, releases the `wifi` door, and clears `_last_body` --
+  the state `dump()` checks against is restored exactly.
+- `view()` returns a `Label` showing a sample count, for the dashboard's
+  add-on panel.
+
+This is the minimum shape a real csi-sensors add-on above would grow into: one
+door, one read for context, one write of a Sense, no state the store can see
+directly.

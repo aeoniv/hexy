@@ -88,14 +88,12 @@ func _test_cube_writes_do_not_bump() -> void:
 
 func _test_cast_bumps_once() -> void:
 	print("\n[ a cast makes a warm chat stale ]")
+	## W10d -- alchemy.gd is deleted; the store itself bumps the stamp the
+	## moment a cast lands in the BODY seat (see `note_seat` in store.gd).
 	var store: HexyStore = HexyStoreScript.new()
-	var senses: Senses = Senses.new()
-	var al: Alchemy = Alchemy.new()
-	al.bind(store, senses)
 	var before: int = Q6Core.cast_version()
 	store.note_cast("cast_confirmed", {"bits": 42, "moving": 0, "when": 1000, "source": "tap"})
 	check(Q6Core.cast_version() == before + 1,
-		"one note_cast on a bound Alchemy bumps the stamp by exactly 1 (got %d, want %d)"
+		"one note_cast bumps the stamp by exactly 1 (got %d, want %d)"
 			% [Q6Core.cast_version(), before + 1])
 	check(store.body_bits() == 42, "and the cast landed in the body")
-	al.unbind()

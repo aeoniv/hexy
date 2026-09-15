@@ -28,6 +28,13 @@ signal clock_synced(offset_ms: int)
 signal peer_gone(who: String)
 
 const IdentityScript := preload("res://scripts/social/identity.gd")
+const HexyMsgScript := preload("res://scripts/core/msg.gd")
+const HexyTopicScript := preload("res://scripts/core/topic.gd")
+
+## Throttle for the pheromone Sense a received figure turns into: one per
+## peer per second, so a room full of hexys does not flood the brain bus at
+## figure-cast rate. (see _take_figure / _publish_pheromone)
+const PHEROMONE_PERIOD_MS := 1000
 
 ## One kind on the fabric, because the kind that matters is in byte 0 of the
 ## payload. A fabric that had to learn a new `kind` string for every sort of
@@ -72,6 +79,18 @@ var _heard := {}
 var _peer_body := {}
 var _store: Node = null
 var _binding := false
+## The brain-bus topic, when a caller has one to attach. Out: broadcast() reads
+## the latched "/body" msg (HexyMsg.KIND_BODY) to put on the wire instead of
+## inventing one from store bits alone. In: each received figure becomes a
+## "pheromone" Sense published on this bus, throttled per peer. Optional --
+## a wmn with no bus attached still works exactly as before (store-only).
+var _bus: Object = null
+## fabric src id -> the wire's whole word: a HexyMsg Body reconstructed from
+## payload["bw"] (body_from_wire), the fields peers() also exposes.
+var _peer_body_msg := {}
+## fabric src id -> next ms this node is allowed to publish a pheromone
+## Sense for them. See PHEROMONE_PERIOD_MS.
+var _pheromone_next_ms := {}
 ## Whether the bio pulse goes out at all. A test that only wants figures on the
 ## wire turns it off; the app leaves it on.
 var bio_pulse := true
@@ -192,6 +211,18 @@ func broadcast(head: Dictionary, body: Dictionary, earth: Dictionary = {}) -> Di
 	if not earth.is_empty():
 		payload["earth"] = int(earth.get("bits", 0)) & 63
 		payload["earth_moving"] = int(earth.get("moving", 0)) & 63
+	## THE ONE BODY SHAPE ON THE WIRE, ALONGSIDE THE LEGACY ENVELOPE.
+	## "bw" (body-wire) is HexyMsg.body_to_wire() of the organism's own Body:
+	## the latched "/body" topic message when a bus is attached, or -- no
+	## bus, or nothing latched yet -- a Body minted from the store bits this
+	## same payload already carries under "body" (the legacy trigram byte).
+	## See the class doc comment for the legacy-vs-Body key table.
+	var msg_body: Dictionary = {}
+	if _bus != null and _bus.has_method("last"):
+		msg_body = _bus.last(HexyTopicScript.TOPIC_BODY)
+	if msg_body.is_empty():
+		msg_body = HexyMsgScript.body_from_bits(int(body.get("bits", 0)) & 63)
+	payload["bw"] = HexyMsgScript.body_to_wire(msg_body)
 	_self_h = _figure_from(fabric.fabric_id, bits, payload)
 	room.set_self(bits, moving, now_ms(), fabric.fabric_id)
 	if keep_ledger:
@@ -275,8 +306,41 @@ func _take_figure(src: String, bits: int, payload: Dictionary) -> void:
 	if keep_ledger:
 		ledger.append(h, [fabric_id()])
 	_peer_body[src] = int(h["body"])
+	var msg_body: Dictionary = {}
+	if payload.has("bw") and typeof(payload["bw"]) == TYPE_DICTIONARY:
+		msg_body = HexyMsgScript.body_from_wire(payload["bw"], now_ms() * 1000000)
+		_peer_body_msg[src] = msg_body
 	peer_figure.emit(src, h)
 	_publish_room()
+	if not msg_body.is_empty():
+		_publish_pheromone(src, msg_body)
+
+
+## "wmn shows the body to peers, and brings peers in as a sense": every
+## received Body becomes a "pheromone" Sense on the brain bus, throttled to
+## once a second per peer -- see PHEROMONE_PERIOD_MS. value is the peer's
+## Body as heard; meta names who it was, how close (band), and whether their
+## circadian phase agrees with ours closely enough to call it "in phase".
+func _publish_pheromone(src: String, msg_body: Dictionary) -> void:
+	if _bus == null or not _bus.has_method("publish"):
+		return
+	var now := now_ms()
+	if now < int(_pheromone_next_ms.get(src, 0)):
+		return
+	_pheromone_next_ms[src] = now + PHEROMONE_PERIOD_MS
+	var their_phase: Variant = peer_phase().get(src, null)
+	var in_phase := false
+	if their_phase != null and _own_phase >= 0.0:
+		in_phase = absf(float(their_phase) - _own_phase) < 0.1
+	var meta := {
+		"who": src,
+		"band": String(peer_proximity().get(src, "")),
+		"in_phase": in_phase,
+		"phase": their_phase,
+		"stage": peer_stage().get(src, null),
+	}
+	_bus.publish(HexyTopicScript.TOPIC_SENSE,
+		HexyMsgScript.sense("pheromone", "radio", now * 1000000, msg_body, meta))
 
 
 func _take_chirp(src: String, payload: Dictionary) -> void:
@@ -318,6 +382,11 @@ func peers() -> Array:
 	var out: Array = []
 	for who in room.names():
 		var p: Dictionary = room.peers[who]
+		# The Body last heard on a wmn6 figure's "bw" key (see broadcast()),
+		# when this peer has ever sent one. Falls back to {} -- the bio-pulse
+		# fields below (headings/phases/stages) still carry heading/phase/
+		# stage even for a peer whose figures never included a Body.
+		var bm: Dictionary = _peer_body_msg.get(who, {})
 		out.append({
 			"who": who,
 			"bits": int(p["bits"]),
@@ -332,13 +401,17 @@ func peers() -> Array:
 			# touch/room/far, or "" when the fabric has not placed this peer
 			# yet -- see MeshFabric.peer_proximity_by_src.
 			"cls": String(cls_by_who.get(who, "")),
-			# radians, or null when no bio pulse has been heard from them.
-			"heading_rad": headings.get(who, null),
+			# radians: the Body's heading when one arrived, else the bio
+			# pulse's, else null when neither has ever been heard.
+			"heading_rad": bm.get("heading_rad", headings.get(who, null)),
 			# 0..1 of their internal day, or null when that phone runs no
 			# estimator yet -- never a guessed midnight.
 			"phase": phases.get(who, null),
 			# Which chapter of the journey they are in, or null when unsaid.
 			"stage": stages.get(who, null),
+			# The Body's six needs, as last received, or [] when this peer
+			# has never sent one -- see HexyMsg.body_to_wire/body_from_wire.
+			"lines": bm.get("lines", []),
 		})
 	return out
 
@@ -378,9 +451,22 @@ func bind(store: Node) -> void:
 		store.hexagram_changed.connect(_on_store_hexagram)
 	if store.has_signal("head_changed") and not store.head_changed.is_connected(_on_store_head):
 		store.head_changed.connect(_on_store_head)
+	## W10c REMOVED hud3's OWN BROADCAST OF THE ALTAR: the store is the one
+	## writer of `earth` now, so the mesh must hear it directly or a peer
+	## never learns a station changed.
+	if store.has_signal("earth_changed") and not store.earth_changed.is_connected(_on_store_earth):
+		store.earth_changed.connect(_on_store_earth)
 	var h: Dictionary = store.hexagram
 	if int(h.get("bits", 0)) != 0 or int(h.get("moving", 0)) != 0 or store.head_bits() != 0:
 		broadcast_figure(h)
+
+
+## Wire this mesh to the brain-bus topic (HexyTopic), if the caller has one.
+## Optional and separate from bind(store): a wmn with a store but no bus still
+## broadcasts and receives, just without the Body wire shape or pheromone
+## Senses. Pass null to detach.
+func attach_bus(topic: Object) -> void:
+	_bus = topic
 
 
 func unbind() -> void:
@@ -388,6 +474,9 @@ func unbind() -> void:
 		_store.hexagram_changed.disconnect(_on_store_hexagram)
 	if _store != null and _store.head_changed.is_connected(_on_store_head):
 		_store.head_changed.disconnect(_on_store_head)
+	if _store != null and _store.has_signal("earth_changed") \
+			and _store.earth_changed.is_connected(_on_store_earth):
+		_store.earth_changed.disconnect(_on_store_earth)
 	_store = null
 
 
@@ -405,6 +494,15 @@ func _on_store_head(h: Dictionary) -> void:
 	broadcast(h, _store.body)
 
 
+## THE ALTAR MOVED. The head and body go out unchanged beside it; W10c made
+## the store the earth's one writer, so this is the only path a peer's copy
+## of the earth can move on.
+func _on_store_earth(e: Dictionary) -> void:
+	if _binding or _store == null:
+		return
+	broadcast(_store.head, _store.body, e)
+
+
 ## -- THE BEAT ----------------------------------------------------------------
 
 func _process(_delta: float) -> void:
@@ -415,6 +513,8 @@ func _process(_delta: float) -> void:
 	for who in gone:
 		_heard.erase(who)
 		_peer_body.erase(who)
+		_peer_body_msg.erase(who)
+		_pheromone_next_ms.erase(who)
 		peer_gone.emit(who)
 	if not gone.is_empty():
 		_publish_room()

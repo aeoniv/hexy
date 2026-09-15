@@ -147,14 +147,14 @@ func _test_dwell(hud: Node) -> void:
 ## Every station evicted from the earth band still exists by name.
 func _test_evictions(hud: Node) -> void:
 	for m in ["toggle_enhanced", "cycle_geometry", "telemetry_text", "brain_text",
-			"config_text", "cycle_sense_period", "mesh_broadcast", "camera_reset",
+			"config_text", "cycle_sense_period", "mesh_peers", "camera_reset",
 			"toggle_sensor_freeze", "cast_earth", "walk_earth"]:
 		check(hud.has_method(m), "hud3 answers to %s()" % m)
 	check(typeof(hud.toggle_enhanced()) == TYPE_BOOL, "toggle_enhanced returns a bool")
 	hud.toggle_enhanced()
 	check(typeof(hud.cycle_geometry()) == TYPE_STRING, "cycle_geometry returns a name")
 	check(typeof(hud.cycle_sense_period()) == TYPE_INT, "cycle_sense_period returns a period")
-	check(typeof(hud.mesh_broadcast()) == TYPE_INT, "mesh_broadcast returns a peer count")
+	check(typeof(hud.mesh_peers()) == TYPE_INT, "mesh_peers returns a peer count")
 	check(typeof(hud.toggle_sensor_freeze()) == TYPE_BOOL, "toggle_sensor_freeze returns a bool")
 	check(typeof(hud.cast_earth()) == TYPE_DICTIONARY, "cast_earth returns the earth seat")
 	hud.walk_earth(1)

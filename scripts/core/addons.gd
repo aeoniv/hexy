@@ -1,37 +1,54 @@
 class_name HexyAddons
 extends Node
 
-## THE LOADER: the one place base learns that an add-on exists.
+## W8d -- THE LOADER, ON THE NEW CONTRACT.
 ##
-## It scans `res://addons/hexy_*/addon.gd`, builds each script, checks the
-## manifest against [class HexyAddon], registers whatever tunables the add-on
-## brought into the one registry, and hands it the bus. Nothing else in
-## scripts/ names an add-on, which is the whole of the "add-on off = base
-## unchanged" invariant: delete the folder and this scan finds nothing.
-##
-## ONE DOOR PER PLUGIN. Two add-ons claiming "ixbody" is a packaging mistake,
-## not a runtime choice, so the second one is refused loudly.
+## Scans `res://addons/hexy_*/addon.gd`, builds each script, refuses an
+## add-on whose [method HexyAddon.writes] names anything outside Sense/Act,
+## wraps the broker it hands out so an undeclared [method Broker.acquire]
+## is refused and pushed, and enforces one holder per door across every
+## add-on on the bus. Nothing else in scripts/ names an add-on: delete the
+## folder and this scan finds nothing, which is the whole of "add-on off =
+## base unchanged".
 
-## An add-on is now on the bus.
 signal attached(addon_name: String)
-
-## An add-on has been taken off it.
 signal detached(addon_name: String)
 
-## Where add-ons live and what their entry file is called.
 const ADDONS_DIR: String = "res://addons"
 const FOLDER_PREFIX: String = "hexy_"
 const ENTRY_FILE: String = "addon.gd"
 
 var _addons: Array[HexyAddon] = []
-var _doors: Dictionary = {}
-var _store: Object = null
 var _bus: Dictionary = {}
+var _broker: Broker = null
 
 
-# -- scanning -----------------------------------------------------------------
+## A BROKER THAT ONLY OPENS THE DOORS ITS OWNER DECLARED. Wraps the real
+## [Broker] so `acquire()` on anything outside `allowed` is refused and
+## pushed loudly, exactly like the doorless/wrong-write refusals at attach.
+class GuardedBroker extends RefCounted:
+	var _real: Broker
+	var _who: String
+	var _allowed: PackedStringArray
 
-## Every `res://addons/hexy_*/addon.gd` on disk, sorted so a boot is repeatable.
+	func _init(real: Broker, who: String, allowed: PackedStringArray) -> void:
+		_real = real
+		_who = who
+		_allowed = allowed
+
+	func acquire(door: String, who: String = "") -> bool:
+		if not _allowed.has(door):
+			push_warning("HexyAddons: %s asked for undeclared door %s" % [_who, door])
+			return false
+		return _real.acquire(door, _who)
+
+	func release(door: String, who: String = "") -> void:
+		_real.release_door(door, _who)
+
+	func holder(door: String) -> String:
+		return _real.holder(door)
+
+
 static func scan_paths() -> PackedStringArray:
 	var out: PackedStringArray = PackedStringArray()
 	var dir := DirAccess.open(ADDONS_DIR)
@@ -49,14 +66,12 @@ static func scan_paths() -> PackedStringArray:
 
 # -- attaching ----------------------------------------------------------------
 
-## SCAN, BUILD, CHECK, ATTACH. Returns how many add-ons ended up on the bus.
-## `bus` is the small dictionary {store, character, alchemy}; `store` is the
-## one HexyStore, handed separately because it is the add-on's first argument.
-func load_all(store: Object, bus: Dictionary = {}) -> int:
-	_store = store
+## `bus` is {topic: HexyTopic, broker: Broker, gauge: HexyGauge (optional),
+## store: HexyStore (read only)}. Each add-on is handed its own wrapped copy
+## with `broker` replaced by a [GuardedBroker].
+func load_all(bus: Dictionary = {}) -> int:
 	_bus = bus.duplicate()
-	if not _bus.has("store"):
-		_bus["store"] = store
+	_broker = _bus.get("broker", null) as Broker
 	var count: int = 0
 	for path in scan_paths():
 		var script: Script = load(path) as Script
@@ -74,7 +89,7 @@ func load_all(store: Object, bus: Dictionary = {}) -> int:
 	return count
 
 
-## ONE ADD-ON ONTO THE BUS, manifest first. False means it was refused, and
+## ONE ADD-ON ONTO THE BUS, contract first. False means it was refused, and
 ## the reason has already been pushed.
 func attach_one(addon: HexyAddon) -> bool:
 	if addon == null:
@@ -82,39 +97,51 @@ func attach_one(addon: HexyAddon) -> bool:
 	if not addon.valid():
 		addon.queue_free()
 		return false
-	var m: Dictionary = addon.manifest()
-	var who: String = String(m.get("name", "")).strip_edges()
+	var who: String = addon.addon_name().strip_edges()
 	if who == "":
-		push_error("HexyAddons: an add-on has no name in its manifest")
 		addon.queue_free()
 		return false
-	var d: String = String(m.get("door", ""))
-	if _doors.has(d):
-		push_error("HexyAddons: door %s is already held by %s" % [d, String(_doors[d])])
-		addon.queue_free()
-		return false
+	for a in _addons:
+		if a.addon_name() == who:
+			push_error("HexyAddons: %s is already on the bus" % who)
+			addon.queue_free()
+			return false
+	## ONE HOLDER PER DOOR, checked before the door is even offered: an
+	## add-on that DECLARES a door a live organ (or an earlier add-on)
+	## already holds is refused up front, loudly, rather than let it find
+	## out the first time it calls acquire().
+	if _broker != null:
+		for d in addon.doors():
+			var door: String = String(d)
+			var owner: String = _broker.holder(door)
+			if owner != "" and owner != who:
+				push_error("HexyAddons: %s wants door %s, %s already holds it"
+					% [who, door, owner])
+				addon.queue_free()
+				return false
 
-	var keys: Dictionary = addon.config_keys()
-	if not keys.is_empty():
-		HexyConfig.instance().register(keys)
+	var addon_bus: Dictionary = _bus.duplicate()
+	if _broker != null:
+		addon_bus["broker"] = GuardedBroker.new(_broker, who, addon.doors())
 
 	addon.name = who
 	add_child(addon)
 	_addons.append(addon)
-	_doors[d] = who
-	addon.attach(_store, HexyConfig.peek(), _bus)
+	addon.attach(addon_bus)
 	attached.emit(who)
 	return true
 
 
-## EVERY ADD-ON OFF, newest first, each one given its own detach() before the
-## node goes. What the registry grew stays grown -- a tunable is not state.
+## EVERY ADD-ON OFF, newest first, each given its own detach() before the
+## node goes, and every door it holds released whether it remembered to or
+## not.
 func detach_all() -> void:
 	for i in range(_addons.size() - 1, -1, -1):
 		var addon: HexyAddon = _addons[i]
 		var who: String = addon.name
 		addon.detach()
-		_doors.erase(addon.door())
+		if _broker != null:
+			_broker.release_all_doors(who)
 		_addons.remove_at(i)
 		remove_child(addon)
 		addon.queue_free()
@@ -123,12 +150,10 @@ func detach_all() -> void:
 
 # -- what a panel may ask for -------------------------------------------------
 
-## The attached add-ons, in attach order.
 func addons() -> Array[HexyAddon]:
 	return _addons.duplicate()
 
 
-## Their names, in attach order.
 func names() -> Array[String]:
 	var out: Array[String] = []
 	for a in _addons:
@@ -136,13 +161,22 @@ func names() -> Array[String]:
 	return out
 
 
-## line or circuit id -> the doors feeding it. This is the dashboard's whole
-## panel 10: six need rows, four circuit rows, and which door lands on each.
+## DOOR -> HOLDER, for every door any attached add-on declared, plus TOPIC ->
+## WRITERS. This is the dashboard's panel 10.
 func doors() -> Dictionary:
 	var out: Dictionary = {}
 	for a in _addons:
-		var l: int = a.line()
-		if not out.has(l):
-			out[l] = []
-		(out[l] as Array).append(a.door())
+		for d in a.doors():
+			out[String(d)] = _broker.holder(String(d)) if _broker != null else String(a.name)
+	return out
+
+
+func topic_writers() -> Dictionary:
+	var out: Dictionary = {}
+	for a in _addons:
+		for t in a.writes():
+			var topic: String = String(t)
+			if not out.has(topic):
+				out[topic] = []
+			(out[topic] as Array).append(String(a.name))
 	return out

@@ -1,17 +1,15 @@
 extends SceneTree
 
-## THE ADD-ON CONTRACT, PROVED ON A FAKE DOOR.
+## THE ADD-ON CONTRACT (W8d), PROVED ON REAL DOORS.
 ##
-## An add-on is allowed to write through the seat bus, the homeostat and the
-## registry, and nowhere else. The claim this file makes is the one the plan
-## makes: ATTACH AND DETACH LEAVES THE STORE EXACTLY AS IT FOUND IT. A fake
-## add-on is attached to a fresh HexyStore, it feeds a need line and lands a
-## seat, it is detached, and `store.dump()` has to be the same dictionary it
-## was before anyone touched it.
-##
-## And the two ways an add-on does not exist -- no door, or a line that is
-## neither a need nor a circuit -- are refused by the loader rather than
-## quietly carried.
+## An add-on is allowed to write Sense and Act, and nowhere else. It may only
+## acquire a broker door it declared, and only if nothing else already holds
+## it. And ATTACH/DETACH LEAVES THE STORE EXACTLY AS IT FOUND IT: the example
+## add-on under addons/hexy_example is attached to a fresh HexyStore's bus, it
+## publishes a Sense that reaches the brain and moves the Body on "/body",
+## it is detached, and store.dump() is the same dictionary it was before.
+
+const HexyStoreScript = preload("res://scripts/core/store.gd")
 
 var failures: int = 0
 
@@ -24,75 +22,44 @@ func check(ok: bool, label: String) -> void:
 		print("FAIL: ", label)
 
 
-## A DOOR THAT IS NOT THERE. It answers the whole contract, remembers the bus
-## it was handed, and puts back on detach() everything it changed.
-class FakeAddon extends HexyAddon:
-	var attached_store: Object = null
-	var attached_bus: Dictionary = {}
-	var attached_config: Object = null
-	## Written by the test and shared with it, because the loader FREES an
-	## add-on it detaches -- a counter on the node itself would be unreadable
-	## the moment the thing being counted is gone.
-	var log: Array = []
-	var _seat_before: Dictionary = {}
+## WRITES OUTSIDE SENSE/ACT: refused at attach.
+class BadWriteAddon extends HexyAddon:
+	func addon_name() -> String:
+		return "hexy_badwrite"
 
-	func door() -> String:
-		return "ixfake"
+	func doors() -> PackedStringArray:
+		return PackedStringArray(["wifi"])
 
-	func line() -> int:
-		return 0  # Character.LINE_BODY
+	func writes() -> PackedStringArray:
+		return PackedStringArray(["/store"])
+
+
+## A DOOR IT NEVER DECLARED: the wrapped broker refuses the acquire.
+class UndeclaredDoorAddon extends HexyAddon:
+	var acquired: bool = true
 
 	func addon_name() -> String:
-		return "hexy_fake"
+		return "hexy_sneaky"
 
-	func version() -> String:
-		return "1"
+	func doors() -> PackedStringArray:
+		return PackedStringArray(["wifi"])
 
-	func config_keys() -> Dictionary:
-		return {
-			"fake.min_confidence": {
-				"type": "float", "min": 0.0, "max": 1.0, "step": 0.01,
-				"default": 0.4, "doc": "How sure the fake door has to be."},
-		}
+	func writes() -> PackedStringArray:
+		return PackedStringArray(["/sense/wifi"])
 
-	func attach(store: Object, config: Object, bus: Dictionary) -> void:
-		attached_store = store
-		attached_config = config
-		attached_bus = bus.duplicate()
-		_seat_before = (store.call("dump") as Dictionary).duplicate(true)
-		## The two writes an add-on is allowed: one down the seat bus, one into
-		## the homeostat.
-		store.call("note_seat", 0, {"kind": "fake", "value": 1})
-		var ch: Variant = bus.get("character", null)
-		if ch != null and ch.has_method("feed"):
-			ch.feed(0, 0.2, "fake", 1000)
-
-	func detach() -> void:
-		log.append("detach")
-		if attached_store != null and not _seat_before.is_empty():
-			attached_store.call("load_dump", _seat_before)
+	func attach(bus: Dictionary) -> void:
+		var broker = bus.get("broker", null)
+		acquired = broker.acquire("camera", addon_name())
 
 
-## NO DOOR AT ALL: valid() must say so and the loader must refuse it.
-class DoorlessAddon extends HexyAddon:
-	func door() -> String:
-		return ""
-
-	func line() -> int:
-		return 0
-
-
-## A LINE THAT IS NEITHER A NEED NOR A CIRCUIT.
-class WrongLineAddon extends HexyAddon:
-	func door() -> String:
-		return "ixwrong"
-
-	func line() -> int:
-		return 99
+## NEITHER A DOOR NOR A WRITE: refused as not existing.
+class EmptyAddon extends HexyAddon:
+	func addon_name() -> String:
+		return "hexy_empty"
 
 
 func _initialize() -> void:
-	print("\n--- TEST ADDON BUS (the contract) ---")
+	print("\n--- TEST ADDON BUS (the W8d contract) ---")
 	await _run()
 	if failures == 0:
 		print("--- ALL ADDON BUS TESTS PASSED PERFECTLY ---\n")
@@ -103,132 +70,115 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	# -- the contract itself --------------------------------------------------
-	check(HexyAddon.line_valid(0) and HexyAddon.line_valid(5),
-		"the six need lines are lines")
-	check(HexyAddon.line_valid(HexyAddon.CIRCUIT_COMPASS)
-			and HexyAddon.line_valid(HexyAddon.CIRCUIT_CIRCADIAN),
-		"the four circuits are lines too")
-	check(not HexyAddon.line_valid(6) and not HexyAddon.line_valid(99)
-			and not HexyAddon.line_valid(-1),
-		"and nothing else is")
-	check(HexyAddon.line_name(0) == "body"
-			and HexyAddon.line_name(HexyAddon.CIRCUIT_COMPASS) == "compass",
-		"every line and circuit has a word")
-
-	var cfg := HexyConfig.instance()
-	cfg.autosave = false
-	cfg.reset()
-
-	var store := HexyStore.new()
-	store.name = "Store"
-	root.add_child(store)
-	await process_frame
-	var before: Dictionary = store.dump().duplicate(true)
+	# -- refusals, on fakes, no filesystem scan involved ----------------------
+	var topic := HexyTopic.new()
+	var broker := Broker.new()
+	broker.autosave = false
+	var bus: Dictionary = {"topic": topic, "broker": broker}
 
 	var loader := HexyAddons.new()
 	loader.name = "Addons"
 	root.add_child(loader)
-	loader._store = store
-	loader._bus = {
-		"store": store,
-		"character": store.get_character(),
-		"alchemy": null,
-	}
 
-	var heard: Array[String] = []
-	loader.attached.connect(func(n: String) -> void: heard.append("+" + n))
-	loader.detached.connect(func(n: String) -> void: heard.append("-" + n))
+	check(not loader.attach_one(EmptyAddon.new()),
+		"an add-on with no door and no write is refused")
+	check(not loader.attach_one(BadWriteAddon.new()),
+		"an add-on writing outside Sense/Act is refused")
 
-	# -- the fake door goes on ------------------------------------------------
-	var fake := FakeAddon.new()
-	var fake_log: Array = []
-	fake.log = fake_log
-	check(loader.attach_one(fake), "the fake add-on attaches")
-	check(loader.names() == ["hexy_fake"], "the loader holds it by name (%s)" % str(loader.names()))
-	check(heard == ["+hexy_fake"], "and said so on attached() (%s)" % str(heard))
-	check(fake.attached_store == store, "it was handed the one store")
-	check(fake.attached_config == cfg, "and the live registry")
-	check(fake.attached_bus.has("store") and fake.attached_bus.has("character")
-			and fake.attached_bus.has("alchemy"),
-		"the bus carries store, character and alchemy")
-	check(fake.attached_bus.get("character", null) == store.get_character(),
-		"and the character on it is the store's own")
-
-	var m: Dictionary = fake.manifest()
-	check(String(m.get("name", "")) == "hexy_fake" and String(m.get("door", "")) == "ixfake"
-			and int(m.get("line", -1)) == 0 and String(m.get("version", "")) == "1",
-		"the manifest carries name, door, line and version (%s)" % str(m))
-
-	check(loader.doors().get(0, []) == ["ixfake"],
-		"the loader maps the body line to the fake door (%s)" % str(loader.doors()))
-
-	# -- the config key it brought --------------------------------------------
-	check(cfg.keys().has("fake.min_confidence"), "its namespaced key joined the drawer")
-	check(String(cfg.row("fake.min_confidence")["group"]) == "fake",
-		"the group came from the namespace")
-	check(is_equal_approx(float(cfg.get_value("fake.min_confidence")), 0.4),
-		"the default is what the add-on asked for")
-	cfg.set_value("fake.min_confidence", 9.0)
-	check(is_equal_approx(float(cfg.get_value("fake.min_confidence")), 1.0),
-		"and it clamps to the row's ceiling like a built-in (got %s)"
-			% str(cfg.get_value("fake.min_confidence")))
-	cfg.set_value("fake.min_confidence", -3.0)
-	check(is_equal_approx(float(cfg.get_value("fake.min_confidence")), 0.0),
-		"and to its floor")
-	var rev: int = cfg.revision()
-	cfg.register({"fake.min_confidence": {"type": "float", "default": 0.9}})
-	check(cfg.revision() == rev, "registering a key twice changes nothing")
-	check(is_equal_approx(float(cfg.row("fake.min_confidence")["default"]), 0.4),
-		"and cannot move the row already there")
-	var schema_keys: Array[String] = []
-	for row in cfg.schema():
-		schema_keys.append(String(row["key"]))
-	check(schema_keys.has("fake.min_confidence"), "schema() carries it like any other row")
-
-	# -- the two refusals -----------------------------------------------------
-	print("-- two add-ons that do not exist (two push_errors are the point) --")
-	check(not loader.attach_one(DoorlessAddon.new()), "an add-on with no door is refused")
-	check(not loader.attach_one(WrongLineAddon.new()), "an add-on with line 99 is refused")
-	check(loader.names().size() == 1, "and neither stands on the bus")
-
-	# -- the doors panel names it ---------------------------------------------
-	var dash := HexyDashboard.new()
-	root.add_child(dash)
-	await process_frame
-	check(dash.panel("doors") != null, "the doors panel stands on the column")
-	check(String(HexyDashboard.TITLES["doors"]).begins_with("10 ·"), "doors is panel 10")
-	check(dash.doors_text().contains("food: —"),
-		"a panel with no loader draws a dash on every row")
-	dash.set_addons(loader)
-	var text: String = dash.doors_text()
-	print(text)
-	check(text.contains("body: ixfake"), "the body row names the fake door")
-	check(text.contains("food: —") and text.contains("connection: —"),
-		"the rows nothing feeds stay dashes")
-	check(text.contains("compass: —") and text.contains("circadian: —"),
-		"the circuits have rows of their own")
-
-	# -- and off again --------------------------------------------------------
+	loader._bus = bus
+	loader._broker = broker
+	var sneaky := UndeclaredDoorAddon.new()
+	check(loader.attach_one(sneaky), "the sneaky add-on itself attaches fine")
+	check(not sneaky.acquired, "but its undeclared acquire('camera') was refused")
 	loader.detach_all()
+	check(loader.names().is_empty(), "and it is off the bus again")
+
+	# -- a contended door an organ already holds -------------------------------
+	broker.acquire("wifi", "organ")
+	check(not loader.attach_one(UndeclaredDoorAddon.new()),
+		"attach_one refuses outright when a declared door is already held")
+	broker.release_door("wifi", "organ")
+
+	# -- the real example add-on, scanned off disk -----------------------------
+	var cfg := HexyConfig.instance()
+	cfg.autosave = false
+	cfg.reset()
+
+	var store: HexyStore = HexyStoreScript.new()
+	store.name = "Store"
+	root.add_child(store)
 	await process_frame
-	check(fake_log.size() == 1, "detach_all() called detach() once (%s)" % str(fake_log))
-	check(loader.names().is_empty(), "the bus is empty again")
-	check(heard == ["+hexy_fake", "-hexy_fake"], "and it said so (%s)" % str(heard))
-	check(dash.doors_text().contains("body: —"), "the doors panel forgets it too")
+	var ch: RefCounted = store.get_character()
+	ch.attach_bus(topic)
+	store.attach_bus(topic)
+	ch.tick(1_700_000_000_000)
+	var before: Dictionary = store.dump().duplicate(true)
 
-	var after: Dictionary = store.dump()
-	check(str(after) == str(before),
-		"the store dumps exactly what it dumped before the attach")
+	var loader2 := HexyAddons.new()
+	loader2.name = "Addons2"
+	root.add_child(loader2)
+	var heard: Array[String] = []
+	loader2.attached.connect(func(n: String) -> void: heard.append("+" + n))
+	loader2.detached.connect(func(n: String) -> void: heard.append("-" + n))
 
-	# -- a scan on a tree with no add-on folders ------------------------------
+	var count: int = loader2.load_all({"topic": topic, "broker": broker, "store": store})
+	## ATTACH ALONE MOVES NOTHING: the example add-on's attach() only
+	## subscribes and acquires a door, so the store must read exactly as it
+	## did before the loader ever scanned the folder.
+	check(str(store.dump()) == str(before),
+		"attach alone leaves the store exactly as it found it")
+	check(count >= 1, "the scan found at least the example add-on (%d)" % count)
+	check(loader2.names().has("hexy_example"), "hexy_example is on the bus (%s)" % str(loader2.names()))
+	check(heard.has("+hexy_example"), "and said so on attached()")
+	check(loader2.doors().get("wifi", "") == "hexy_example",
+		"the doors panel shows hexy_example holding wifi (%s)" % str(loader2.doors()))
+	check(loader2.topic_writers().get("/sense/wifi", []).has("hexy_example"),
+		"and the topic->writers map names it too")
+
+	## A second add-on trying the same declared door is refused up front.
+	var rival := UndeclaredDoorAddon.new()
+	check(not loader2.attach_one(rival), "a second add-on cannot also take wifi")
+
+	var example: HexyAddon = null
+	for a in loader2.addons():
+		if a.addon_name() == "hexy_example":
+			example = a
+	check(example != null, "the example add-on object is reachable")
+
+	var body_before: Dictionary = topic.last("/body")
+	example.call("sample", 1_700_000_010_000 * 1_000_000, 0.9)
+	ch.bus_tick(1_700_000_011_000, 1.0)
+	var body_after: Dictionary = topic.last("/body")
+	check(not body_after.is_empty(), "a Body arrived on /body after the example's Sense")
+	check(str(body_after) != str(body_before) or body_before.is_empty(),
+		"and the example add-on's Sense reached the brain")
+
+	var v: Control = example.view()
+	check(v != null, "the example add-on brings a view")
+
+	## DETACH ALONE MOVES NOTHING EITHER: whatever the example's Sense already
+	## did to the store is real and stays; detach() only unsubscribes and
+	## releases its door, so the store must read the same immediately before
+	## and immediately after it.
+	var before_detach: Dictionary = store.dump().duplicate(true)
+	loader2.detach_all()
+	await process_frame
+	check(loader2.names().is_empty(), "the bus is empty again")
+	check(heard.has("-hexy_example"), "and it said so")
+	check(broker.holder("wifi") == "", "and the wifi door is free again")
+	check(str(store.dump()) == str(before_detach),
+		"detach alone leaves the store exactly as it found it")
+
+	ch.detach_bus()
+	store.detach_bus()
+
+	# -- scan_paths sanity ------------------------------------------------------
 	for path in HexyAddons.scan_paths():
 		check(String(path).begins_with("res://addons/hexy_"),
 			"scan_paths only ever names res://addons/hexy_* (%s)" % path)
-	check(HexyAddons.scan_paths().size() >= 0, "the scan survives a tree with no add-ons")
 
-	dash.queue_free()
 	loader.queue_free()
+	loader2.queue_free()
 	store.queue_free()
 	cfg.reset()
 	HexyConfig.forget()

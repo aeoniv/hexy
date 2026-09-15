@@ -10,7 +10,7 @@ extends Control
 ## mesh -- as bars, arcs, lamps, hexagrams, a heat grid and a radar, readable
 ## at arm's length on a phone.
 ##
-## IT KNOWS NOTHING IT WAS NOT HANDED. Store, mnn, wmn, senses, alchemy and
+## IT KNOWS NOTHING IT WAS NOT HANDED. Store, mnn, wmn, senses, gauge and
 ## qwen arrive through bind() and are read DUCK-TYPED, exactly as the rest of
 ## the glass reads them. No path below the glass is named here, and no engine
 ## singleton is asked for anything.
@@ -51,8 +51,8 @@ const TITLES: Dictionary = {
 }
 
 ## THE FOUR TIMESCALES, in the order they are stacked: the second the radar is
-## painting, the day the user's own clock is in, the weeks of pressure standing
-## on the six lines, and the life the journey says this figure is a chapter of.
+## painting, the day the user's own clock is in, the weeks of line_lean standing
+## on the six lines, and the life the gauge's chapter rules put this figure in.
 const PHASE_ROWS: Array[String] = ["seconds", "day", "weeks", "life"]
 
 ## Five heights of block, so a signed mark's magnitude reads as a bar without
@@ -75,7 +75,7 @@ const CONTROL_ROWS: Array[Dictionary] = [
 	{"method": "brain_text", "label": "BRAIN", "kind": "text"},
 	{"method": "config_text", "label": "CONFIG", "kind": "text"},
 	{"method": "cycle_sense_period", "label": "SENSE PERIOD", "kind": "flag"},
-	{"method": "mesh_broadcast", "label": "BROADCAST", "kind": "flag"},
+	{"method": "mesh_peers", "label": "PEERS", "kind": "flag"},
 	{"method": "camera_reset", "label": "CAMERA RESET", "kind": ""},
 	{"method": "toggle_sensor_freeze", "label": "FREEZE SENSORS", "kind": "flag"},
 	{"method": "cast_earth", "label": "CAST EARTH", "kind": "flag"},
@@ -157,7 +157,12 @@ var _store: Node = null
 var _mnn: Node = null
 var _wmn: Node = null
 var _senses: Node = null
-var _alchemy: Node = null
+## W8e -- THE GAUGE, READ AND NEVER WRITTEN. Every caption on this panel
+## that used to come off a core object with an opinion (the pressure, the
+## chapter, the day bands) now comes off the one gauge file.
+var _gauge: RefCounted = null
+## The broker, so panel 10 can say who is actually holding a door right now.
+var _broker: Node = null
 var _qwen: Node = null
 
 ## The compass the glass hands down, so the dashboard's radar turns north-up
@@ -195,6 +200,8 @@ var _addons: Node = null
 
 ## line or circuit id -> the Label that names the doors feeding it.
 var _door_labels: Dictionary = {}
+## The one gauge line on panel 8 -- see [method _build_tunables].
+var _gauge_label: Label = null
 
 ## The four timescale rows of panel 11, by key, and the last dictionary Front
 ## pushed into them.
@@ -380,6 +387,19 @@ func _build_footer() -> Control:
 ## default, and nothing in this file has to be told about it.
 func _build_tunables(box: VBoxContainer) -> void:
 	_config = HexyConfig.instance()
+
+	## W8e -- THE GAUGE, AS ONE LINE. The gauge is the app's whole
+	## interpretation layer and it is the one thing on this panel that is NOT
+	## a knob: it is fitted by the bus, not by a thumb. So it gets a label and
+	## no control -- the only door onto it from here is
+	## [method HexyGauge.correct], and the controls that already exist for the
+	## fields it shares with the schema are the controls it uses.
+	_gauge_label = Label.new()
+	_gauge_label.name = "Gauge"
+	_gauge_label.text = "gauge —"
+	_gauge_label.add_theme_font_size_override("font_size", 11)
+	_gauge_label.add_theme_color_override("font_color", HUMAN)
+	box.add_child(_gauge_label)
 
 	var tools := HBoxContainer.new()
 	tools.name = "Tools"
@@ -668,13 +688,17 @@ func control_text() -> String:
 
 # -- panel 10: the doors ------------------------------------------------------
 
-## WHICH HARDWARE DOOR FEEDS WHICH LINE.
+## WHO IS HOLDING WHICH DOOR, AND WHO IS WRITING WHICH TOPIC.
 ##
-## Ten rows: the six need lines the homeostat holds, then the four fly
-## circuits an add-on may drive instead. Each row names the doors of every
-## attached add-on that answered with that line, and an em dash when nothing
-## does -- which is what the whole column reads on a base app with no add-ons
-## on disk, and is the picture "add-on off = base unchanged" should make.
+## W8e -- THE ROWS ARE THE BUS'S, NOT A FIXED TABLE. An add-on no longer
+## claims a line of the body; it declares DOORS (broker resources) and the
+## TOPICS it writes. So this panel is two blocks, both of them empty on a
+## base app with no add-ons on disk, which is the picture "add-on off = base
+## unchanged" should make:
+##
+##   DOORS    -- one row per door any attached add-on declared, naming the
+##               holder the broker says is standing on it right now.
+##   WRITERS  -- one row per topic, naming every add-on publishing on it.
 ## THE PHASE PANEL: four rows of plain text, one per timescale.
 ##
 ## NOTHING HERE REACHES FOR A BRAIN. scripts/glass may not preload
@@ -766,21 +790,21 @@ func _set_phase_row(key: String, text: String) -> void:
 		l.text = text
 
 
+## The heading of each block, and the one line a block shows when the bus is
+## carrying nothing for it. Both are read by [method doors_text], so the text
+## a test reads and the text a person reads are the same string.
+const DOORS_EMPTY: String = "no add-on holds a door"
+const WRITERS_EMPTY: String = "no add-on writes a topic"
+
+var _doors_box: VBoxContainer = null
+
+
 func _build_doors(box: VBoxContainer) -> void:
-	for i in range(HexyAddon.NEED_NAMES.size()):
-		box.add_child(_build_door_row(i, HexyAddon.NEED_NAMES[i]))
-	var sep := Label.new()
-	sep.name = "Circuits"
-	sep.text = "— CIRCUITS"
-	sep.add_theme_font_size_override("font_size", 11)
-	sep.add_theme_color_override("font_color", MACHINE)
-	box.add_child(sep)
-	for id in HexyAddon.CIRCUIT_NAMES:
-		box.add_child(_build_door_row(int(id), String(HexyAddon.CIRCUIT_NAMES[id])))
+	_doors_box = box
 	_sync_doors()
 
 
-func _build_door_row(id: int, label: String) -> Control:
+func _build_door_row(label: String, value: String, tint: Color) -> Control:
 	var line := HBoxContainer.new()
 	line.name = "Door:" + label
 	line.add_theme_constant_override("separation", 6)
@@ -795,28 +819,84 @@ func _build_door_row(id: int, label: String) -> Control:
 
 	var read := Label.new()
 	read.name = "Door"
-	read.text = "—"
+	read.text = value
 	read.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	read.add_theme_font_size_override("font_size", 11)
-	read.add_theme_color_override("font_color", HUMAN)
+	read.add_theme_color_override("font_color", tint)
 	line.add_child(read)
 
-	_door_labels[id] = read
+	_door_labels[label] = read
 	return line
+
+
+static func _block_head(text: String) -> Label:
+	var sep := Label.new()
+	sep.name = "Head:" + text
+	sep.text = text
+	sep.add_theme_font_size_override("font_size", 11)
+	return sep
 
 
 ## Repaint the ten rows from the loader. Cheap enough to run on every beat,
 ## and it is the only thing that can change on this panel.
 func _sync_doors() -> void:
-	var map: Dictionary = {}
-	if _addons != null and _addons.has_method("doors"):
-		map = _addons.call("doors") as Dictionary
-	for id in _door_labels:
-		var l: Label = _door_labels[id] as Label
-		if l == null:
-			continue
-		var hits: Array = map.get(int(id), []) as Array
-		l.text = "—" if hits.is_empty() else ", ".join(PackedStringArray(hits))
+	if _doors_box == null:
+		return
+	for child in _doors_box.get_children():
+		_doors_box.remove_child(child)
+		child.queue_free()
+	_door_labels.clear()
+
+	var head_doors: Label = _block_head("— DOORS")
+	head_doors.add_theme_color_override("font_color", MACHINE)
+	_doors_box.add_child(head_doors)
+	var map: Dictionary = _doors_map()
+	if map.is_empty():
+		_doors_box.add_child(_build_door_row("—", DOORS_EMPTY, DIM))
+	else:
+		var names: Array = map.keys()
+		names.sort()
+		for d in names:
+			_doors_box.add_child(_build_door_row(String(d), String(map[d]), HUMAN))
+
+	var head_writers: Label = _block_head("— WRITERS")
+	head_writers.add_theme_color_override("font_color", MACHINE)
+	_doors_box.add_child(head_writers)
+	var writers: Dictionary = _writers_map()
+	if writers.is_empty():
+		_doors_box.add_child(_build_door_row("—", WRITERS_EMPTY, DIM))
+	else:
+		var topics: Array = writers.keys()
+		topics.sort()
+		for t in topics:
+			_doors_box.add_child(_build_door_row(String(t),
+				", ".join(PackedStringArray(writers[t] as Array)), HUMAN))
+
+
+## DOOR -> HOLDER. The loader knows which doors exist (every add-on declares
+## its own); the broker knows who is standing on one right this second, and
+## it is the broker that is asked, so a door declared and never acquired
+## reads "free" rather than lying about an owner.
+func _doors_map() -> Dictionary:
+	var out: Dictionary = {}
+	if _addons == null or not _addons.has_method("doors"):
+		return out
+	for d in (_addons.call("doors") as Dictionary).keys():
+		var door: String = String(d)
+		var holder: String = ""
+		if _broker != null and _broker.has_method("holder"):
+			holder = String(_broker.call("holder", door))
+		if holder == "":
+			holder = String((_addons.call("doors") as Dictionary)[d])
+		out[door] = holder if holder != "" else "free"
+	return out
+
+
+## TOPIC -> THE ADD-ONS WRITING ON IT, straight off the loader's manifest.
+func _writers_map() -> Dictionary:
+	if _addons == null or not _addons.has_method("topic_writers"):
+		return {}
+	return _addons.call("topic_writers") as Dictionary
 
 
 ## The loader whose doors this panel draws.
@@ -830,30 +910,44 @@ func set_addons(addons: Node) -> void:
 func doors_text() -> String:
 	_sync_doors()
 	var out: PackedStringArray = PackedStringArray()
-	for i in range(HexyAddon.NEED_NAMES.size()):
-		out.append("%s: %s" % [HexyAddon.NEED_NAMES[i], _door_text(i)])
-	for id in HexyAddon.CIRCUIT_NAMES:
-		out.append("%s: %s" % [String(HexyAddon.CIRCUIT_NAMES[id]), _door_text(int(id))])
+	out.append("— DOORS")
+	var map: Dictionary = _doors_map()
+	if map.is_empty():
+		out.append("—: %s" % DOORS_EMPTY)
+	else:
+		var names: Array = map.keys()
+		names.sort()
+		for d in names:
+			out.append("%s: %s" % [String(d), String(map[d])])
+	out.append("— WRITERS")
+	var writers: Dictionary = _writers_map()
+	if writers.is_empty():
+		out.append("—: %s" % WRITERS_EMPTY)
+	else:
+		var topics: Array = writers.keys()
+		topics.sort()
+		for t in topics:
+			out.append("%s: %s" % [String(t),
+				", ".join(PackedStringArray(writers[t] as Array))])
 	return "
 ".join(out)
-
-
-func _door_text(id: int) -> String:
-	var l: Label = _door_labels.get(id, null) as Label
-	return "—" if l == null else l.text
 
 
 # -- wiring ------------------------------------------------------------------
 
 ## Everything this panel is allowed to know, handed over at once. Qwen is
-## optional because the glass binds it separately; alchemy arrives late.
-func bind(store: Node, mnn: Node, wmn: Node, senses: Node, alchemy: Node, qwen: Node = null) -> void:
+## optional because the glass binds it separately; the bus arrives late.
+func bind(store: Node, mnn: Node, wmn: Node, senses: Node, pressure: Node = null,
+		qwen: Node = null) -> void:
 	_store = store
 	_mnn = mnn
 	_wmn = wmn
 	_senses = senses
-	_alchemy = alchemy
 	_qwen = qwen
+	## THE FIFTH SLOT IS DEAD. It used to be the core object that turned a
+	## line of the body when a person stood still; nothing on the glass may
+	## hold a writer of organism state any more, so it is taken and dropped.
+	var _dead: Node = pressure
 
 
 func set_senses(senses: Node) -> void:
@@ -965,8 +1059,17 @@ func _on_radar_input(event: InputEvent) -> void:
 	radar.accept_event()
 
 
-func set_alchemy(alchemy: Node) -> void:
-	_alchemy = alchemy
+## THE ONE GAUGE, handed down from the app through the front. Read only.
+func set_bus(topic: RefCounted, gauge: RefCounted) -> void:
+	var _unused: RefCounted = topic
+	_gauge = gauge
+	_sync_gauge_row()
+
+
+## The broker, for panel 10's holder column.
+func set_broker(b: Node) -> void:
+	_broker = b
+	_sync_doors()
 
 
 func set_host(host: Node) -> void:
@@ -1094,6 +1197,7 @@ func _refresh() -> void:
 	_snap = snap
 
 	_sync_doors()
+	_sync_gauge_row()
 
 	## THE BORROWED CASE FEEDS ITSELF. The front pushes the state, the peer
 	## headings, the proximity and the compass into this same instance every
@@ -1229,15 +1333,38 @@ func _read_senses() -> Dictionary:
 	return out
 
 
+## PANEL 5, OFF THE GAUGE AND THE SIXTEEN. The pressure standing on the six
+## lines is the gauge's own `line_lean`, which is exactly what the reading
+## layer adds to each fill before it thresholds it -- the same number the old
+## core object called a mark, now held in one file a person can correct.
 func _read_fires() -> Dictionary:
-	if _alchemy != null and _alchemy.has_method("state"):
-		return _alchemy.call("state") as Dictionary
 	var still: float = float(_senses.stillness()) if _senses != null and _senses.has_method("stillness") else 0.0
+	var lean: Array = []
+	var need: float = 2.5
+	if _gauge != null:
+		lean = (_gauge.call("get_field", "line_lean", []) as Array)
+		need = maxf(0.001, float(_gauge.call("get_field", "civil_fire_s", 2.5)))
 	return {
-		"dwell_s": still, "dwell_needed_s": 2.5,
+		"dwell_s": still, "dwell_needed_s": need,
 		"refractory_s": 0.0, "refractory_needed_s": 3.5,
-		"last_reason": "", "flex": false,
+		"last_reason": _lean_reason(lean), "flex": false,
+		"line_lean": lean,
 	}
+
+
+## THE SIX LEANS, SAID ONCE. "—" when the gauge is standing at zero, which is
+## an honest "nothing is leaning" rather than a row of zeroes.
+static func _lean_reason(lean: Array) -> String:
+	if lean.is_empty():
+		return ""
+	var parts: PackedStringArray = PackedStringArray()
+	var any: bool = false
+	for i in range(lean.size()):
+		var v: float = float(lean[i])
+		if not is_zero_approx(v):
+			any = true
+		parts.append("L%d %+.2f" % [i + 1, v])
+	return ("lean " + " ".join(parts)) if any else "no line is leaning"
 
 
 func _fly_state() -> Dictionary:
@@ -1578,3 +1705,39 @@ func _centred(g: Control, at: Vector2, text: String, tint: Color, size_px: int) 
 
 static func _gb(bytes: int) -> String:
 	return "%.1f GB" % (float(bytes) / 1073741824.0)
+
+
+## ---------------------------------------------------- panel 8's gauge ----
+
+## THE THREE NUMBERS THE GAUGE IS STANDING ON: the hours it has shifted this
+## person's day by, how sure it is of that, and the chapter its own rules put
+## the store's walk in. Recomputed on every beat; it is three reads and a
+## format, and it is the only place on this panel the gauge is named.
+func _sync_gauge_row() -> void:
+	if _gauge_label != null:
+		_gauge_label.text = gauge_text()
+
+
+## The same line as text, for a test or a tool.
+func gauge_text() -> String:
+	if _gauge == null:
+		return "gauge —"
+	var stage: int = 0
+	if _store != null and _store.has_method("body_path"):
+		stage = int(_gauge.call("stage_of", _store.call("body_path"), 0))
+	return "gauge  offset %+.2fh  conf %.2f  stage %d %s" % [
+		float(_gauge.call("get_field", "clock_offset_h", 0.0)),
+		float(_gauge.call("get_field", "confidence", 0.0)),
+		stage, String(_gauge.call("stage_name", stage))]
+
+
+## A CORRECTION FROM THE GLASS, refused unless the gauge itself allows it.
+## `field` is a dotted key in [method HexyGauge.clamps]; anything else is a
+## no-op. This is the ONLY write the dashboard is allowed to make, and it
+## writes interpretation, never state.
+func correct_gauge(field: String, value: Variant) -> bool:
+	if _gauge == null:
+		return false
+	var ok: bool = bool(_gauge.call("correct", field, value))
+	_sync_gauge_row()
+	return ok

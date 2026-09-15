@@ -242,12 +242,14 @@ func _count_children_of_type(parent: Node, type_name: String) -> int:
 	return n
 
 
-## W7a.1/2/4/7 -- THE PHASE SPINE IS LIVE.
+## W8e -- THE PHASE SPINE IS LIVE, AND IT IS THE GAUGE'S.
 ##
-## The audit found every part of this already written and none of it wired:
-## the estimate was never run, the entrain state was never saved, the sentence
-## never got a phase_name, and the journey only ever saw one step. This is the
-## file that notices if any of them goes inert again.
+## The spine used to be a clock the front kept for itself and a stage rule in
+## a const block. Both live in one file now -- user://gauge.json, through
+## HexyGauge -- and the front only READS it. This is the file that notices if
+## any of that goes inert again: the estimate must really run, the gauge must
+## be the app's one gauge, the sentence must get a real phase_name off it, and
+## the chapter must be read from the whole walk rather than one step.
 func _run_phase_spine() -> void:
 	print("\n[ the phase spine ]")
 	var packed: PackedScene = load(SCENE)
@@ -276,20 +278,24 @@ func _run_phase_spine() -> void:
 	check(["night", "dawn", "morning", "midday", "afternoon", "dusk", "evening"].has(ph),
 		"the internal hour names one of the seven bands (got '%s')" % ph)
 
-	# -- 2. entrain reaches the store, and comes back off it ------------------
-	check(store != null and store.has_method("entrain_state"), "the store keeps an entrain section")
-	var saved: Dictionary = store.entrain_state() as Dictionary
-	check(not saved.is_empty(), "and the front wrote this run's clock into it")
-	check((saved.get("samples", []) as Array).size() > 0, "with the samples it has taken so far")
-	var dumped: Dictionary = store.dump()
-	check((dumped.get("entrain", {}) as Dictionary).has("samples"),
-		"a dump of the whole store carries the entrain section")
-
-	var cold: HexyStore = HexyStore.new()
-	cold.load_dump(dumped)
-	check((cold.entrain_state().get("samples", []) as Array).size()
-		== (saved.get("samples", []) as Array).size(),
-		"and a fresh store loaded from it has the same clock back")
+	# -- 2. the clock is the app's ONE gauge, and the front only reads it -----
+	var gauge: Variant = app.get("gauge")
+	check(gauge != null, "the app built one gauge")
+	check(front.gauge() == gauge, "and the front was handed that same one")
+	check(front.topic() == app.get("topic"), "and the app's one topic with it")
+	## A PURE READ. The front may not move the gauge's own two numbers; only
+	## the bus (through fit) and the user (through correct) may.
+	var before_offset: float = float(gauge.get_field("clock_offset_h", 0.0))
+	var before_conf: float = float(gauge.get_field("confidence", 0.0))
+	for _i in 8:
+		front.beat()
+	check(is_equal_approx(float(gauge.get_field("clock_offset_h", 0.0)), before_offset),
+		"eight beats of the front never move the gauge's clock offset")
+	check(is_equal_approx(float(gauge.get_field("confidence", 0.0)), before_conf),
+		"nor its confidence -- the glass only looks")
+	check(is_equal_approx(float(front.phase_estimate().get("offset_h", -99.0)),
+		float(gauge.get_field("clock_offset_h", 0.0))),
+		"and the offset the front reports IS the gauge's own")
 
 	# -- 4. the sentence says a real day word --------------------------------
 	var day: Dictionary = front._day_dict() as Dictionary
@@ -309,10 +315,18 @@ func _run_phase_spine() -> void:
 	check(store.body_path().size() >= 3, "three steps of walk are remembered")
 	front.beat()
 	var walked: Array[int] = store.body_path()
-	check(Journey.stage_of_path(walked, 0) == front._stage,
-		"the front's stage is the path's stage, not the single step's")
-	check(front._stage == Journey.Stage.ROAD_BACK,
-		"and returning to old ground fires ROAD_BACK (got %d)" % front._stage)
+	check(int(gauge.stage_of(walked, 0)) == front._stage,
+		"the front's stage is the GAUGE's reading of the whole path")
+	## Stage 8 is "The Road Back" in the gauge's own stage table: only a
+	## path-aware rule can name it, and a single-step rule never could.
+	check(front._stage == 8,
+		"and returning to old ground fires The Road Back (got %d)" % front._stage)
+	check(String(gauge.stage_name(front._stage)) == "The Road Back",
+		"which the gauge's own stage table spells out")
+	var chapter: Dictionary = front.current_chapter() as Dictionary
+	check(String(chapter.get("stage_name", "")) == "The Road Back",
+		"and the chapter the sheets are handed says so too")
+	check(String(chapter.get("gloss", "")) != "", "with the gauge's gloss under it")
 
 	app.queue_free()
 	await process_frame

@@ -208,6 +208,7 @@ var earth_lines: EarthLinesDial = null
 ## dial, and the room mark over the head dial. Neither takes a tap.
 var dwell_ring: Control = null
 var room_mark: Control = null
+var tiller_ghost: Control = null
 
 ## ONE CAPTION UNDER EACH DIAL: the figure that dial is holding, said the way
 ## the strip above them used to say all three at once.
@@ -242,7 +243,28 @@ var _mnn: Node = null
 var _wmn: Node = null
 var _senses: Node = null
 var _creature: Node = null
-var _alchemy: Node = null
+## W8e -- THE BUS AND THE GAUGE. The dials page is the ONE page that
+## publishes, and it publishes a Sense (a finger on the head ring says a
+## heading), never a state. Everything else here is a read of the gauge.
+var _topic: RefCounted = null
+var _body_sub: int = -1
+var _gauge: RefCounted = null
+
+## THE ORGANISM'S OWN BODY MESSAGE, as the bus last carried it. The BODY dial
+## reads its bits from here (the front does the same) and falls back to the
+## store only when no bus has spoken; the HEAD ring reads its heading to find
+## out whether the brain has actually followed the tiller.
+var _body: Dictionary = {}
+
+## WHAT THE FINGER LAST ASKED THE HEAD FOR, in radians, and whether it has ever
+## asked. A request is not a heading: the brain may refuse it or lag behind it,
+## and this page has no right to pretend otherwise.
+var _tiller_rad: float = 0.0
+var _tiller_asked: bool = false
+
+## HOW FAR APART REQUEST AND REALITY MAY STAND before the refusal is drawn.
+## Ten degrees: closer than that and a ghost pointer would be noise.
+const TILLER_SLACK_RAD: float = 0.174532925
 var _who: String = "hexy"
 var _stream: String = ""
 var _enhanced: bool = true
@@ -400,6 +422,9 @@ func _build_head() -> void:
 
 	room_mark = RoomMark.new(self)
 	head.add_child(room_mark)
+
+	tiller_ghost = TillerGhost.new(self)
+	head.add_child(tiller_ghost)
 
 	head_cap = _build_caption("HeadCaption")
 
@@ -679,33 +704,27 @@ func _on_head_gesture(event: InputEvent) -> void:
 	steer_head(fposmod(((moved as Vector2) - mid).angle(), TAU))
 
 
-## WHERE THE HEAD IS POINTED, said once and pushed once. The signal is always
-## raised; the fly's own goal heading is set as well when there is a fly, and
-## the name that is set is the one the connectome really spells --
-## `FlyCentralComplex.target_heading`, the fan-shaped body's goal vector. There
-## is no `set_target_heading` on it, only `set_target_hexagram` and
-## `set_target_trigram`, and neither of those is an angle.
+## WHERE THE HEAD IS POINTED, SAID ONCE AND PUBLISHED ONCE.
+##
+## W8e -- THE ONE PLACE THE GLASS PUBLISHES, AND IT PUBLISHES A SENSE. The
+## tiller used to reach through the store into the organism and write the
+## fan-shaped body's goal vector, which made a dial a writer of brain state.
+## It no longer does: the drag becomes a tarsi Sense at door "head_tiller",
+## published on "/sense" -- the bus fans every Sense carrying a door out to
+## "/sense/<door>" of its own accord, so a subscriber may listen to
+## "/sense/head_tiller" alone -- and the organism decides what a finger on a
+## ring is worth. The signal is still always raised, bus or no bus.
+const DOOR_HEAD_TILLER: String = "head_tiller"
+
 func steer_head(angle_rad: float) -> void:
 	var a: float = fposmod(angle_rad, TAU)
+	_tiller_rad = a
+	_tiller_asked = true
 	head_steered.emit(a)
-	var cx: Object = central_complex()
-	if cx == null:
+	if _topic == null:
 		return
-	if cx.has_method("set_target_heading"):
-		cx.call("set_target_heading", a)
-	elif "target_heading" in cx:
-		cx.set("target_heading", a)
-
-
-## The fan-shaped body, through the character the store keeps, or null when no
-## brain has been built -- which is what a hand-made Hud3 with no store is.
-func central_complex() -> Object:
-	if _store == null or not _store.has_method("get_character"):
-		return null
-	var ch: Variant = _store.get_character()
-	if ch == null:
-		return null
-	return ch.get("central_complex") as Object
+	_topic.publish(HexyTopic.TOPIC_SENSE, HexyMsg.sense("tarsi", DOOR_HEAD_TILLER,
+		Time.get_ticks_usec() * 1000, a, {}))
 
 
 ## THE EARTH SCRUB. The same shape as the head's, saying a share of the day
@@ -737,6 +756,19 @@ func _on_earth_gesture(event: InputEvent) -> void:
 ## already reads.
 static func day_phase_of(angle_rad: float) -> float:
 	return clampf(fposmod(angle_rad + PI * 0.5, TAU) / TAU, 0.0, 1.0)
+
+
+## WHAT THE SCRUBBED HOUR IS CALLED. A PREVIEW AND NOTHING ELSE: the gauge is
+## asked what band and what word that hour falls in, and nothing is written --
+## a scrub is a question, not an observation. "" with no gauge to ask.
+func scrub_caption(day_phase: float) -> String:
+	if _gauge == null:
+		return ""
+	var band: String = String(_gauge.call("phase_of_frac", day_phase))
+	var word: String = String(_gauge.call("day_word", band))
+	return "%02d:%02d %s" % [
+		int(clampf(day_phase, 0.0, 1.0) * 24.0),
+		int(fposmod(clampf(day_phase, 0.0, 1.0) * 24.0, 1.0) * 60.0), word]
 
 
 ## Where a finger went down, or null if this event is not a press.
@@ -836,15 +868,73 @@ func set_addons(addons: Node) -> void:
 		dashboard.set_addons(addons)
 
 
-## The alchemy is held only so the glass can say what it last did.
-func set_alchemy(alchemy: Node) -> void:
-	_alchemy = alchemy
-	if dashboard != null:
-		dashboard.set_alchemy(alchemy)
+## THE BUS AND THE GAUGE, handed down from the app through the front. The
+## topic is used for exactly one publish (see [method steer_head]); the gauge
+## is read and never written.
+func set_bus(topic: RefCounted, gauge: RefCounted) -> void:
+	if _topic != null and _body_sub >= 0:
+		_topic.unsubscribe(_body_sub)
+	_body_sub = -1
+	_topic = topic
+	_gauge = gauge
+	if _topic != null:
+		_body_sub = int(_topic.subscribe(HexyTopic.TOPIC_BODY, Callable(self, "_on_body_msg")))
+		## A LATCHED BODY IS STILL A BODY -- a page opened after the organism
+		## has already spoken stands on what is live, not on an empty room.
+		var latched: Dictionary = _topic.last(HexyTopic.TOPIC_BODY)
+		if not latched.is_empty():
+			_on_body_msg(latched)
+	if dashboard != null and dashboard.has_method("set_bus"):
+		dashboard.set_bus(topic, gauge)
 
 
-func alchemy() -> Node:
-	return _alchemy
+## THE BODY, OFF THE BUS, KEPT WHOLE. No writes follow from it: the dials are
+## redrawn from it on the next refresh, exactly as they were from the store.
+func _on_body_msg(msg: Dictionary) -> void:
+	if typeof(msg) != TYPE_DICTIONARY or String(msg.get("kind", "")) != "body":
+		return
+	_body = msg.duplicate(true)
+	if body != null:
+		body.set_body_bits(_body_bits())
+
+
+## ---- THE TILLER'S REFUSAL, MADE VISIBLE --------------------------------
+##
+## W10c -- the head ring is a REQUEST, not a command. `steer_head` publishes a
+## tarsi Sense and the organism decides what a finger on a ring is worth: it
+## may refuse it outright or take its time getting there. Until now the glass
+## drew only the request, so a refusal looked exactly like a success.
+##
+## Now there are two pointers while they disagree: the solid one at the
+## heading the brain actually reports on "/body", and a faint ghost at the
+## angle the finger asked for. When the brain follows, the ghost merges into
+## the pointer and there is one again. No new button, no new gesture.
+
+## WHERE THE FINGER LAST ASKED THE HEAD TO POINT, in radians.
+func tiller_heading() -> float:
+	return _tiller_rad
+
+
+## WHERE THE BODY ACTUALLY POINTS, as the bus last said. Zero with no bus.
+func body_heading() -> float:
+	return fposmod(float(_body.get("heading_rad", 0.0)), TAU)
+
+
+## THE SHORTEST ANGLE BETWEEN THE TWO, always 0..PI.
+func tiller_gap_rad() -> float:
+	if not _tiller_asked:
+		return 0.0
+	return absf(angle_difference(body_heading(), tiller_heading()))
+
+
+## TRUE WHILE THE REQUEST AND THE REAL HEADING STAND MORE THAN
+## [constant TILLER_SLACK_RAD] apart -- which is exactly when the ghost is drawn.
+func tiller_refused() -> bool:
+	return _tiller_asked and tiller_gap_rad() > TILLER_SLACK_RAD
+
+
+func gauge() -> RefCounted:
+	return _gauge
 
 
 ## THE ONE RADAR'S OWNER, handed in by whoever mounted this page (the front).
@@ -954,10 +1044,10 @@ func _on_earth_station_tapped(index: int) -> void:
 		7:
 			bubble.say("sense period %d ms" % cycle_sense_period(), at)
 		8:
-			var peers: int = mesh_broadcast()
+			var peers: int = mesh_peers()
 			var word: String = "mesh beacon: solo mode"
 			if peers >= 0:
-				word = "mesh broadcast: %d peers" % peers
+				word = "mesh: %d peers" % peers
 			bubble.say(word, at)
 		9:
 			camera_reset()
@@ -991,12 +1081,15 @@ func cycle_sense_period() -> int:
 	return _cycle_period()
 
 
-## Both figures go on the air. Returns the peer count, or -1 when there is no
-## mesh at all to put them on.
-func mesh_broadcast() -> int:
-	if _wmn == null or not _wmn.has_method("broadcast"):
+## WHO IS IN THE ROOM. W10c -- this station used to push both figures onto the
+## wire itself, which made a page a writer of the mesh. It no longer does: Wmn
+## already follows the store's own `hexagram_changed` and `head_changed`, so a
+## figure is on the air the moment it moves and a button that says so again is
+## a second writer for nothing. What is left is the reading: the peer count, or
+## -1 when there is no mesh at all to count.
+func mesh_peers() -> int:
+	if _wmn == null or not _wmn.has_method("peer_count"):
 		return -1
-	_wmn.broadcast(_head_dict(), _body_dict())
 	return _peer_count()
 
 
@@ -1325,11 +1418,12 @@ func day_count() -> int:
 	return maxi(1, seen.size())
 
 
-## The pacing journal, when Alchemy is bound and carrying one.
+## THE JOURNAL. W8e removed the core object that kept one: nothing on the
+## glass holds a writer of organism state any more, so there is no per-flip
+## journal to read and this answers an honest empty array. The strip below
+## says so in words rather than drawing a blank block.
 func _journal() -> Array:
-	if _alchemy == null or not ("pacing" in _alchemy) or _alchemy.pacing == null:
-		return []
-	return _alchemy.pacing.journal as Array
+	return []
 
 
 ## THE LAST TWELVE THINGS THE FIRE DID, one per line. This is what the status
@@ -1357,9 +1451,9 @@ func journal_text() -> String:
 # -- the dwell ---------------------------------------------------------------
 
 ## HOW FULL THE CIVIL FIRE IS, 0..1: the stillness the senses are reporting over
-## the seconds of it Pacing wants. Pacing's own live number is used when Alchemy
-## is bound -- a person moving the slider in the dashboard must see the ring
-## fill faster -- and the const stands in when it is not.
+## the seconds of it Pacing wants -- so a person moving that slider in the
+## dashboard sees the ring fill faster -- and the const stands in when there
+## is no Pacing to ask.
 func dwell_fraction() -> float:
 	var span: float = civil_fire_s()
 	if span <= 0.0 or _senses == null or not _senses.has_method("stillness"):
@@ -1370,15 +1464,11 @@ func dwell_fraction() -> float:
 ## The seconds of stillness the civil fire wants, live from Pacing when it is
 ## bound and from the const when it is not.
 func civil_fire_s() -> float:
-	if _alchemy != null and ("pacing" in _alchemy) and _alchemy.pacing != null:
-		return float(_alchemy.pacing.civil_fire_s)
 	return _threshold("CIVIL_FIRE_THRESHOLD", CIVIL_FIRE_THRESHOLD)
 
 
 ## The excitation at which the martial fire takes the ring's colour.
 func martial_threshold() -> float:
-	if _alchemy != null and ("pacing" in _alchemy) and _alchemy.pacing != null:
-		return float(_alchemy.pacing.martial_threshold)
 	return _threshold("MARTIAL_THRESHOLD", MARTIAL_THRESHOLD)
 
 
@@ -1506,7 +1596,9 @@ func _build_dashboard() -> void:
 	dashboard = HexyDashboard.new()
 	root.add_child(dashboard)
 	dashboard.set_host(self)
-	dashboard.bind(_store, _mnn, _wmn, _senses, _alchemy, _qwen)
+	dashboard.bind(_store, _mnn, _wmn, _senses, null, _qwen)
+	if dashboard.has_method("set_bus"):
+		dashboard.set_bus(_topic, _gauge)
 	if _addons != null:
 		dashboard.set_addons(_addons)
 	## BORROW THE ONE RADAR, if somebody is standing one. Without a lender
@@ -1603,7 +1695,12 @@ func _head_bits() -> int:
 	return int(_head_dict().get("bits", 0)) & 63
 
 
+## THE BODY'S BITS, OFF THE BUS FIRST. W10c -- the BODY dial reads the
+## organism's own Body message, exactly as the front does, and falls back to
+## the store only when nothing has ever spoken on "/body".
 func _body_bits() -> int:
+	if not _body.is_empty():
+		return int(_body.get("bits", 0)) & 63
 	if _store == null:
 		return 0
 	if _store.has_method("body_bits"):
@@ -1638,14 +1735,13 @@ func _walk_body(slot: int, _why: String) -> void:
 	bubble.say("☀️ BODY: %s" % _figure_word(bits), at)
 
 
-## The body is ANNOUNCED, never written: Alchemy alone writes it, so a walk of
-## the wheel re-anchors the cube instead of being wiped by the next senses tick.
+## The body is ANNOUNCED, never written: the seat bus carries the walk and the
+## organism decides what the body actually stands on, so a walk of the wheel
+## is a statement rather than a write the next tick wipes.
 func _write_body(bits: int, throws: Array[int], why: String, slot: int, moving: int = 0) -> void:
 	if body != null:
 		body.set_body_slot(slot)
-	if _store == null or not _store.has_method("note_seat"):
-		return
-	_store.note_seat(HexyStore.Seat.BODY, {
+	_say_seat(HexyStore.Seat.BODY, {
 		"bits": bits,
 		"moving": moving & 63,
 		"throws": throws,
@@ -1673,9 +1769,7 @@ func _cast_head() -> void:
 ## one event shape; the store stays the head's writer and no cube is touched.
 func _write_head(bits: int, throws: Array[int], why: String, slot: int, moving: int = 0) -> void:
 	head.set_head_slot(slot)
-	if _store == null or not _store.has_method("note_seat"):
-		return
-	_store.note_seat(HexyStore.Seat.HEAD, {
+	_say_seat(HexyStore.Seat.HEAD, {
 		"bits": bits,
 		"moving": moving & 63,
 		"throws": throws,
@@ -1685,6 +1779,32 @@ func _write_head(bits: int, throws: Array[int], why: String, slot: int, moving: 
 		"sig": "",
 		"seq_index": slot,
 	})
+
+
+## ---- THE ONE WAY THIS PAGE SAYS A SEAT MOVED ------------------------------
+##
+## W10c -- THE DIALS PUBLISH A SENSE, NOT A STATE. A dial used to call
+## `store.note_seat` (and, on the altar, `store.note_cast` and `wmn.broadcast`)
+## straight, which made this page a writer of three seats at once. It no longer
+## writes anything: the gesture becomes a tarsi Sense at door
+## [constant DOOR_SEAT], published on "/sense" -- the bus fans a Sense with a
+## door out to "/sense/<door>" of its own accord -- and the store, which is the
+## one writer of seat state, subscribes there and applies it. `cast` names the
+## note_cast kind a throw also deserves and is "" for a plain walk.
+##
+## Returns true when the Sense went out on a bus. With no bus there is nothing
+## to say it on, and the glass stays a thing that only looks.
+const DOOR_SEAT: String = "earth_seat"
+
+func _say_seat(seat: int, figure: Dictionary, cast_kind: String = "") -> bool:
+	if _topic == null:
+		return false
+	var value: Dictionary = figure.duplicate(true)
+	value["seat"] = seat
+	value["cast"] = cast_kind
+	return bool(_topic.publish(HexyTopic.TOPIC_SENSE, HexyMsg.sense("tarsi", DOOR_SEAT,
+			Time.get_ticks_usec() * 1000, value, {"seat": seat, "source": String(figure.get("source", ""))})))
+
 
 
 # -- small helps -------------------------------------------------------------
@@ -1794,9 +1914,15 @@ func _cast_earth() -> void:
 func _write_earth(bits: int, throws: Array[int], why: String, slot: int, moving: int = 0) -> void:
 	if earth != null:
 		earth.set_earth_slot(slot)
-	if _store == null or not _store.has_method("note_seat"):
-		return
-	_store.note_seat(HexyStore.Seat.EARTH, {
+	## The reward rides in the value: the store applies the seat and then notes
+	## the cast itself, with one arg, so the altar's throw is a reward only and
+	## is never announced on the BODY seat for injection.
+	##
+	## THE ROOM VOTES ON HEADS, and it no longer does so from here: the store
+	## emits `earth_changed` when the altar moves, and whoever owns the wire
+	## listens to the store, not to a dial. (Wmn today connects hexagram_changed
+	## and head_changed only -- see the W10c report.)
+	_say_seat(HexyStore.Seat.EARTH, {
 		"bits": bits,
 		"moving": moving & 63,
 		"throws": throws,
@@ -1805,15 +1931,7 @@ func _write_earth(bits: int, throws: Array[int], why: String, slot: int, moving:
 		"source": why,
 		"sig": "",
 		"seq_index": slot,
-	})
-	# One arg on purpose: the earth is the altar, not the body, so this cast is
-	# a reward only -- it must not be announced on the BODY seat for injection.
-	if _store.has_method("note_cast"):
-		_store.note_cast("cast_confirmed")
-	## THE ROOM VOTES ON HEADS. The altar rides along as its own optional
-	## field; it is never passed off as this hexy's head.
-	if _wmn != null and _wmn.has_method("broadcast"):
-		_wmn.broadcast(_head_dict(), _body_dict(), _earth_dict())
+	}, "cast_confirmed")
 
 
 func _earth_bits() -> int:
@@ -1897,3 +2015,40 @@ class RoomMark extends Control:
 		var ang: float = float(dial.get("dial_angle")) + float(int(dial.call("head_slot"))) * (TAU / 64.0)
 		var dir := Vector2(cos(ang), sin(ang))
 		draw_line(mid + dir * (r * 0.86), mid + dir * (r * 1.06), Hud3.COL_ROOM, 3.0)
+
+
+## THE TILLER'S TWO POINTERS. A finger on the head ring ASKS for a heading; the
+## organism answers on "/body" in its own time, or not at all. While the two
+## stand more than [constant Hud3.TILLER_SLACK_RAD] apart this draws them both
+## -- the solid needle where the body really points, a faint ghost where the
+## finger asked -- so a refusal looks like a refusal instead of like a success.
+## When the brain follows, the ghost merges into the needle and there is one
+## pointer again. It answers no finger and holds no state of its own: every
+## number it draws is asked of the hud on the frame it draws it.
+class TillerGhost extends Control:
+	var _hud: Node = null
+
+	func _init(h: Node) -> void:
+		_hud = h
+		name = "TillerGhost"
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_anchors_preset(Control.PRESET_FULL_RECT)
+
+	func _process(_delta: float) -> void:
+		queue_redraw()
+
+	func _draw() -> void:
+		if _hud == null or size.x < 8.0 or size.y < 8.0:
+			return
+		if not bool(_hud.call("tiller_refused")):
+			return
+		var mid: Vector2 = size * 0.5
+		var r: float = minf(size.x, size.y) * 0.44
+		var real: float = float(_hud.call("body_heading"))
+		var asked: float = float(_hud.call("tiller_heading"))
+		var real_dir := Vector2(cos(real), sin(real))
+		var ask_dir := Vector2(cos(asked), sin(asked))
+		## The ghost first, so the solid needle stands over it where they meet.
+		draw_line(mid, mid + ask_dir * (r * 0.92), Color(Hud3.COL_DWELL, 0.30), 2.0, true)
+		draw_circle(mid + ask_dir * (r * 0.92), 3.0, Color(Hud3.COL_DWELL, 0.30))
+		draw_line(mid, mid + real_dir * (r * 0.92), Hud3.COL_DWELL, 3.0, true)

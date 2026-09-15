@@ -330,3 +330,154 @@ func from_dict(d: Dictionary) -> void:
 	_last_tick_ms = int(d.get("last_tick_ms", -1))
 	_last_spoke_ms = int(d.get("last_spoke_ms", -1))
 	_sync_open_state()
+
+## ============================ W8c -- THE ORGANISM ===========================
+##
+## THE HOMEOSTAT'S SIX LINE FILLS ARE THE BODY. Not a picture of it, not a
+## cache of it: the body IS these six floats, and `bits` is a READOUT of them
+## (each line yang where its fill crosses OPEN_THRESHOLD), computed on the way
+## out and stored nowhere. Before W8c four outsiders wrote body bits behind the
+## homeostat's back -- the glass through feed/reward paths, Alchemy through
+## store.set_body with its own hysteresis, Entrain through a phase estimate,
+## wmn through peer effects -- and the figure the glass drew was not the figure
+## the needs were standing on.
+##
+## Now: senses in as Sense messages on a topic, one Body and one Phase out per
+## tick, and `feed` / `reward_event` are this circuit's INTERNAL API, called
+## from inside scripts/brain and nowhere else.
+##
+## WHAT THIS FILE TAKES OFF THE BUS (the rest goes to FlyBrain.route_sense):
+##   tarsi     -> a line fill, directly. value {line:0..5, amount:float}.
+##   pheromone -> the CONNECTION line, and only this organ may open it: a
+##                conspecific is the one attested source there has ever been.
+##                It also reaches FlyBrain as a social zeitgeber.
+const BUS_TOPIC_SENSE := "/sense"
+const BUS_TOPIC_BODY := "/body"
+const BUS_TOPIC_PHASE := "/phase"
+
+## The most one touch may pour into a line. A tarsal contact is evidence, not
+## a refill.
+const TARSI_MAX_STRENGTH: float = 0.5
+## What one attested conspecific contact is worth to the connection line.
+const PHEROMONE_STRENGTH: float = 0.1
+
+var bus: RefCounted = null
+var _bus_sub: int = -1
+
+
+## Attach the organism to a topic bus. One subscription: everything on
+## "/sense" comes here, the two organs this file owns are taken, and the rest
+## is handed down to the fly brain's own routing.
+func attach_bus(topic: RefCounted) -> void:
+	if topic == null:
+		return
+	detach_bus()
+	bus = topic
+	_bus_sub = int(topic.subscribe(BUS_TOPIC_SENSE, Callable(self, "_on_sense")))
+
+
+func detach_bus() -> void:
+	if bus != null and _bus_sub >= 0:
+		bus.unsubscribe(_bus_sub)
+	bus = null
+	_bus_sub = -1
+
+
+func _on_sense(msg: Dictionary) -> void:
+	route_sense(msg)
+
+
+## Returns the organ that took the message, or "" when none did.
+func route_sense(msg: Dictionary) -> String:
+	if typeof(msg) != TYPE_DICTIONARY or String(msg.get("kind", "")) != "sense":
+		return ""
+	var organ: String = String(msg.get("organ", ""))
+	var value: Variant = msg.get("value", null)
+	var now_ms: int = int(msg.get("t_ns", 0)) / 1_000_000
+	match organ:
+		"tarsi":
+			## W8e -- THE TILLER. A finger on the head ring says a heading,
+			## not a line fill; the goal vector is the fan-shaped body's own.
+			if String(msg.get("door", "")) == "head_tiller":
+				if fly_brain != null and fly_brain.central_complex != null:
+					fly_brain.central_complex.set_target_heading(float(value))
+				return organ
+			var line: int = int(_field(value, "line", -1.0))
+			if line < 0 or line > 5:
+				return ""
+			## SIGNED. A touch may pour into a line or drain it; `feed` only
+			## ever adds, and refuses the connection line to anything but an
+			## attested source, so the draining half is done here -- inside the
+			## brain, which is the only place a line fill may be written.
+			var amount: float = clampf(
+				_field(value, "amount", 0.0), -TARSI_MAX_STRENGTH, TARSI_MAX_STRENGTH)
+			if is_zero_approx(amount):
+				return ""
+			var when: int = maxi(now_ms, _last_tick_ms)
+			if amount > 0.0:
+				feed(line + 1, amount, String(msg.get("door", "touch")), when)
+			else:
+				tick(when)
+				_set_fullness(line, _fullness[line] + amount)
+			return organ
+		"pheromone":
+			## THE ONLY ATTESTED SOURCE. A body cannot talk itself into being
+			## connected; another body has to say so.
+			var strength: float = clampf(
+				_field(value, "strength", 1.0) * PHEROMONE_STRENGTH, 0.0, 1.0)
+			if strength > 0.0:
+				feed(LINE_CONNECTION + 1, strength, ATTESTED, maxi(now_ms, _last_tick_ms))
+			if fly_brain != null:
+				fly_brain.route_sense(msg)
+			return organ
+	if fly_brain == null:
+		return ""
+	return String(fly_brain.route_sense(msg))
+
+
+## ONE BEAT OF THE ORGANISM. The needs decay and couple, the fly brain spends
+## everything the bus handed it, and exactly two messages go out: the Body the
+## six lines now are, and the Phase the clock now stands in.
+func bus_tick(now_ms: int, dt_sec: float = -1.0) -> void:
+	var dt: float = dt_sec
+	if dt <= 0.0:
+		dt = maxf(float(now_ms - _last_tick_ms) / 1000.0, 0.0001) if _last_tick_ms >= 0 else 0.0166
+	tick(now_ms)
+	if fly_brain != null:
+		fly_brain.bus_tick(dt)
+	publish_body(now_ms)
+	publish_phase(now_ms)
+
+
+## THE BODY, AS A MESSAGE. `bits` is the threshold readout of the six fills,
+## computed here and stored nowhere.
+func body_msg(now_ms: int = 0) -> Dictionary:
+	return HexyMsg.body_from_fly_state(get_fly_state(), lines(), now_ms * 1_000_000)
+
+
+func phase_msg(now_ms: int = 0) -> Dictionary:
+	var f: Dictionary = fly_brain.phase_fields() if fly_brain != null else {}
+	return HexyMsg.phase(now_ms * 1_000_000,
+		float(f.get("seconds", 0.0)), float(f.get("day", 0.0)),
+		float(f.get("weeks", 0.0)), String(f.get("life", "")), [])
+
+
+func publish_body(now_ms: int = 0) -> bool:
+	if bus == null:
+		return false
+	return bool(bus.publish(BUS_TOPIC_BODY, body_msg(now_ms)))
+
+
+func publish_phase(now_ms: int = 0) -> bool:
+	if bus == null:
+		return false
+	return bool(bus.publish(BUS_TOPIC_PHASE, phase_msg(now_ms)))
+
+
+## A number out of a Sense value that may be a bare number or a dictionary.
+static func _field(value: Variant, key: String, fallback: float) -> float:
+	if typeof(value) == TYPE_DICTIONARY and (value as Dictionary).has(key):
+		return float((value as Dictionary)[key])
+	if typeof(value) in [TYPE_INT, TYPE_FLOAT]:
+		return float(value)
+	return fallback

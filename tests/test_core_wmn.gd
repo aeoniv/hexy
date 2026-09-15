@@ -8,6 +8,8 @@ extends SceneTree
 
 const HexyStoreScript = preload("res://scripts/core/store.gd")
 const WmnScript = preload("res://scripts/core/wmn/wmn.gd")
+const HexyTopicScript = preload("res://scripts/core/topic.gd")
+const HexyMsgScript = preload("res://scripts/core/msg.gd")
 
 const LEDGER_PATH := "user://test_wmn_ledger.json"
 
@@ -15,7 +17,7 @@ var _fails := 0
 ## EVERY CHECK IS COUNTED. A compile error in a depended script makes a whole
 ## section skip silently, and a suite that prints ALL PASS because it ran
 ## nothing is worse than a red one. Raise this floor when checks are added.
-const MIN_CHECKS := 38
+const MIN_CHECKS := 45
 var _checks := 0
 
 
@@ -35,6 +37,7 @@ func _initialize() -> void:
 	_test_ledger()
 	_test_room()
 	_test_presence()
+	_test_earth_hook()
 	await _test_loopback()
 
 	print("checks: ", _checks, " (floor ", MIN_CHECKS, ")")
@@ -281,6 +284,29 @@ func _test_presence() -> void:
 	_check(p.due(100000 + Presence.HEARTBEAT_MS), "the next beat is due after two seconds")
 
 
+# --- 5b. the altar reaches the mesh -----------------------------------------
+
+## W10d -- W10c made the store the earth's one writer (hud3 no longer
+## broadcasts it itself), so Wmn must hear `store.earth_changed` directly or
+## a peer never learns a station changed. Proved as wiring, the same way the
+## seat bus tests prove one writer per seat: bind connects it, unbind lets it
+## go.
+func _test_earth_hook() -> void:
+	print("\n[ earth_changed reaches the mesh ]")
+	var wmn: Node = WmnScript.new()
+	var store: Node = HexyStoreScript.new()
+	root.add_child(wmn)
+	root.add_child(store)
+	wmn.bind(store)
+	_check(store.earth_changed.is_connected(wmn._on_store_earth),
+		"bind wires store.earth_changed to the mesh")
+	wmn.unbind()
+	_check(not store.earth_changed.is_connected(wmn._on_store_earth),
+		"and unbind lets it go")
+	wmn.queue_free()
+	store.queue_free()
+
+
 # --- 6. two nodes on loopback ----------------------------------------------
 
 func _test_loopback() -> void:
@@ -305,6 +331,18 @@ func _test_loopback() -> void:
 	_check(a.fabric_id() != b.fabric_id(), "two named instances are two people")
 	a.bind(store_a)
 	b.bind(store_b)
+
+	# W10b -- ONE BODY SHAPE ON THE WIRE. alpha attaches a bus and latches a
+	# Body on "/body" before casting anything; beta attaches a bus too, so it
+	# can turn what it hears back into a pheromone Sense.
+	var topic_a := HexyTopicScript.new()
+	var topic_b := HexyTopicScript.new()
+	a.attach_bus(topic_a)
+	b.attach_bus(topic_b)
+	var alpha_body := HexyMsgScript.body(1234, 0b010010,
+		[0.1, 0.2, 0.3, 0.4, 0.5, 0.6], 1.25,
+		[0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2], 0.7, "Day", "wander")
+	topic_a.publish(HexyTopicScript.TOPIC_BODY, alpha_body)
 
 	var heard_a: Array[Dictionary] = []
 	var heard_b: Array[Dictionary] = []
@@ -379,6 +417,30 @@ func _test_loopback() -> void:
 		"stage is null or an int, same bargain")
 	_check(a.own_phase() == -1.0 and a.own_stage() == -1,
 		"a node that was never told its own phase says so")
+
+	# THE ONE BODY SHAPE arrives at beta: the Body alpha latched on "/body"
+	# (bits/heading identical to what alpha published) shows up on beta's
+	# peers() row for alpha, and a "pheromone" Sense landed on beta's bus.
+	var aid: String = a.fabric_id()
+	var alpha_row_heard := func() -> bool:
+		var r: Array = b.peers().filter(func(x): return String(x["who"]) == aid)
+		return not r.is_empty() and r[0].get("heading_rad") != null and not is_zero_approx(float(r[0]["heading_rad"]))
+	await _wait(4.0, alpha_row_heard)
+	var arow: Array = b.peers().filter(func(x): return String(x["who"]) == aid)
+	# "bits" on a peers() row is the peer's HEAD (byte 0, the room's vote);
+	# the Body's own bits ride the legacy "body" key beside it -- see the
+	# envelope-vs-Body key table in wmn.gd's broadcast().
+	_check(arow.size() == 1 and int(arow[0]["body"]) == int(alpha_body["bits"]),
+		"beta's peers() row for alpha carries alpha's Body bits (got %s)" % str(arow))
+	_check(arow.size() == 1 and is_equal_approx(float(arow[0]["heading_rad"]), 1.25),
+		"and alpha's Body heading, identical to what alpha latched")
+	var sense: Dictionary = topic_b.last(HexyTopicScript.TOPIC_SENSE)
+	_check(String(sense.get("organ", "")) == "pheromone" and String(sense.get("door", "")) == "radio",
+		"a received figure with a Body on it becomes a pheromone Sense on beta's bus")
+	_check(String(sense.get("meta", {}).get("who", "")) == a.fabric_id(),
+		"the Sense names who it came from")
+	_check(int((sense.get("value", {}) as Dictionary).get("bits", -1)) == int(alpha_body["bits"]),
+		"the Sense's value is the peer Body itself")
 
 	# WMN COMPUTES NEITHER OF THESE. It only carries what a caller set, and the
 	# proof is that setting it here reaches beta's reader without anything in

@@ -99,32 +99,13 @@ static func _schema_rows() -> Array[Dictionary]:
 		# -- prior: how hard the decode loop hears the cube --------------------
 		{"key": "prior.follows_stillness", "group": "prior", "type": "bool",
 			"min": 0.0, "max": 0.0, "step": 0.0, "default": false, "options": [],
-			"doc": "Let Alchemy drive the prior weight from stillness and tension. Off, prior.weight is used as written."},
+			"doc": "Let the app's own beat drive the prior weight from stillness and tension. Off, prior.weight is used as written."},
 		{"key": "prior.max", "group": "prior", "type": "float",
 			"min": 0.0, "max": 1.0, "step": 0.01, "default": 0.35, "options": [],
 			"doc": "Ceiling on the prior weight, however it is driven."},
 		{"key": "prior.weight", "group": "prior", "type": "float",
 			"min": 0.0, "max": 1.0, "step": 0.01, "default": 0.0, "options": [],
 			"doc": "Manual prior weight, used when prior.follows_stillness is off. Clamped to prior.max."},
-
-		# -- alchemy: how many days of pressure a line needs to turn -----------
-		{"key": "alchemy.flip_days", "group": "alchemy", "type": "int",
-			"min": 0.0, "max": 30.0, "step": 1.0, "default": 3, "options": [],
-			"doc": "Distinct days of same-direction evidence before a line turns. 0 turns a line the beat it is asked to."},
-		{"key": "alchemy.mark_threshold", "group": "alchemy", "type": "float",
-			"min": 0.0, "max": 1.0, "step": 0.01, "default": 0.6, "options": [],
-			"doc": "How far a line's signed mark must lean before the days gate is consulted."},
-		{"key": "alchemy.mark_decay_days", "group": "alchemy", "type": "float",
-			"min": 0.0, "max": 365.0, "step": 0.5, "default": 14.0, "options": [],
-			"doc": "Days for an unfed mark to leak away by 1/e. 0 never forgets."},
-
-		# -- entrain: the ring of samples the user's own clock is guessed from -
-		{"key": "entrain.days", "group": "entrain", "type": "int",
-			"min": 1.0, "max": 30.0, "step": 1.0, "default": 7, "options": [],
-			"doc": "Days of zeitgeber samples kept. Older ones are trimmed off the ring before every estimate."},
-		{"key": "entrain.min_samples", "group": "entrain", "type": "int",
-			"min": 1.0, "max": 2048.0, "step": 1.0, "default": 48, "options": [],
-			"doc": "Samples below which the phase estimate is a guess and confidence stays near the floor."},
 
 		# -- qwen: the shape of an answer -------------------------------------
 		{"key": "qwen.max_sentences", "group": "qwen", "type": "int",
@@ -156,10 +137,6 @@ static func _schema_rows() -> Array[Dictionary]:
 		{"key": "hud.bubble_ttl_s", "group": "hud", "type": "float",
 			"min": 0.5, "max": 60.0, "step": 0.5, "default": 6.0, "options": [],
 			"doc": "Seconds a speech bubble stays on the glass."},
-		{"key": "hud.status_mode", "group": "hud", "type": "enum",
-			"min": 0.0, "max": 0.0, "step": 0.0, "default": "day",
-			"options": ["day", "telemetry"],
-			"doc": "The status strip reads as the day's shape or as raw telemetry."},
 		{"key": "hud.room_highlight", "group": "hud", "type": "bool",
 			"min": 0.0, "max": 0.0, "step": 0.0, "default": true, "options": [],
 			"doc": "Highlight the room the body is standing in."},
@@ -229,8 +206,8 @@ func _on_changed(key: String, _value: Variant) -> void:
 
 
 ## Hand the manual prior weight to the decode loop. Does nothing at all while
-## `prior.follows_stillness` is on -- that path is Alchemy's, and two writers
-## on one number is how a body ends up listening to neither.
+## `prior.follows_stillness` is on -- that path is the app's own beat's, and
+## two writers on one number is how a body ends up listening to neither.
 func push_prior() -> bool:
 	return Q6Core.apply_manual_prior(
 		float(get_value("prior.weight")),

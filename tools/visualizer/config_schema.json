@@ -1,17 +1,11 @@
 {
 	"defaults": {
-		"alchemy.flip_days": 3,
-		"alchemy.mark_decay_days": 14.0,
-		"alchemy.mark_threshold": 0.6,
 		"creature.breathe_with_dwell": true,
-		"entrain.days": 7,
-		"entrain.min_samples": 48,
 		"hud.bubble_ttl_s": 6.0,
 		"hud.dwell_ring": true,
 		"hud.earth_mode": "lines",
 		"hud.line_flash": true,
 		"hud.room_highlight": true,
-		"hud.status_mode": "day",
 		"mesh.q6_on_wire": true,
 		"mesh.q6_topk": 8,
 		"pacing.anchor": 0.5,
@@ -35,8 +29,6 @@
 	"groups": [
 		"pacing",
 		"prior",
-		"alchemy",
-		"entrain",
 		"qwen",
 		"senses",
 		"hud",
@@ -157,7 +149,7 @@
 		},
 		{
 			"default": false,
-			"doc": "Let Alchemy drive the prior weight from stillness and tension. Off, prior.weight is used as written.",
+			"doc": "Let the app's own beat drive the prior weight from stillness and tension. Off, prior.weight is used as written.",
 			"group": "prior",
 			"key": "prior.follows_stillness",
 			"max": 0.0,
@@ -187,61 +179,6 @@
 			"options": [],
 			"step": 0.01,
 			"type": "float"
-		},
-		{
-			"default": 3,
-			"doc": "Distinct days of same-direction evidence before a line turns. 0 turns a line the beat it is asked to.",
-			"group": "alchemy",
-			"key": "alchemy.flip_days",
-			"max": 30.0,
-			"min": 0.0,
-			"options": [],
-			"step": 1.0,
-			"type": "int"
-		},
-		{
-			"default": 0.6,
-			"doc": "How far a line's signed mark must lean before the days gate is consulted.",
-			"group": "alchemy",
-			"key": "alchemy.mark_threshold",
-			"max": 1.0,
-			"min": 0.0,
-			"options": [],
-			"step": 0.01,
-			"type": "float"
-		},
-		{
-			"default": 14.0,
-			"doc": "Days for an unfed mark to leak away by 1/e. 0 never forgets.",
-			"group": "alchemy",
-			"key": "alchemy.mark_decay_days",
-			"max": 365.0,
-			"min": 0.0,
-			"options": [],
-			"step": 0.5,
-			"type": "float"
-		},
-		{
-			"default": 7,
-			"doc": "Days of zeitgeber samples kept. Older ones are trimmed off the ring before every estimate.",
-			"group": "entrain",
-			"key": "entrain.days",
-			"max": 30.0,
-			"min": 1.0,
-			"options": [],
-			"step": 1.0,
-			"type": "int"
-		},
-		{
-			"default": 48,
-			"doc": "Samples below which the phase estimate is a guess and confidence stays near the floor.",
-			"group": "entrain",
-			"key": "entrain.min_samples",
-			"max": 2048.0,
-			"min": 1.0,
-			"options": [],
-			"step": 1.0,
-			"type": "int"
 		},
 		{
 			"default": 1,
@@ -333,20 +270,6 @@
 			"options": [],
 			"step": 0.5,
 			"type": "float"
-		},
-		{
-			"default": "day",
-			"doc": "The status strip reads as the day's shape or as raw telemetry.",
-			"group": "hud",
-			"key": "hud.status_mode",
-			"max": 0.0,
-			"min": 0.0,
-			"options": [
-				"day",
-				"telemetry"
-			],
-			"step": 0.0,
-			"type": "enum"
 		},
 		{
 			"default": true,

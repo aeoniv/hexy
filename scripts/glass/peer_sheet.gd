@@ -16,7 +16,6 @@ extends Control
 const SKIN := preload("res://scripts/glass/bubble.gd")
 const Identity := preload("res://scripts/social/identity.gd")
 const KingWen := preload("res://scripts/core/iching/king_wen.gd")
-const Journey := preload("res://scripts/core/iching/journey.gd")
 
 ## How far down a swipe has to travel to close the sheet.
 const SWIPE_PX: float = 80.0
@@ -171,8 +170,7 @@ func show_peer(row: Dictionary, plot: Dictionary) -> void:
 	_phase_label.text = "phase: %s" % phase_txt
 
 	var stage: Variant = row.get("stage", null)
-	var stage_txt: String = Journey.STAGE_NAMES[clampi(int(stage), 0, Journey.STAGE_NAMES.size() - 1)] \
-		if stage != null else "unknown"
+	var stage_txt: String = _stage_name(int(stage)) if stage != null else "unknown"
 	if bool(plot.get("mentor", false)):
 		stage_txt += " · one chapter ahead"
 	_stage_label.text = "stage: %s" % stage_txt
@@ -251,3 +249,22 @@ static func _press_at(event: InputEvent) -> Variant:
 		if st.pressed:
 			return st.position
 	return null
+
+
+## W8e -- THE CHAPTER'S NAME COMES OFF THE GAUGE. The ten stage names used to
+## be a const array in the core; they are a data table in gauge.json now, so a
+## sheet that wants to name a peer's chapter asks the one gauge this app is
+## reading. With no gauge bound it says "stage N", which is honest: the number
+## is the peer's own, only the word for it is missing.
+var _gauge: RefCounted = null
+
+
+func set_gauge(gauge: RefCounted) -> void:
+	_gauge = gauge
+
+
+func _stage_name(stage: int) -> String:
+	if _gauge == null:
+		return "stage %d" % stage
+	var name: String = String(_gauge.call("stage_name", stage))
+	return name if name != "" else "stage %d" % stage

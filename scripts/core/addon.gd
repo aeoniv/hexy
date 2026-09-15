@@ -1,143 +1,137 @@
 class_name HexyAddon
 extends Node
 
-## THE CONTRACT AN ADD-ON SIGNS, AND THE ONLY DOOR BASE OPENS FOR IT.
+## W8d -- THE ADD-ON CONTRACT: a modular FUNCTION, not a body part.
 ##
-## An add-on exists only if it opens a HARDWARE DOOR and drives a FLY CIRCUIT
-## or one of the six need lines. Those two answers -- [method door] and
-## [method line] -- are the whole of its identity: everything else the loader
-## does with an add-on it does by asking these.
+## An organ is base. An add-on is something bolted onto the organism from
+## outside -- rig a camera, mesh in a djay, echo-locate a room, read csi
+## sensors -- that opens doors through the broker, subscribes to organism
+## topics, publishes Sense in and Act out, and may bring a view. OFF MEANS
+## BASE UNCHANGED: `store.dump()` before an attach and after the matching
+## detach must be the same dictionary, because everything an add-on may
+## write goes through the bus, never into a field of its own.
 ##
-## BASE NEVER LEARNS AN ADD-ON'S NAME. HexyAddons scans
-## `res://addons/hexy_*/addon.gd`, builds whatever it finds, checks the
-## manifest and hands it the bus. Nothing in scripts/ may name an add-on, and
-## no add-on may name another: the only edge is add-on -> base.
+## THE FOUR THINGS THE LOADER CHECKS, built from the methods below so an
+## add-on cannot answer the manifest one way and the bus another:
+##   - [method doors]  -- which broker doors this add-on may ever acquire.
+##     Asking for one not on this list is refused by the wrapped broker
+##     [HexyAddons] hands it in `attach`'s bus.
+##   - [method reads]  -- which topics it subscribes to. Advisory: the
+##     loader does not stop a subscribe, but a manifest that lies here is a
+##     manifest a panel will draw wrong.
+##   - [method writes] -- which topics it publishes on. Only "/sense",
+##     "/sense/<door>" and "/act" are ever allowed; an add-on naming
+##     anything else is refused outright at attach.
 ##
-## ONE STATE, STILL. An attached add-on writes through `store.note_seat`, a
-## need-line write through `bus.alchemy.nudge` (so marks and hysteresis apply),
-## a circuit write through `Character.feed` / `Character.reward_event`, and
-## `Config.set_value` -- never into a field of its own that somebody else then
-## has to read. That is why `store.dump()` before an attach and after a detach
-## must be the same dictionary, which is what tests/test_addon_bus.gd proves.
+## BASE NEVER LEARNS AN ADD-ON'S NAME. `HexyAddons` scans
+## `res://addons/hexy_*/addon.gd`; nothing in scripts/ may name an add-on and
+## no add-on may name another -- the only edge is add-on -> base.
 
-## THE FOUR CIRCUITS a door may drive instead of a need line. The six need
-## lines are 0..5 (Character.LINE_BODY .. LINE_CONNECTION); these start at ten
-## so no reader can mistake one kind of index for the other.
-const CIRCUIT_COMPASS: int = 10
-const CIRCUIT_MUSHROOM: int = 11
-const CIRCUIT_GIANT_FIBER: int = 12
-const CIRCUIT_CIRCADIAN: int = 13
-
-## circuit id -> the word a panel prints for it.
-const CIRCUIT_NAMES: Dictionary = {
-	CIRCUIT_COMPASS: "compass",
-	CIRCUIT_MUSHROOM: "mushroom",
-	CIRCUIT_GIANT_FIBER: "giant_fiber",
-	CIRCUIT_CIRCADIAN: "circadian",
-}
-
-## The six need lines, by index, as Character names them. Carried here so a
-## panel may print the rows without loading the brain.
-const NEED_NAMES: Array[String] = [
-	"body", "food", "breath", "rest", "focus", "connection",
-]
+## THE THREE TOPICS AN ADD-ON MAY EVER WRITE. "/sense/<door>" is checked as a
+## prefix of "/sense/", so a door-specific fan-out topic is allowed without
+## the loader needing to know every door name in advance.
+const WRITE_TOPICS := [HexyTopic.TOPIC_SENSE, HexyTopic.TOPIC_ACT]
+const WRITE_PREFIX := "/sense/"
 
 
 # -- the contract -------------------------------------------------------------
 
-## THE HARDWARE DOOR, as the plugin that opens it is called: "ixbody",
-## "ixvoice", "ixloc", "ixmesh". One door per plugin; an empty string is not a
-## door and the loader will refuse it.
-func door() -> String:
-	return ""
+## THE BROKER DOORS this add-on may ever [method Broker.acquire]. Anything
+## not named here is refused by the wrapped broker it is handed.
+func doors() -> PackedStringArray:
+	return PackedStringArray()
 
 
-## WHAT THIS DOOR FEEDS: a need line 0..5, or one of the CIRCUIT_* ids above.
-## Anything else is not a line and the loader will refuse it.
-func line() -> int:
-	return -1
+## THE TOPICS this add-on subscribes to.
+func reads() -> PackedStringArray:
+	return PackedStringArray()
 
 
-## Take the bus. `store` is the one HexyStore, `config` the live HexyConfig (or
-## null when there is none), `bus` the small dictionary
-## {store, character, alchemy} -- the seat bus, the homeostat and the walk.
-func attach(_store: Object, _config: Object, _bus: Dictionary) -> void:
+## THE TOPICS this add-on publishes on. Only "/sense", "/sense/<door>" and
+## "/act" are ever allowed -- see [const WRITE_TOPICS].
+func writes() -> PackedStringArray:
+	return PackedStringArray()
+
+
+## A FACE FOR THE DASHBOARD, or null when this add-on has nothing to draw.
+func view() -> Control:
+	return null
+
+
+## TAKE THE BUS. `bus` is {topic: HexyTopic, broker: Broker (wrapped so an
+## undeclared door is refused), gauge: HexyGauge, consents: Consents (the
+## static class itself), store: HexyStore (read only -- an add-on writes
+## through Sense/Act, never through the store directly)}.
+func attach(_bus: Dictionary) -> void:
 	pass
 
 
-## Put everything back. After this the store must dump exactly what it dumped
-## before the attach.
+## PUT EVERYTHING BACK: unsubscribe every topic, release every door. After
+## this the add-on holds nothing and has said nothing new.
 func detach() -> void:
 	pass
 
 
-## The tunables this add-on brings, keyed by NAMESPACED key ("body.min_confidence")
-## and valued by a row in exactly the shape [method HexyConfig.schema] uses.
-## HexyAddons hands the whole dictionary to [method HexyConfig.register].
-func config_keys() -> Dictionary:
-	return {}
-
-
-## A face for the dashboard, or null when this add-on has nothing to draw.
-func panel() -> Control:
-	return null
-
-
-## What this add-on calls itself. Defaults to the folder it was found in
-## ("hexy_body"), which is the only name base ever knows it by.
+## WHAT THIS ADD-ON CALLS ITSELF. Defaults to the folder it was found in
+## ("hexy_example"), which is the only name base ever knows it by.
 func addon_name() -> String:
 	var path: String = ""
 	var s: Script = get_script() as Script
 	if s != null:
 		path = s.resource_path
 	if path == "":
-		return door()
+		return ""
 	var folder: String = path.get_base_dir().get_file()
-	return folder if folder != "" else door()
+	return folder
 
 
-## The add-on's own version string. A loud mismatch beats a silent one.
+## THE ADD-ON'S OWN VERSION STRING. A loud mismatch beats a silent one.
 func version() -> String:
 	return "0"
 
 
-## THE FOUR THINGS THE LOADER CHECKS. Built from the four methods above so an
-## add-on cannot answer the manifest one way and the bus another.
+## THE MANIFEST, built from the four methods above so it can never drift
+## from what [method attach] actually does.
 func manifest() -> Dictionary:
 	return {
 		"name": addon_name(),
-		"door": door(),
-		"line": line(),
+		"doors": doors(),
+		"reads": reads(),
+		"writes": writes(),
 		"version": version(),
 	}
 
 
 # -- validity -----------------------------------------------------------------
 
-## True for a need line 0..5 or one of the four circuit ids.
-static func line_valid(l: int) -> bool:
-	if l >= 0 and l < NEED_NAMES.size():
+## A TOPIC AN ADD-ON MAY WRITE ON: "/sense", "/act", or "/sense/<door>".
+static func write_topic_valid(topic: String) -> bool:
+	if WRITE_TOPICS.has(topic):
 		return true
-	return CIRCUIT_NAMES.has(l)
+	return topic.begins_with(WRITE_PREFIX)
 
 
-## The word for a line or circuit id, or "" when it is neither.
-static func line_name(l: int) -> String:
-	if l >= 0 and l < NEED_NAMES.size():
-		return NEED_NAMES[l]
-	return String(CIRCUIT_NAMES.get(l, ""))
+## EVERY WRITE THIS ADD-ON DECLARES IS ALLOWED, or the loader refuses it.
+func writes_valid() -> bool:
+	for t in writes():
+		if not write_topic_valid(String(t)):
+			return false
+	return true
 
 
-## DOES THIS ADD-ON EXIST AT ALL? No door or no line means no add-on, and it
-## says so out loud -- a silently ignored add-on is a phone that does nothing
-## for a reason nobody can find.
+## DOES THIS ADD-ON EXIST AT ALL? At least one door or one write is the bar --
+## an add-on with neither touches nothing and does nothing, which is not a
+## function, it is a folder.
 func valid() -> bool:
 	var ok: bool = true
-	if door().strip_edges() == "":
-		push_error("HexyAddon: %s opens no door (door() is empty)" % addon_name())
+	if addon_name().strip_edges() == "":
+		push_error("HexyAddon: an add-on has no name (addon_name() is empty)")
 		ok = false
-	if not line_valid(line()):
-		push_error("HexyAddon: %s drives no line or circuit (line() = %d)"
-			% [addon_name(), line()])
+	if doors().is_empty() and writes().is_empty():
+		push_error("HexyAddon: %s opens no door and writes nothing" % addon_name())
+		ok = false
+	if not writes_valid():
+		push_error("HexyAddon: %s writes outside Sense/Act (%s)"
+			% [addon_name(), str(writes())])
 		ok = false
 	return ok

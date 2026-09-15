@@ -459,6 +459,51 @@ func save_stats() -> void:
 	f.close()
 
 
+# ── W8d: contended doors for organs and add-ons ─────────────────────────────
+#
+# ONE HOLDER PER DOOR. This is a SEPARATE, simpler table from `_held` above:
+# `_held`/`take`/`release` is the four-law resource policy (priority, seize,
+# exclusion, steal) for the four named devices; `acquire`/`release`/`holder`
+# below is the flat "first asker keeps it" rule W8d's add-on contract needs
+# for an arbitrary door name (`"camera"`, `"mic"`, `"speaker"`, `"radio"`,
+# or an add-on's own `"wifi"`). Organs go through `acquire` first, so an
+# add-on asking for a door an organ already holds gets `false`, loudly.
+
+var _acquired: Dictionary = {}  # door:String -> holder:String
+
+
+## TAKE A CONTENDED DOOR. True if `who` now holds it (already holding it is
+## still true); false, loudly, when somebody else does.
+func acquire(door: String, who: String) -> bool:
+	if door == "" or who == "":
+		return false
+	var owner: String = String(_acquired.get(door, ""))
+	if owner == "" or owner == who:
+		_acquired[door] = who
+		return true
+	push_warning("broker: %s wants door %s, %s already holds it" % [who, door, owner])
+	return false
+
+
+## GIVE A DOOR BACK. Only the holder may; anybody else's release is silently
+## nothing, same as [method release] above.
+func release_door(door: String, who: String) -> void:
+	if String(_acquired.get(door, "")) == who:
+		_acquired.erase(door)
+
+
+## WHO HOLDS A CONTENDED DOOR, or "" for free.
+func holder(door: String) -> String:
+	return String(_acquired.get(door, ""))
+
+
+## EVERY DOOR THIS HOLDER HAS THROUGH [method acquire], for a detach.
+func release_all_doors(who: String) -> void:
+	for door in _acquired.keys().duplicate():
+		if String(_acquired[door]) == who:
+			_acquired.erase(door)
+
+
 func _load_stats() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return

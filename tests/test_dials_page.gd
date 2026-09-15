@@ -45,6 +45,7 @@ func _initialize() -> void:
 	print("\n--- TEST DIALS PAGE (one page, one room, a way back, two joysticks) ---")
 	await _run()
 	await _run_w7a()
+	await _run_w10c()
 	print("--- dials page: %d passed, %d failed ---" % [passes, failures])
 	if failures == 0:
 		print("--- ALL DIALS PAGE TESTS PASSED PERFECTLY ---\n")
@@ -145,12 +146,23 @@ func _run() -> void:
 	check(got >= 0.0 and got < TAU, "and the angle it says is inside one turn (%f)" % got)
 	check(is_equal_approx(got, PI * 0.5), "and it IS the angle the finger stands at")
 
-	var cx: Object = hud.central_complex()
+	## W8e -- THE DIALS PAGE NO LONGER REACHES FOR THE BRAIN. The drag is
+	## published as a tarsi Sense at door "head_tiller" and the ORGANISM sets
+	## its own goal vector, so the glass is asked what it published and the
+	## brain is asked, separately, what it did about it.
+	var sensed: Dictionary = hud._topic.last("/sense/head_tiller") as Dictionary
+	check(String(sensed.get("kind", "")) == "sense", "the drag published a Sense")
+	check(String(sensed.get("organ", "")) == "tarsi"
+		and String(sensed.get("door", "")) == "head_tiller",
+		"on organ tarsi at door head_tiller")
+	check(is_equal_approx(float(sensed.get("value", -1.0)), got),
+		"carrying the angle the finger stands at and nothing else")
+	var cx: Object = _cx(app)
 	check(cx != null, "the store's character carries a FlyCentralComplex")
 	check(cx != null and "target_heading" in cx,
 		"and the goal heading on it is spelled target_heading")
 	check(cx != null and is_equal_approx(float(cx.get("target_heading")), got),
-		"the drag set the fan-shaped body's own goal heading")
+		"the organism took the Sense and set its own goal heading")
 
 	head.gui_input.emit(_motion(mid + Vector2(-reach, 0.0)))
 	check(steered.size() == 2, "every move while the finger is down steers again")
@@ -312,19 +324,30 @@ func _run_w7a() -> void:
 	var scrubbed_word: String = String((front._day_dict() as Dictionary).get("phase_name", ""))
 	check(scrubbed_word == "dusk" or scrubbed_word == "evening",
 		"and the sentence's day word follows the finger (0.75 of a day -> '%s')" % scrubbed_word)
-	## A PREVIEW ONLY: nothing about a scrub may become an observation.
-	var before: int = front._entrain.samples.size()
+	## THE SCRUB IS A GAUGE PREVIEW: the gauge is ASKED what that hour is
+	## called and nothing is written -- a scrub is a question, not an
+	## observation.
+	check(hud.has_method("scrub_caption"), "the dials page can caption a scrubbed hour")
+	var caption: String = String(hud.scrub_caption(0.75))
+	check(caption.find("18:00") >= 0, "the caption names the scrubbed hour (got '%s')" % caption)
+	check(caption.find(scrubbed_word) >= 0,
+		"and the gauge's own word for it (got '%s')" % caption)
+	var gauge: Variant = app.get("gauge")
+	var before_samples: int = (gauge.samples as Array).size()
+	var before_offset: float = float(gauge.get_field("clock_offset_h", 0.0))
 	hud.earth_scrubbed.emit(0.25)
-	check(front._entrain.samples.size() == before, "a scrub never writes a sample into Entrain")
-	check(is_equal_approx(front._entrain.phase_offset_h, front._entrain.phase_offset_h),
-		"nor moves the estimated offset")
+	hud.scrub_caption(0.25)
+	check((gauge.samples as Array).size() == before_samples,
+		"a scrub never writes a sample into the gauge")
+	check(is_equal_approx(float(gauge.get_field("clock_offset_h", 0.0)), before_offset),
+		"nor moves its clock offset")
 	hud.earth_released.emit()
 	check(is_equal_approx(front.own_phase(), resting) or front.own_phase() >= 0.0,
 		"letting go hands the phase back to the clock (got %f)" % front.own_phase())
 	check(front._scrub_phase < 0.0, "and the override is cleared outright")
 
 	# -- 6. the head tiller reaches the creature ------------------------------
-	var cx: Object = hud.central_complex()
+	var cx: Object = _cx(app)
 	check(cx != null, "the store's character carries a FlyCentralComplex")
 	if cx == null:
 		app.queue_free()
@@ -356,3 +379,129 @@ func _run_w7a() -> void:
 
 	app.queue_free()
 	await process_frame
+
+
+## THE FAN-SHAPED BODY, through the store's character. The dials page used to
+## hand this out itself; it does not know the brain any more, so a test that
+## wants to check what the organism DID with a Sense asks the organism.
+static func _cx(app: Node) -> Object:
+	var store: Variant = app.get("store")
+	if store == null:
+		return null
+	var ch: Variant = store.get_character()
+	return (ch.get("central_complex") as Object) if ch != null else null
+
+
+## W10c -- THE DIALS WRITE NOTHING, AND A REFUSAL IS VISIBLE.
+##
+## Two claims, and both are the kind a person would notice going wrong:
+##
+##   1. THE ALTAR PUBLISHES A SENSE. A cast on the earth used to call
+##      store.note_seat, store.note_cast and wmn.broadcast straight from the
+##      dial. Now the gesture goes out as a tarsi Sense at door "earth_seat"
+##      and the STORE, which owns seat state, applies it -- so the figure the
+##      store ends up on is the figure the Sense carried, and the glass wrote
+##      none of it.
+##   2. THE HEAD RING SHOWS WHEN IT IS NOT OBEYED. The tiller is a request;
+##      while the body's real heading stands more than ten degrees off it, the
+##      page draws a ghost pointer at the request and the solid one at the
+##      truth. When the brain follows, the ghost merges.
+func _run_w10c() -> void:
+	print("
+[ the dials publish a seat, and a refused tiller is visible ]")
+	var packed: PackedScene = load(SCENE)
+	if packed == null:
+		return
+	var app: Node = packed.instantiate()
+	root.size = PHONE
+	root.content_scale_size = PHONE
+	root.add_child(app)
+	await process_frame
+	await process_frame
+	var front: Node = app.get("front")
+	var store: HexyStore = app.get("store") as HexyStore
+	var topic: Variant = app.get("topic")
+	if front == null or store == null or topic == null:
+		app.queue_free()
+		return
+	var hud: Node = front.open_dials()
+	await process_frame
+	await process_frame
+	if hud == null:
+		app.queue_free()
+		return
+
+	# -- 1. the EARTH cast is a Sense, and the store is what applies it -------
+	var seated: Dictionary = hud.cast_earth() as Dictionary
+	var msg: Dictionary = topic.last("/sense/earth_seat") as Dictionary
+	check(String(msg.get("kind", "")) == "sense", "the earth cast published a Sense")
+	check(String(msg.get("organ", "")) == "tarsi"
+			and String(msg.get("door", "")) == "earth_seat",
+		"on organ tarsi at door earth_seat")
+	var value: Dictionary = (msg.get("value", {}) as Dictionary)
+	check(int(value.get("seat", -1)) == HexyStore.Seat.EARTH,
+		"carrying the seat it landed in")
+	check(String(value.get("cast", "")) == "cast_confirmed",
+		"and the cast kind the altar's throw deserves")
+	check(int(value.get("bits", -1)) == store.earth_bits(),
+		"and the store stands on exactly the figure the Sense carried (%d vs %d)"
+			% [int(value.get("bits", -1)), store.earth_bits()])
+	check(int(seated.get("bits", -1)) == store.earth_bits(),
+		"which is the seat cast_earth hands back")
+
+	## And the same door carries a WALK of the altar, which lands the same way:
+	## one Sense, one seat, one store applying it.
+	hud.walk_earth(9)
+	var walked: Dictionary = (topic.last("/sense/earth_seat") as Dictionary).get("value", {})
+	check(int(walked.get("seat", -1)) == HexyStore.Seat.EARTH,
+		"a walk of the altar goes out on the same door")
+	check(int(walked.get("bits", -1)) == store.earth_bits(),
+		"and the store followed the walk too")
+
+	## THE PAGE ITSELF WRITES NOTHING. Detach the store from the bus and the
+	## same gesture moves nothing at all -- proof the store was the writer.
+	var before: int = store.earth_bits()
+	store.detach_bus()
+	hud.walk_earth(31)
+	check(store.earth_bits() == before,
+		"with the store off the bus the dial moves no seat by itself")
+	store.attach_bus(topic)
+
+	# -- 2. the tiller's refusal, drawn ---------------------------------------
+	check(hud.get("tiller_ghost") != null, "the head dial carries a ghost pointer")
+	check(not bool(hud.call("tiller_refused")),
+		"with nothing ever asked there is one pointer and no ghost")
+	hud.steer_head(PI * 0.5)
+	_say_body(topic, store.body_bits(), 0.0)
+	check(bool(hud.call("tiller_refused")),
+		"a body that has not turned yet leaves the request ghosted (gap %f)"
+			% float(hud.call("tiller_gap_rad")))
+	check(is_equal_approx(float(hud.call("tiller_heading")), PI * 0.5),
+		"the ghost stands at the angle the finger asked for")
+	check(is_equal_approx(float(hud.call("body_heading")), 0.0),
+		"and the solid pointer at the heading the body reports")
+	_say_body(topic, store.body_bits(), PI * 0.5 - 0.05)
+	check(not bool(hud.call("tiller_refused")),
+		"once the brain is within ten degrees the ghost merges")
+	_say_body(topic, store.body_bits(), PI)
+	check(bool(hud.call("tiller_refused")),
+		"and a body that turns away again is ghosted again")
+
+	# -- 3. the BODY dial reads its bits off the bus --------------------------
+	_say_body(topic, 0b101010, PI)
+	check(int(hud.call("_body_bits")) == 0b101010,
+		"the BODY dial stands on the figure the bus carried")
+
+	front.close_dials()
+	await process_frame
+	app.wmn.stop()
+	root.remove_child(app)
+	app.queue_free()
+	await process_frame
+
+
+## ONE BODY MESSAGE, put on the bus the way the organism puts one there.
+static func _say_body(topic: Variant, bits: int, heading: float) -> void:
+	topic.publish(HexyTopic.TOPIC_BODY, HexyMsg.body(0, bits,
+		[0.0, 0.0, 0.0, 0.0, 0.0, 0.0], heading,
+		[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 0.0, "Day"))
