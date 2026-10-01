@@ -1,0 +1,42 @@
+# Godot editor cache and imports
+.godot/
+*.tmp
+*.import.tmp
+
+# Build outputs
+build/
+*.apk
+*.aab
+*.idsig
+
+# Android custom build (installed per machine from the templates)
+android/
+
+# Android plugin build state
+android_plugin/.gradle/
+android_plugin/.kotlin/
+android_plugin/build/
+android_plugin/*/build/
+android_plugin/*/.cxx/
+android_plugin/local.properties
+addons/*/bin/*.aar
+addons/*/bin/**/*.aar
+
+# Signing secrets
+*.keystore
+*.jks
+keystore.properties
+
+# Model weights: resolved at run time from the model store, never committed
+*.mnn
+*.gguf
+*.safetensors
+*.onnx
+*.tflite
+*.task
+*.weight
+/models/
+
+# Derived
+graphify-out/
+__pycache__/

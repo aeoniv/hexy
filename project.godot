@@ -1,0 +1,32 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; but it can also be edited by hand.
+;
+; Card p0.shell writes only what an empty project needs. No main scene, no
+; autoload, no icon, no editor plugin: none of their files exist yet.
+;   p0.draw  sets  [application] run/main_scene="res://scenes/hexy.tscn"
+;   step 3   adds  [editor_plugins] for the add-ons under addons/
+;   the card that adds icon.png sets config/icon
+
+config_version=5
+
+[application]
+
+config/name="Hexy"
+config/version="0.0.0"
+config/features=PackedStringArray("4.7", "Mobile")
+config/quit_on_go_back=false
+
+[display]
+
+window/size/viewport_width=720
+window/size/viewport_height=1280
+window/handheld/orientation=1
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[rendering]
+
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
+textures/vram_compression/import_etc2_astc=true

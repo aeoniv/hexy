@@ -1,0 +1,43 @@
+name: tests
+
+# Headless Godot tests only. The APK build is a separate workflow (not yet).
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: 4.7.1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Godot ${{ env.GODOT_VERSION }} (Linux, run headless)
+        run: |
+          set -eu
+          mkdir -p "$HOME/godot"
+          curl -fsSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip -d "$HOME/godot"
+          mv "$HOME/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" "$HOME/godot/godot"
+          rm -f godot.zip
+          "$HOME/godot/godot" --version
+
+      - name: Import project
+        run: |
+          "$HOME/godot/godot" --headless --path . --import || true
+
+      - name: Run tests
+        run: |
+          "$HOME/godot/godot" --headless --path . -s res://tools/run_tests.gd
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-logs
+          path: build/test-logs/
+          if-no-files-found: ignore
