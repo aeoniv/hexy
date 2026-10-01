@@ -1,0 +1,1110 @@
+{
+ "about": "Parity ledger: one entry per GREEN test of the frozen source (sdlc/hexy/baseline.json). status: ported (here = the test in this repo) | deferred | dropped (reason required) | todo. Seeded by tools/parity_seed.py; checked by tests/test_parity.gd.",
+ "frozen_green": 217,
+ "entries": [
+  {
+   "frozen": "tests/acts_smoke.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/bag_replay.gd",
+   "tech": "journal",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/brain_bus_smoke.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/broker_smoke.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/cards_smoke.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/clock_smoke.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/consents_smoke.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/device_facts_smoke.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/fabric_smoke.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/fly_brain_smoke.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/gauge_smoke.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/geo_smoke.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/heading_smoke.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/ixmnn_seam_smoke.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/journey_smoke.gd",
+   "tech": "journal",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/mesh_smoke.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/optic_lobe_smoke.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/oracle_feed_smoke.gd",
+   "tech": "q6",
+   "status": "deferred",
+   "reason": "loads scripts/glass/doors_sheet.gd"
+  },
+  {
+   "frozen": "tests/oracle_rig_smoke.gd",
+   "tech": "q6",
+   "status": "ported",
+   "here": "tests/q6/test_oracle_rig_smoke.gd"
+  },
+  {
+   "frozen": "tests/oracle_sense_smoke.gd",
+   "tech": "q6",
+   "status": "ported",
+   "here": "tests/q6/test_oracle_sense_smoke.gd"
+  },
+  {
+   "frozen": "tests/oracle_tendency_smoke.gd",
+   "tech": "q6",
+   "status": "ported",
+   "here": "tests/q6/test_oracle_tendency_smoke.gd"
+  },
+  {
+   "frozen": "tests/q6_cast_version.gd",
+   "tech": "q6",
+   "status": "deferred",
+   "reason": "loads scripts/core/store.gd -> brain/character.gd"
+  },
+  {
+   "frozen": "tests/q6_core.gd",
+   "tech": "q6",
+   "status": "ported",
+   "here": "tests/q6/test_q6_core.gd"
+  },
+  {
+   "frozen": "tests/q6_lattice_smoke.gd",
+   "tech": "q6",
+   "status": "ported",
+   "here": "tests/q6/test_q6_lattice_smoke.gd"
+  },
+  {
+   "frozen": "tests/qwen_cards_smoke.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/senses_smoke.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/sentence_smoke.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/stage_smoke.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_addon_baro.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_addon_bus.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_addon_ecoloc.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_addon_wificsi.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_backend_geometry.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_body_provenance_roundtrip.gd",
+   "tech": "other",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_body_sheet_camera.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_brain_fed.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_card_actions.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_card_shadow.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_cast_bus.gd",
+   "tech": "q6",
+   "status": "deferred",
+   "reason": "loads scripts/core/store.gd -> brain/character.gd"
+  },
+  {
+   "frozen": "tests/test_character_changing_line.gd",
+   "tech": "q6",
+   "status": "deferred",
+   "reason": "loads scripts/brain/character.gd"
+  },
+  {
+   "frozen": "tests/test_character_struts.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_chirp_clock.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_circadian_radar_smoke.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_clock_phase_wraps.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_composer_attribution.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_config.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_config_schema_json.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_connectome_escape.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_connectome_fixture.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_connectome_perf.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_connectome_plugin_compatibility.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_connectome_realpack.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_connectome_ring.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_connectome_tier.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_context_heading_no_absolute_north.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_context_sheet_close.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_core_iching.gd",
+   "tech": "q6",
+   "status": "deferred",
+   "reason": "loads scripts/core/store.gd -> brain/character.gd"
+  },
+  {
+   "frozen": "tests/test_core_learning_active_prediction.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_core_learning_backend.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_core_learning_contracts.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_core_learning_evaluator.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_core_learning_input_catalog.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_core_learning_integration.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_core_learning_motion_capture.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_core_learning_training_metrics.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_core_mnn.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_core_pacing.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_core_qwen.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_core_senses.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_core_teaching_support.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_core_wmn.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_creature_rd_animation.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_creature_rd_shell.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_dashboard.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_decay_and_caps.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_device_profile.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_dials_page.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_doors_eye.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_doors_sheet.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_dtw_ruler_generic_dims.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_duet_cues.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_duet_device_flow.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_duet_exchange.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_duet_glass.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_duet_lifecycle.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_duet_pairing.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_duet_session.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_duet_sound_gate.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_dyad.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_dyad_bridge.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_eight_views.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_event_rate_channel.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_event_zero_is_not_missing.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_ffbrain_encode_ref_parity.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_ffbrain_full.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_finder_wide.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_fly_boot_wiring.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_fly_brain_wiring.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_fly_memory.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_fly_outputs.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_fly_perf.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_fold4_gating.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_front_card_reading.gd",
+   "tech": "q6",
+   "status": "deferred",
+   "reason": "loads scripts/glass/front.gd"
+  },
+  {
+   "frozen": "tests/test_front_composer_backpressure.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_front_smoke.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_fusion_disabled_below_minimums.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_fusion_weights_shrinkage.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_gauge_wall.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_glass_context_routes.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_glass_home_touch.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_glass_smoke.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_habits_q6.gd",
+   "tech": "q6",
+   "status": "deferred",
+   "reason": "loads scripts/brain/character.gd"
+  },
+  {
+   "frozen": "tests/test_hexy_character.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_hexy_character_sheet.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_hexy_growth.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_hud3_lines.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_hud_telemetry_smoke.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_huohoutu_dual_mandala.gd",
+   "tech": "q6",
+   "status": "ported",
+   "here": "tests/q6/test_huohoutu_dual_mandala.gd"
+  },
+  {
+   "frozen": "tests/test_ideal_window_c11.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_ixbody_adapter_absent.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_ixbody_adapter_signals.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_ixcap_adapter.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_ixloc_adapter.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_ixvoice_adapter.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_lab_sheet.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_lan_mesh_dedupe.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_light_adapter_resample.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_magnetic_adapter_resample.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_mb_line_is_pure.gd",
+   "tech": "q6",
+   "status": "deferred",
+   "reason": "loads scripts/brain/fly_skill_memory.gd"
+  },
+  {
+   "frozen": "tests/test_mesh_live.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_mic_band_adapter_resample.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_mic_band_feed.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_mic_consent_revocation_voids_window.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_model_fetch.gd",
+   "tech": "journal",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_model_store.gd",
+   "tech": "journal",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_motion_adapter_gap_voids.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_motion_adapter_resample.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_native_cube_shell.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_needs.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_needs_lab.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_needs_probe.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_needs_wiring.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_on_change_age_voiding.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_optic_lobe_from_thumbnail.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_own_caps.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_peer_body_presence.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_peer_hypergram_integration.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_practice_lifecycle.gd",
+   "tech": "other",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_practice_log.gd",
+   "tech": "journal",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_pressure_adapter_resample.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_pressure_not_exposed_reports_honestly.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_prior_stillness.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_q6_equivariance.gd",
+   "tech": "q6",
+   "status": "ported",
+   "here": "tests/q6/test_q6_equivariance.gd"
+  },
+  {
+   "frozen": "tests/test_qwen_cancel_lane.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_qwen_inference_backpressure.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_qwen_menu_rejects_free_text.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_radar_capabilities.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_radar_one_frame.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_rd_editor_sheet.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_rd_tensegrity_joint.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_reading_configuration.gd",
+   "tech": "q6",
+   "status": "deferred",
+   "reason": "loads scripts/glass/reading_sheet.gd"
+  },
+  {
+   "frozen": "tests/test_relation.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_relation_live.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_rig_lesson_persist.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_rig_manifest_stable.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_rig_oracle_channels.gd",
+   "tech": "q6",
+   "status": "deferred",
+   "reason": "loads scripts/core/learning/sensor_rig.gd"
+  },
+  {
+   "frozen": "tests/test_rig_variable_span.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_robust_state_scorer.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_safe_write.gd",
+   "tech": "journal",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_seat_bus.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_sense_from_skill.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_sense_skill_hop.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_sensor_oracle_8x8.gd",
+   "tech": "q6",
+   "status": "deferred",
+   "reason": "loads scripts/sensor_oracle.gd -> brain"
+  },
+  {
+   "frozen": "tests/test_sensor_rig_compose.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_sensor_sources_headless.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_episodic_recall.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_lesson_ask_counterexample.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_lesson_fly_alone.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_lesson_loop.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_lesson_reward_gain.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_memory.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_memory_circular.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_memory_knobs.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_memory_reward_gain.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_memory_step_plastic.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_memory_still_vs_wave.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_recall_by_name.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_record_exchange.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_reward_event.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_studio_panel.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_studio_panel_teach_path.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_skill_window_contract.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_sound_skill_session.gd",
+   "tech": "voice",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_state_skill_end_to_end.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_storage_budget_lru.gd",
+   "tech": "journal",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_studio_app_composition.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_studio_cards.gd",
+   "tech": "shell",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_thought_drive.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_vision_source_gates.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_watcher_consent.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_watcher_contracts.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_watcher_contracts_v3.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_watcher_dedupe.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_watcher_detector.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_watcher_eval.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_watcher_events.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_watcher_learning_v3.gd",
+   "tech": "brain",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_watcher_machine.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_watcher_output.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_watcher_sensor_coverage.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_watcher_sources_v3.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_watcher_stale.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_watcher_store.gd",
+   "tech": "senses",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_wedge_trigram_table.gd",
+   "tech": "q6",
+   "status": "deferred",
+   "reason": "loads scripts/brain/fly_calcium_radar_2d.gd, fly_brain.gd, fly_connectome.gd"
+  },
+  {
+   "frozen": "tests/test_wmn_relation.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/test_wmn_restart.gd",
+   "tech": "mesh",
+   "status": "todo"
+  },
+  {
+   "frozen": "tests/topic_smoke.gd",
+   "tech": "mesh",
+   "status": "todo"
+  }
+ ]
+}
