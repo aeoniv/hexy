@@ -4,7 +4,7 @@ const Senses = preload("res://scripts/logic/senses/senses.gd")
 const Brain = preload("res://scripts/logic/brain/brain.gd")
 const Q6 = preload("res://scripts/logic/q6/q6.gd")
 const Voice = preload("res://scripts/logic/voice/voice.gd")
-const Mesh = preload("res://scripts/logic/mesh/mesh.gd")
+const MeshLogic = preload("res://scripts/logic/mesh/mesh.gd")
 const Journal = preload("res://scripts/logic/journal/journal.gd")
 
 var failed: bool = false
@@ -22,7 +22,7 @@ func _initialize() -> void:
 	check(judgement.d == null, "distance is absent without H and X")
 	var spoken: Dictionary = Voice.new().speak(judgement)
 	check(not spoken.available and spoken.card == null and spoken.line == Voice.NO_VOICE, "fixed no-voice line")
-	var sharing: Dictionary = Mesh.new().share(judgement)
+	var sharing: Dictionary = MeshLogic.new().share(judgement)
 	check(not sharing.available and not sharing.sent and sharing.peers == null, "mesh reports absent")
 	var receipt: Dictionary = Journal.new().remember(sample, judgement, spoken, sharing)
 	check(receipt.kind == "tick" and receipt.time_ms == now_ms and not receipt.minted, "clock receipt does not mint an act")
