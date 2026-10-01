@@ -4,7 +4,6 @@
 ;
 ; Card p0.shell writes only what an empty project needs. No main scene, no
 ; autoload, no icon, no editor plugin: none of their files exist yet.
-;   p0.draw  sets  [application] run/main_scene="res://scenes/hexy.tscn"
 ;   step 3   adds  [editor_plugins] for the add-ons under addons/
 ;   the card that adds icon.png sets config/icon
 
@@ -13,6 +12,7 @@ config_version=5
 [application]
 
 config/name="Hexy"
+run/main_scene="res://scenes/hexy.tscn"
 config/version="0.0.0"
 config/features=PackedStringArray("4.7", "Mobile")
 config/quit_on_go_back=false
