@@ -35,10 +35,21 @@ extends SceneTree
 ##   FAIL 3/4    res://tests/acceptance/ac_sixg1.gd  (exit 1)
 ##   TOTAL 1/2 files passed, 15/16 checks -- FAIL
 ## Exit code: 0 when every file passed, 1 otherwise.
+##
+## TIMEOUT: files run strictly one after another (each child is waited on
+## before the next starts, so frozen-source tests never fight over network
+## ports). A file gets 120 s of wall time; set HEXY_TEST_TIMEOUT=<seconds> to
+## change it. On timeout the child is killed, the file counts as a failure and
+## the run continues:
+##   FAIL 0/0    res://tests/test_hang.gd  (timeout 120s)
+## Child output goes to the log via Godot's --log-file (readable even after a
+## kill); the runner polls OS.is_process_running instead of blocking.
 
 const TESTS_ROOT: String = "res://tests"
 const ACCEPTANCE_DIR: String = "res://tests/acceptance"
 const LOG_DIR: String = "res://build/test-logs"
+const DEFAULT_TIMEOUT_S: int = 120
+const POLL_MS: int = 50
 
 
 func _initialize() -> void:
@@ -58,17 +69,39 @@ func _initialize() -> void:
 	var exe: String = OS.get_executable_path()
 	var project: String = ProjectSettings.globalize_path("res://")
 
+	var timeout_s: int = DEFAULT_TIMEOUT_S
+	var env_timeout: String = OS.get_environment("HEXY_TEST_TIMEOUT").strip_edges()
+	if env_timeout.is_valid_int() and env_timeout.to_int() > 0:
+		timeout_s = env_timeout.to_int()
+
 	var files_passed: int = 0
 	var checks_passed: int = 0
 	var checks_total: int = 0
 	for path: String in chosen:
-		var output: Array = []
-		var args: PackedStringArray = PackedStringArray(["--headless", "--path", project, "-s", path])
-		var code: int = OS.execute(exe, args, output, true, false)
+		var log_path: String = ProjectSettings.globalize_path(LOG_DIR.path_join(_log_name(path)))
+		DirAccess.remove_absolute(log_path)
+		var args: PackedStringArray = PackedStringArray([
+			"--headless", "--path", project, "--log-file", log_path, "-s", path])
+		var pid: int = OS.create_process(exe, args)
+		var timed_out: bool = false
+		var code: int = -1
+		if pid > 0:
+			var started: int = Time.get_ticks_msec()
+			while OS.is_process_running(pid):
+				if Time.get_ticks_msec() - started >= timeout_s * 1000:
+					timed_out = true
+					OS.kill(pid)
+					break
+				OS.delay_msec(POLL_MS)
+			if not timed_out:
+				code = OS.get_process_exit_code(pid)
+			else:
+				var waited: int = Time.get_ticks_msec()
+				while OS.is_process_running(pid) and Time.get_ticks_msec() - waited < 5000:
+					OS.delay_msec(POLL_MS)
 		var text: String = ""
-		for chunk: Variant in output:
-			text += str(chunk)
-		_write_log(path, text)
+		if FileAccess.file_exists(log_path):
+			text = FileAccess.get_file_as_string(log_path)
 
 		var passes: int = 0
 		var fails: int = 0
@@ -85,12 +118,16 @@ func _initialize() -> void:
 		var n: int = passes + fails
 		checks_passed += passes
 		checks_total += n
-		var ok: bool = code == 0 and fails == 0 and errors == 0
+		var ok: bool = not timed_out and pid > 0 and code == 0 and fails == 0 and errors == 0
 		if ok:
 			files_passed += 1
 			print("PASS %d/%d  %s" % [passes, n, path])
 		else:
 			var why: String = "exit %d" % code
+			if timed_out:
+				why = "timeout %ds" % timeout_s
+			elif pid <= 0:
+				why = "could not start"
 			if errors > 0:
 				why += ", %d script error(s)" % errors
 			print("FAIL %d/%d  %s  (%s)" % [passes, n, path, why])
@@ -140,12 +177,8 @@ func _is_mark(line: String, word: String) -> bool:
 	return line.begins_with(word + ":") or line.begins_with(word + " ")
 
 
-func _write_log(path: String, text: String) -> void:
-	var name: String = path.trim_prefix("res://").replace("/", "__").trim_suffix(".gd") + ".log"
-	var file: FileAccess = FileAccess.open(LOG_DIR.path_join(name), FileAccess.WRITE)
-	if file != null:
-		file.store_string(text)
-		file.close()
+func _log_name(path: String) -> String:
+	return path.trim_prefix("res://").replace("/", "__").trim_suffix(".gd") + ".log"
 
 
 func _print_tail(text: String) -> void:
